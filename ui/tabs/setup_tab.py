@@ -71,6 +71,11 @@ class SetupTab(ctk.CTkFrame):
         # New Auto-Regen Checkbox (Main)
         self.app.auto_regen_main_checkbox = ctk.CTkCheckBox(self, text="Continue to Regenerate until all files pass", variable=self.app.auto_regen_main, text_color=self.app.text_color)
         self.app.auto_regen_main_checkbox.pack(pady=(0, 5), padx=10, anchor="w")
+        
+        # Dual-GPU Checkbox (only show if 2+ GPUs detected)
+        if self.app.gpu_count >= 2:
+            self.app.dual_gpu_checkbox = ctk.CTkCheckBox(self, text=f"Use Both GPUs ({self.app.gpu_count} detected)", variable=self.app.use_dual_gpu, text_color=self.app.text_color)
+            self.app.dual_gpu_checkbox.pack(pady=(0, 5), padx=10, anchor="w")
 
         self.app.start_stop_button = ctk.CTkButton(self, text="Start Generation", command=self.app.toggle_generation_main, height=40, font=ctk.CTkFont(size=14, weight="bold"), text_color="black")
         self.app.start_stop_button.pack(fill="x", padx=10, pady=5)

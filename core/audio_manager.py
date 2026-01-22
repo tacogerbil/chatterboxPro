@@ -46,46 +46,81 @@ class AudioManager:
         temp_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            logging.info(f"Step 1: Combining {len(all_items_in_order)} raw audio chunks...")
-            combined = AudioSegment.empty()
+            logging.info(f"Step 1: Creating file list for FFmpeg concat...")
             
-            for s_data in all_items_in_order:
-                if s_data.get("is_pause"):
-                    combined += AudioSegment.silent(duration=s_data.get("duration", 1000))
-                    continue
+            # Create concat file list for FFmpeg
+            concat_list_path = temp_dir / "concat_list.txt"
+            with open(concat_list_path, 'w', encoding='utf-8') as f:
+                for s_data in all_items_in_order:
+                    # Handle pauses
+                    if s_data.get("is_pause"):
+                        # Generate silent audio file for pause
+                        pause_duration_ms = s_data.get("duration", 1000)
+                        pause_file = temp_dir / f"pause_{s_data['uuid']}.wav"
+                        AudioSegment.silent(duration=pause_duration_ms).export(pause_file, format="wav")
+                        f.write(f"file '{pause_file.absolute()}'\n")
+                        continue
 
-                if len(combined) > 0:
-                    is_para = not app.chunking_enabled.get() and s_data.get('paragraph') == 'yes'
-                    pause_duration = 750 if is_para else app.get_validated_int(app.silence_duration_str, 250)
-                    combined += AudioSegment.silent(duration=pause_duration)
+                    # Add silence between chunks
+                    if len([line for line in open(concat_list_path).readlines() if line.strip()]) > 0:
+                        is_para = not app.chunking_enabled.get() and s_data.get('paragraph') == 'yes'
+                        pause_duration = 750 if is_para else app.get_validated_int(app.silence_duration_str, 250)
+                        silence_file = temp_dir / f"silence_{s_data['uuid']}.wav"
+                        AudioSegment.silent(duration=pause_duration).export(silence_file, format="wav")
+                        f.write(f"file '{silence_file.absolute()}'\n")
 
-                if s_data.get("is_chapter_heading"):
-                    combined += AudioSegment.silent(duration=1500)
+                    # Add chapter heading silence
+                    if s_data.get("is_chapter_heading"):
+                        chapter_silence = temp_dir / f"chapter_pre_{s_data['uuid']}.wav"
+                        AudioSegment.silent(duration=1500).export(chapter_silence, format="wav")
+                        f.write(f"file '{chapter_silence.absolute()}'\n")
 
-                f_path = session_path / "Sentence_wavs" / f"audio_{s_data['uuid']}.wav"
-                if f_path.exists():
-                    try:
-                        combined += AudioSegment.from_wav(f_path)
-                    except Exception as e:
-                        logging.error(f"Failed to load chunk {f_path.name}, skipping: {e}")
-                else:
-                    logging.warning(f"Audio for sentence #{s_data['sentence_number']} not found, skipping.")
+                    # Add main audio file
+                    f_path = session_path / "Sentence_wavs" / f"audio_{s_data['uuid']}.wav"
+                    if f_path.exists():
+                        f.write(f"file '{f_path.absolute()}'\n")
+                    else:
+                        logging.warning(f"Audio for sentence #{s_data['sentence_number']} not found, skipping.")
 
-                if s_data.get("is_chapter_heading"):
-                    combined += AudioSegment.silent(duration=1500)
+                    # Add chapter heading silence (post)
+                    if s_data.get("is_chapter_heading"):
+                        chapter_silence_post = temp_dir / f"chapter_post_{s_data['uuid']}.wav"
+                        AudioSegment.silent(duration=1500).export(chapter_silence_post, format="wav")
+                        f.write(f"file '{chapter_silence_post.absolute()}'\n")
 
-            if len(combined) == 0:
+            # Check if we have any files to concatenate
+            with open(concat_list_path, 'r') as f:
+                file_count = len([line for line in f if line.strip()])
+            
+            if file_count == 0:
                 if not auto_path: messagebox.showerror("Error", "No valid audio files were found to assemble.")
                 return
 
+            # Add ACX silence if needed
             if is_for_acx:
-                head_silence = AudioSegment.silent(duration=1000)
-                tail_silence = AudioSegment.silent(duration=2000)
-                combined = head_silence + combined + tail_silence
+                head_silence_file = temp_dir / "acx_head.wav"
+                tail_silence_file = temp_dir / "acx_tail.wav"
+                AudioSegment.silent(duration=1000).export(head_silence_file, format="wav")
+                AudioSegment.silent(duration=2000).export(tail_silence_file, format="wav")
+                
+                # Prepend and append to concat list
+                with open(concat_list_path, 'r') as f:
+                    original_content = f.read()
+                with open(concat_list_path, 'w') as f:
+                    f.write(f"file '{head_silence_file.absolute()}'\n")
+                    f.write(original_content)
+                    f.write(f"file '{tail_silence_file.absolute()}'\n")
 
+            # Use FFmpeg concat demuxer (memory-efficient streaming)
             raw_combined_path = temp_dir / "raw_combined_audio.wav"
-            logging.info(f"Exporting raw combined file to {raw_combined_path} for processing.")
-            combined.export(raw_combined_path, format="wav")
+            logging.info(f"Concatenating {file_count} audio segments using FFmpeg...")
+            
+            (
+                ffmpeg.input(str(concat_list_path), format='concat', safe=0, protocol_whitelist='file,pipe')
+                .output(str(raw_combined_path), acodec='pcm_s16le', ar=S3GEN_SR)
+                .overwrite_output()
+                .run(quiet=False, capture_stderr=True)
+            )
 
             path_to_process = raw_combined_path
             

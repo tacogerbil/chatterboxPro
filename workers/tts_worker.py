@@ -167,6 +167,11 @@ def worker_process_chunk(task_bundle):
                 logging.warning(f"Signal Rejected inside worker chunk #{sentence_number}, attempt {attempt_num+1}: {signal_error}")
                 if Path(temp_path_str).exists(): os.remove(temp_path_str) # Cleanup if we wrote it (logic above wrote sf.write first)
                 continue
+            
+            # GPU Memory Cleanup: Free tensor immediately after use
+            del wav_tensor
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         except Exception as e:
             logging.error(f"Generation crashed for chunk #{sentence_number}, attempt {attempt_num+1}: {e}", exc_info=True)

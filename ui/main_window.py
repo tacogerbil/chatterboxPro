@@ -108,6 +108,10 @@ class ChatterboxProGUI(ctk.CTk):
         self.aggro_clean_on_parse = ctk.BooleanVar(value=False)
         self.apply_fix_to_all_failed = ctk.BooleanVar(value=False)
         self.auto_assemble_after_run = ctk.BooleanVar(value=True)
+        
+        # Dual-GPU detection and control
+        self.gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        self.use_dual_gpu = ctk.BooleanVar(value=False)  # Default to single GPU
 
         self.setup_ui()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
