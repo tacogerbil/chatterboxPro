@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 import shutil
 import difflib
+import numpy as np
 
 import torch
 import torchaudio
@@ -63,6 +64,36 @@ def set_seed(seed: int):
     np.random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+def validate_audio_signal(wav_tensor, sr):
+    """
+    Checks for signal-level artifacts like constant clipping (screeching) or excessive noise (ZCR).
+    Returns (Passed: bool, Reason: str)
+    """
+    # Ensure tensor is CPU and flat
+    if wav_tensor.dim() > 1:
+        wav_tensor = wav_tensor.squeeze()
+    
+    # Check 1: Amplitude Saturation / constant clipping
+    # If a large percentage of samples are near the limits (-1.0 or 1.0), it's likely digital screaming.
+    # Checks if > 25% of samples are > 0.95 amp. (Generous threshold, real speech rarely sustains this)
+    abs_wav = torch.abs(wav_tensor)
+    saturation_ratio = (abs_wav > 0.95).float().mean().item()
+    if saturation_ratio > 0.25:
+        return False, f"Amplitude Saturation ({saturation_ratio:.1%})"
+        
+    # Check 2: Zero Crossing Rate (ZCR)
+    # High ZCR indicates high-frequency noise.
+    # Simple ZCR implementation
+    zcr = ((wav_tensor[:-1] * wav_tensor[1:]) < 0).float().mean().item()
+    
+    # Speech usually has low ZCR. Sibilants ('s') can be high (~0.3-0.4).
+    # White noise is ~0.5.
+    # We set a high threshold to only catch pure static/noise.
+    if zcr > 0.45:
+        return False, f"High ZCR ({zcr:.2f})"
+        
+    return True, "OK"
 
 def get_similarity_ratio(text1, text2):
     norm1 = re.sub(r'[\W_]+', '', text1).lower()
@@ -129,6 +160,14 @@ def worker_process_chunk(task_bundle):
 
             duration = wav_tensor.shape[-1] / tts_model.sr
             
+            # --- Signal Processing Check (Pre-Whisper) ---
+            # Reject obvious garbage before wasting time saving to disk or running Whisper
+            is_valid_signal, signal_error = validate_audio_signal(wav_tensor.cpu(), tts_model.sr)
+            if not is_valid_signal:
+                logging.warning(f"Signal Rejected inside worker chunk #{sentence_number}, attempt {attempt_num+1}: {signal_error}")
+                if Path(temp_path_str).exists(): os.remove(temp_path_str) # Cleanup if we wrote it (logic above wrote sf.write first)
+                continue
+
         except Exception as e:
             logging.error(f"Generation crashed for chunk #{sentence_number}, attempt {attempt_num+1}: {e}", exc_info=True)
             if Path(temp_path_str).exists(): os.remove(temp_path_str) # Clean up partial file
@@ -145,10 +184,36 @@ def worker_process_chunk(task_bundle):
         # --- ASR Validation Logic ---
         ratio = 0.0
         try:
-            transcribed = whisper_model.transcribe(temp_path_str, fp16=(whisper_model.device.type == 'cuda'))['text']
+            # Get full result object to access confidence metrics
+            result = whisper_model.transcribe(temp_path_str, fp16=(whisper_model.device.type == 'cuda'))
+            transcribed = result['text']
+            
+            # 1. Check for Non-Speech Artifacts (Balloon/Rubber/Static)
+            # Short TTS clips usually result in 1 segment. If any segment is highly confident "no speech", we reject.
+            # Use threshold 0.4 based on analysis (0.71 was observed for rubber noise).
+            max_no_speech_prob = max((s.no_speech_prob for s in result['segments']), default=0.0)
+            if max_no_speech_prob > 0.4:
+                logging.warning(f"ASR REJECTED: High No-Speech Probability ({max_no_speech_prob:.2f}) for chunk #{sentence_number}, attempt {attempt_num+1}")
+                # Treat as failure, do not even check text match
+                if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                continue
+
+            # 2. Check for Hallucination Loops (Screeching)
+            # High compression ratio (>2.0) indicates repetitive loops, common in screeching/hallucinated outputs.
+            max_compression_ratio = max((s.compression_ratio for s in result['segments']), default=0.0)
+            if max_compression_ratio > 2.0:
+                logging.warning(f"ASR REJECTED: High Compression Ratio ({max_compression_ratio:.2f}) for chunk #{sentence_number}, attempt {attempt_num+1}")
+                if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                continue
+            
+            # 3. Standard Text Similarity Check
             ratio = get_similarity_ratio(text_chunk, transcribed)
+            
         except Exception as e:
             logging.error(f"Whisper transcription failed for {temp_path_str}: {e}")
+            # If whisper fails entirely, we probably shouldn't trust this file either
+            if Path(temp_path_str).exists(): os.remove(temp_path_str)
+            continue
 
         current_candidate_data['similarity_ratio'] = ratio
         
