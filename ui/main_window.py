@@ -146,7 +146,13 @@ class ChatterboxProGUI(ctk.CTk):
         if not messagebox.askokcancel("Quit", "Do you want to quit? This will stop any ongoing processes."):
             return
 
-        self.attributes("-disabled", True)
+        # Platform-specific window disable (Windows only)
+        if sys.platform == "win32":
+            try:
+                self.attributes("-disabled", True)
+            except Exception:
+                pass  # Fallback if attribute not supported
+        
         self.start_stop_button.configure(text="Shutting down...", state="disabled")
         
         logging.info("Shutdown signal received. Waiting for background processes to finish.")
@@ -182,6 +188,11 @@ class ChatterboxProGUI(ctk.CTk):
         if self.generation_thread and self.generation_thread.is_alive():
             self.stop_generation()
         else:
+            # Initialize Auto-Fix State
+            if self.auto_regen_main.get():
+                self.auto_fix_stage = "MAIN_INITIAL"
+            else:
+                self.auto_fix_stage = "NONE"
             self.start_generation_orchestrator()
             
     # --- Background Task Management ---
@@ -224,6 +235,71 @@ class ChatterboxProGUI(ctk.CTk):
         self.start_stop_button.configure(text="Stop Generation", fg_color="#D22B2B", hover_color="#B02525")
         self.generation_thread = threading.Thread(target=self.orchestrator.run, args=(indices_to_process,), daemon=True)
         self.generation_thread.start()
+        self.after(1000, self._monitor_generation_completion)
+
+    def _monitor_generation_completion(self):
+        """Monitors the generation thread and triggers auto-fix logic upon completion."""
+        if self.generation_thread and self.generation_thread.is_alive():
+            self.after(500, self._monitor_generation_completion)
+        else:
+            # Generation finished
+            if self.stop_flag.is_set():
+                self.auto_fix_stage = "NONE" # User stopped manually
+            else:
+                self.after(100, self._auto_fix_logic)
+
+    def _auto_fix_logic(self):
+        """State machine for auto-regeneration loops."""
+        failed_indices = [i for i, s in enumerate(self.sentences) if s.get('tts_generated') == 'failed']
+        
+        if not failed_indices:
+            self.auto_fix_stage = "NONE"
+            logging.info("Auto-Fix: All clear. Generation complete.")
+            # Trigger assembly if enabled
+            if self.auto_assemble_after_run.get():
+                self.start_assembly_in_background()
+            else:
+                self.start_stop_button.configure(text="Start Generation", fg_color=None, hover_color=None, state="normal")
+            return
+
+        # We have failures. Check Stage.
+        if self.auto_fix_stage == "MAIN_INITIAL":
+            logging.info(f"Auto-Fix: Initial run has {len(failed_indices)} failures. Triggering Retry 1 (Regenerate Marked)...")
+            self.auto_fix_stage = "MAIN_RETRY_1"
+            # We must manually clear any previous 'marked' status and mark only failed ones?
+            # regenerate_marked_sentences picks up all 'marked'.
+            # Failures are marked automatically by the orchestrator usually?
+            # Actually, let's ensure failed ones are marked.
+            for idx in failed_indices: self.sentences[idx]['marked'] = True
+            
+            self.start_generation_orchestrator(failed_indices)
+
+        elif self.auto_fix_stage == "MAIN_RETRY_1":
+            logging.info(f"Auto-Fix: Retry 1 has {len(failed_indices)} failures. Splitting all failed chunks...")
+            self.auto_fix_stage = "MAIN_SPLIT"
+            self.split_all_failed_chunks(confirm=False) # Helper modification needed to skip confirm dialog?
+            # After splitting, we need to regenerate the new pieces.
+            # Splitting updates self.sentences. We need to find the new failed/marked chunks.
+            new_failed = [i for i, s in enumerate(self.sentences) if s.get('marked')]
+            self.start_generation_orchestrator(new_failed)
+
+        elif self.auto_fix_stage == "MAIN_SPLIT":
+            logging.info(f"Auto-Fix: Post-Split run finished. {len(failed_indices)} failures remain. Entering Infinite Loop...")
+            self.auto_fix_stage = "MAIN_LOOP"
+            self.start_generation_orchestrator(failed_indices)
+
+        elif self.auto_fix_stage == "MAIN_LOOP":
+            logging.info(f"Auto-Fix (Loop): {len(failed_indices)} failures remain. Retrying...")
+            self.start_generation_orchestrator(failed_indices)
+
+        elif self.auto_fix_stage == "SUB_LOOP":
+             logging.info(f"Auto-Fix (Sub-Loop): {len(failed_indices)} failures remain. Retrying...")
+             self.start_generation_orchestrator(failed_indices)
+        
+        else:
+             # No auto-fix active, just update button
+             self.start_stop_button.configure(text="Start Generation", fg_color=None, hover_color=None, state="normal")
+             messagebox.showinfo("Done", f"Generation complete. {len(failed_indices)} failed chunks.")
 
     def stop_generation(self):
         if self.generation_thread and self.generation_thread.is_alive():
@@ -524,12 +600,13 @@ class ChatterboxProGUI(ctk.CTk):
         self.save_session()
         messagebox.showinfo("Success", f"Split chunk into {len(new_items)} sentences.")
 
-    def split_all_failed_chunks(self):
+    def split_all_failed_chunks(self, confirm=True):
         failed_indices = [i for i, s in enumerate(self.sentences) if s.get('tts_generated') == 'failed']
         if not failed_indices:
-            return messagebox.showinfo("Info", "No failed chunks found to split.")
+            if confirm: messagebox.showinfo("Info", "No failed chunks found to split.")
+            return
         
-        if not messagebox.askyesno("Confirm Deletion", f"This will attempt to split {len(failed_indices)} failed chunks, deleting their current audio. This cannot be undone. Continue?"):
+        if confirm and not messagebox.askyesno("Confirm Deletion", f"This will attempt to split {len(failed_indices)} failed chunks, deleting their current audio. This cannot be undone. Continue?"):
             return
 
         current_page = self.playlist_frame.current_page
@@ -560,6 +637,10 @@ class ChatterboxProGUI(ctk.CTk):
             messagebox.showinfo("Info", "No splittable failed chunks were found (all were single sentences).")
 
     def regenerate_marked_sentences(self):
+        # Auto-Fix Sub Loop Logic
+        if self.auto_regen_sub.get() and self.auto_fix_stage == "NONE":
+            self.auto_fix_stage = "SUB_LOOP"
+
         indices = [i for i, s in enumerate(self.sentences) if s.get('marked')]
         if not indices: return messagebox.showinfo("Info", "No sentences marked for regeneration.")
         self.start_generation_orchestrator(indices)

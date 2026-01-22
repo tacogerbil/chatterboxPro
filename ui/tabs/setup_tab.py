@@ -68,6 +68,10 @@ class SetupTab(ctk.CTkFrame):
         self.app.auto_assemble_checkbox = ctk.CTkCheckBox(self, text="Re-Assemble After Full Run", variable=self.app.auto_assemble_after_run, text_color=self.app.text_color)
         self.app.auto_assemble_checkbox.pack(pady=(0, 5), padx=10, anchor="w")
 
+        # New Auto-Regen Checkbox (Main)
+        self.app.auto_regen_main_checkbox = ctk.CTkCheckBox(self, text="Continue to Regenerate until all files pass", variable=self.app.auto_regen_main, text_color=self.app.text_color)
+        self.app.auto_regen_main_checkbox.pack(pady=(0, 5), padx=10, anchor="w")
+
         self.app.start_stop_button = ctk.CTkButton(self, text="Start Generation", command=self.app.toggle_generation_main, height=40, font=ctk.CTkFont(size=14, weight="bold"), text_color="black")
         self.app.start_stop_button.pack(fill="x", padx=10, pady=5)
         self.app.progress_bar = ctk.CTkProgressBar(self, progress_color="#3A7EBF"); self.app.progress_bar.pack(fill="x", padx=10, pady=(10,0)); self.app.progress_bar.set(0)
