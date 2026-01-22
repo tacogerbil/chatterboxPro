@@ -1,4 +1,5 @@
 # workers/tts_worker.py
+import sys
 import os
 import re
 import random
@@ -9,10 +10,30 @@ import difflib
 
 import torch
 import torchaudio
+import soundfile as sf
 
 # Chatterbox-specific imports
 from chatterbox.tts import ChatterboxTTS
 import whisper
+# --- DEBUG: ASK PYTHON WHERE FFMPEG IS ---
+print(f"\n[DEBUG] Python executable: {sys.executable}")
+ffmpeg_location = shutil.which("ffmpeg")
+if ffmpeg_location:
+    print(f"[DEBUG] SUCCESS: Found ffmpeg at: {ffmpeg_location}")
+else:
+    print(f"[DEBUG] FAILURE: Python cannot find 'ffmpeg' in the system PATH.")
+    # Print the path so you can see if your hard work was ignored
+    print(f"[DEBUG] Current PATH: {os.environ['PATH']}\n")
+# -----------------------------------------
+
+# --- WINDOWS FFMPEG FIX ---
+# Force Python to see the FFmpeg executable inside Conda
+if os.name == 'nt':  # Check if we are on Windows
+    # The ffmpeg.exe lives in Env/Library/bin
+    ffmpeg_bin = os.path.join(sys.prefix, 'Library', 'bin')
+    if os.path.exists(ffmpeg_bin):
+        os.environ["PATH"] += os.pathsep + ffmpeg_bin
+# --------------------------
 
 # --- Worker-Specific Globals ---
 _WORKER_TTS_MODEL, _WORKER_WHISPER_MODEL = None, None
@@ -68,7 +89,7 @@ def worker_process_chunk(task_bundle):
     run_temp_dir = Path(output_dir_str) / session_name / f"run_{run_idx+1}_temp"
     run_temp_dir.mkdir(exist_ok=True, parents=True)
     
-    base_candidate_path_prefix = run_temp_dir / f"c_{uuid}_cand"
+    base_candidate_path_prefix = run_temp_dir.resolve() / f"c_{uuid}_cand"
 
     try:
         tts_model.prepare_conditionals(ref_audio_path, exaggeration=min(exaggeration, 1.0), use_cache=True)
@@ -100,7 +121,12 @@ def worker_process_chunk(task_bundle):
                 logging.warning(f"Generation failed (empty audio) for chunk #{sentence_number}, attempt {attempt_num+1}.")
                 continue
             
-            torchaudio.save(temp_path_str, wav_tensor.cpu(), tts_model.sr)
+#            torchaudio.save(temp_path_str, wav_tensor.cpu(), tts_model.sr, backend="soundfile")
+            audio_data = wav_tensor.cpu().numpy()
+            if len(audio_data.shape) > 1:
+                audio_data = audio_data.T
+            sf.write(temp_path_str, audio_data, tts_model.sr)
+
             duration = wav_tensor.shape[-1] / tts_model.sr
             
         except Exception as e:

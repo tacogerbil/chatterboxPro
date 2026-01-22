@@ -41,7 +41,9 @@ class AudioManager:
 
         output_path = Path(output_path_str)
         temp_dir = session_path / f"assembly_temp_{uuid.uuid4().hex}"
-        temp_dir.mkdir(exist_ok=True)
+        # FIX: Force absolute path and create parent folders if missing
+        temp_dir = temp_dir.resolve()
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             logging.info(f"Step 1: Combining {len(all_items_in_order)} raw audio chunks...")
@@ -95,7 +97,7 @@ class AudioManager:
                     (
                         ffmpeg.input(str(path_to_process))
                               .output(str(normalized_path), af=f"loudnorm=I={float(app.norm_level_str.get())}:TP={peak_level}:LRA=11", ar=S3GEN_SR)
-                              .overwrite_output().run(quiet=True, capture_stderr=True)
+                              .overwrite_output().run(quiet=False, capture_stderr=True)
                     )
                     path_to_process = normalized_path
                     logging.info("Normalization successful.")
@@ -146,16 +148,28 @@ class AudioManager:
                     'ar': '44100',
                     'ac': 1,
                     'b:a': '192k',
-                    'metadata:g:title': title,
-                    'metadata:g:artist': artist,
-                    'metadata:g:album': album,
+                    #'metadata:g:title': title,
+                    #'metadata:g:artist': artist,
+                    #'metadata:g:album': album,
                 }
                 try:
                     (
                         ffmpeg.input(str(path_to_process))
                         .output(str(output_path), **output_options)
-                        .overwrite_output().run(quiet=True, capture_stderr=True)
+                        .overwrite_output().run(quiet=False, capture_stderr=True)
                     )
+                except ffmpeg.Error as e:
+                    # --- DEBUG FIX: PRINT THE REAL ERROR ---
+                    print("\n" + "="*40)
+                    print("!!! FFMPEG ERROR CAPTURED !!!")
+                    print("="*40)
+                    if e.stderr:
+                        print(e.stderr.decode('utf8'))
+                    else:
+                        print("No stderr returned. Check file permissions or disk space.")
+                    print("="*40 + "\n")
+                    # ---------------------------------------
+                    raise e
                 except Exception as e:
                     logging.error(f"Final MP3 export failed: {e}", exc_info=True)
                     raise

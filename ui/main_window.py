@@ -278,7 +278,10 @@ class ChatterboxProGUI(ctk.CTk):
     def save_session(self):
         if not self.session_name.get(): return
         session_path = Path(self.OUTPUTS_DIR) / self.session_name.get()
-        session_path.mkdir(exist_ok=True)
+        #session_path.mkdir(exist_ok=True)
+        # FIX: Force absolute path and create parents
+        session_path = session_path.resolve()
+        session_path.mkdir(parents=True, exist_ok=True)
         session_data = {
             "source_file_path": self.source_file_path,
             "sentences": self.sentences,
@@ -339,7 +342,13 @@ class ChatterboxProGUI(ctk.CTk):
             self.after(0, lambda: self.process_button.configure(state="normal", text="Process Text File"))
 
     def show_editor_window(self, text, aggressive_clean):
-        editor = ctk.CTkToplevel(self); editor.title("Review and Edit Text"); editor.geometry("800x600"); editor.grab_set()
+        editor = ctk.CTkToplevel(self)
+        editor.title("Review and Edit Text")
+        editor.geometry("800x600")
+        
+        # FIX: Wait for window to be visible before grabbing focus
+        editor.wait_visibility() 
+        editor.grab_set()
         textbox = ctk.CTkTextbox(editor, wrap="word"); textbox.pack(fill="both", expand=True, padx=10, pady=10); textbox.insert("1.0", text)
         def on_confirm():
             logging.info("Editor confirmed. Processing text...")
