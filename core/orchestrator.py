@@ -1,11 +1,13 @@
 # core/orchestrator.py
 import logging
 import random
+import gc
 from pathlib import Path
 import shutil
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
 from tkinter import messagebox
+import torch
 
 from workers.tts_worker import worker_process_chunk
 from utils.text_processor import punc_norm
