@@ -148,9 +148,11 @@ class AudioManager:
                     'ar': '44100',
                     'ac': 1,
                     'b:a': '192k',
-                    #'metadata:g:title': title,
-                    #'metadata:g:artist': artist,
-                    #'metadata:g:album': album,
+                    'metadata': [
+                        f'title={title}',
+                        f'artist={artist}',
+                        f'album={album}'
+                    ]
                 }
                 try:
                     (
