@@ -581,6 +581,33 @@ class ChatterboxProGUI(ctk.CTk):
             self.playlist_frame.load_data(self.sentences, page_to_display=current_page)
             self.save_session()
 
+    def insert_chapter_marker(self):
+        """Manually inserts a chapter heading item."""
+        idx = self.playlist_frame.get_selected_indices()
+        insert_index = idx[0] if idx else len(self.sentences)
+        
+        dialog = ctk.CTkInputDialog(text="Enter Chapter Name (e.g., 'Chapter 5'):", title="Insert Chapter")
+        chapter_name = dialog.get_input()
+        
+        if chapter_name and chapter_name.strip():
+            current_page = self.playlist_frame.current_page
+            # Create a manual chapter item.
+            # We set is_chapter_heading=True so the export logic sees it as a split point.
+            # We also set marked=True so the user can choose to generate audio for the title itself if they want (TTS reading "Chapter 5")
+            new_item = {
+                "uuid": uuid.uuid4().hex, 
+                "original_sentence": chapter_name.strip(), 
+                "paragraph": "no", 
+                "tts_generated": "no", 
+                "marked": True, 
+                "is_chapter_heading": True
+            }
+            self.sentences.insert(insert_index, new_item)
+            self._renumber_sentences()
+            self.playlist_frame.load_data(self.sentences, page_to_display=current_page)
+            self.save_session()
+            messagebox.showinfo("Success", "Chapter marker inserted. It will be treated as a chapter split during export.")
+
     def insert_text_block(self):
         idx = self.playlist_frame.get_selected_indices()
         insert_index = idx[0] if idx else len(self.sentences)
@@ -850,6 +877,8 @@ class ChatterboxProGUI(ctk.CTk):
         self.playlist_frame.refresh_view()
         messagebox.showinfo("Success", f"Template '{template_name}' loaded.")
 
+from ui.tabs.chapters_tab import ChaptersTab
+
     def setup_ui(self):
         self.grid_columnconfigure(0, weight=1, minsize=400)
         self.grid_columnconfigure(1, weight=3)
@@ -863,9 +892,10 @@ class ChatterboxProGUI(ctk.CTk):
         self.tabview.pack(fill="both", expand=True, padx=5, pady=5)
         
         self.setup_tab = SetupTab(self.tabview.add("1. Setup"), self); self.setup_tab.pack(fill="both", expand=True)
-        self.generation_tab = GenerationTab(self.tabview.add("2. Generation"), self); self.generation_tab.pack(fill="both", expand=True)
-        self.finalize_tab = FinalizeTab(self.tabview.add("3. Finalize"), self); self.finalize_tab.pack(fill="both", expand=True)
-        self.advanced_tab = AdvancedTab(self.tabview.add("4. Advanced"), self); self.advanced_tab.pack(fill="both", expand=True)
+        self.chapters_tab = ChaptersTab(self.tabview.add("2. Chapters"), self); self.chapters_tab.pack(fill="both", expand=True)
+        self.generation_tab = GenerationTab(self.tabview.add("3. Generation"), self); self.generation_tab.pack(fill="both", expand=True)
+        self.finalize_tab = FinalizeTab(self.tabview.add("4. Finalize"), self); self.finalize_tab.pack(fill="both", expand=True)
+        self.advanced_tab = AdvancedTab(self.tabview.add("5. Advanced"), self); self.advanced_tab.pack(fill="both", expand=True)
 
         right_frame = ctk.CTkFrame(self, fg_color=self.colors["frame_bg"])
         right_frame.grid(row=0, column=1, padx=(0, 10), pady=10, sticky="nsew")

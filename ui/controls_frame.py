@@ -64,12 +64,13 @@ class ControlsFrame(ctk.CTkFrame):
         editing_collapsible = CollapsibleFrame(self, text="Chunk Editing & Status", start_open=False, **collapsible_kwargs)
         editing_collapsible.pack(fill="x", expand=True, padx=5, pady=(0, 3))
         editing_frame = editing_collapsible.get_content_frame()
-        editing_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        editing_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
         ctk.CTkButton(editing_frame, text="✎ Edit", command=self.app.edit_selected_sentence, **button_kwargs).grid(row=0, column=0, padx=2, pady=2, sticky="ew")
         ctk.CTkButton(editing_frame, text="➗ Split", command=self.app.split_selected_chunk, **button_kwargs).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
         ctk.CTkButton(editing_frame, text="➕ Insert Text", command=self.app.insert_text_block, **button_kwargs).grid(row=0, column=2, padx=2, pady=2, sticky="ew")
         ctk.CTkButton(editing_frame, text="⏸ Insert Pause", command=self.app.insert_pause, **button_kwargs).grid(row=0, column=3, padx=2, pady=2, sticky="ew")
+        ctk.CTkButton(editing_frame, text="📑 Insert Chapter", command=self.app.insert_chapter_marker, **button_kwargs).grid(row=0, column=4, padx=2, pady=2, sticky="ew")
 
         ctk.CTkButton(editing_frame, text="M Mark", command=self.app.mark_current_sentence, **button_kwargs).grid(row=1, column=0, padx=2, pady=2, sticky="ew")
         ctk.CTkButton(editing_frame, text="✓ Mark Passed", command=self.app.mark_as_passed, fg_color="#2ECC71", hover_color="#27AE60", **button_kwargs).grid(row=1, column=1, padx=2, pady=2, sticky="ew")
