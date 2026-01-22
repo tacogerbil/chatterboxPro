@@ -110,6 +110,11 @@ class ChatterboxProGUI(ctk.CTk):
         self.apply_fix_to_all_failed = ctk.BooleanVar(value=False)
         self.auto_assemble_after_run = ctk.BooleanVar(value=True)
         
+        # Auto-Regeneration Control Variables
+        self.auto_regen_main = ctk.BooleanVar(value=False)
+        self.auto_regen_sub = ctk.BooleanVar(value=False)
+        self.auto_fix_stage = "NONE"  # NONE, MAIN_INITIAL, MAIN_RETRY_1, MAIN_SPLIT, MAIN_LOOP, SUB_LOOP
+        
         # Dual-GPU detection and control
         self.gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
         self.use_dual_gpu = ctk.BooleanVar(value=False)  # Default to single GPU
