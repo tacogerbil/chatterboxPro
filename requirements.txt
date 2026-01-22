@@ -1,16 +1,15 @@
-=================================================================
-Requirements for Chatterbox Pro (Updated)
-To install, use: pip install -r requirements_pro.txt
-=================================================================
---- Core PyTorch Libraries ---
-The extra index URL helps pip find the correct PyTorch version for your system (CPU or specific CUDA).
-We list the versions without the specific build string (e.g., +cu121) to make it more portable.
+# =================================================================
+# Requirements for Chatterbox Pro
+# To install: pip install -r requirements.txt
+# =================================================================
+
+# --- Core PyTorch Libraries ---
+# The extra index URL helps pip find the correct PyTorch version for your system
 --extra-index-url https://download.pytorch.org/whl/cu121
 torch==2.7.0
 torchaudio==2.7.0
 
---- Core ML & TTS Model Libraries ---
-Pinned to specific versions for model stability.
+# --- Core ML & TTS Model Libraries ---
 transformers==4.46.3
 diffusers==0.29.0
 openai-whisper==20240930
@@ -19,30 +18,37 @@ omegaconf==2.3.0
 einops==0.8.1
 conformer==0.3.2
 
---- Audio & Signal Processing ---
+# --- Audio & Signal Processing ---
 librosa==0.10.0
 pydub==0.25.1
 scipy==1.15.3
 resemble-perth==1.0.1
+soundfile==0.12.1
 
---- GUI Libraries ---
+# --- GUI Libraries ---
 customtkinter==5.2.2
 CTkToolTip==0.8
 CTkMessagebox==2.7
 pygame==2.6.1
 
---- Text & File Processing ---
+# --- Text & File Processing ---
 sentence-splitter==1.4
 pdftextract==0.0.5
 EbookLib==0.18
 beautifulsoup4==4.12.3
 
-pypandoc also requires a system installation of Pandoc for .docx/.mobi support
+# For DOCX/MOBI support (also requires system installation of Pandoc)
 pypandoc==1.13
 
---- Post-Processing Tools ---
-ffmpeg-python requires a system installation of FFmpeg
+# --- Post-Processing Tools ---
+# Requires system installation of FFmpeg
 ffmpeg-python==0.2.0
 
-auto-editor is used for silence removal
+# For silence removal (optional but recommended)
 auto-editor==27.1.1
+
+# =================================================================
+# System Dependencies (install separately):
+# - FFmpeg: Required for audio normalization and assembly
+# - Pandoc: Required for .docx and .mobi file support
+# =================================================================

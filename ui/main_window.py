@@ -21,6 +21,7 @@ from ui.tabs.setup_tab import SetupTab
 from ui.tabs.generation_tab import GenerationTab
 from ui.tabs.finalize_tab import FinalizeTab
 from ui.tabs.advanced_tab import AdvancedTab
+from ui.tabs.chapters_tab import ChaptersTab
 
 from core.orchestrator import GenerationOrchestrator
 from core.audio_manager import AudioManager
@@ -961,8 +962,6 @@ class ChatterboxProGUI(ctk.CTk):
         self.ref_audio_path_display.set(os.path.basename(self.ref_audio_path.get()) or "No file selected.")
         self.playlist_frame.refresh_view()
         messagebox.showinfo("Success", f"Template '{template_name}' loaded.")
-
-from ui.tabs.chapters_tab import ChaptersTab
 
     def setup_ui(self):
         self.grid_columnconfigure(0, weight=1, minsize=400)
