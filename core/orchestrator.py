@@ -185,8 +185,7 @@ class GenerationOrchestrator:
                                                 logging.error(f"Chunk {app.sentences[original_idx]['sentence_number']} had a hard error during generation and was marked.")
                                                 
                                         app.after(0, app.playlist_frame.update_item, original_idx)
-                                except Exception as e:
-                                    logging.error(f"A worker process for index {futures[future]} failed: {e}", exc_info=True)
+                                
                                 finally:
                                     completed_count += 1
                                     app.after(0, app.update_progress_display, completed_count / len(tasks), completed_count, len(tasks))
