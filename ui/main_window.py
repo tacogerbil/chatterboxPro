@@ -1064,6 +1064,7 @@ class ChatterboxProGUI(ctk.CTk):
         self.bind("<m>", self.mark_current_sentence)
 
     def switch_to_tab(self, tab_index):
-        tab_names = ["1. Setup", "2. Generation", "3. Finalize", "4. Advanced"]
+        # Tab order matches creation order in setup_ui()
+        tab_names = ["1. Setup", "2. Chapters", "3. Generation", "4. Finalize", "5. Advanced"]
         if 0 <= tab_index < len(tab_names):
             self.tabview.set(tab_names[tab_index])
