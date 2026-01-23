@@ -99,17 +99,7 @@ def get_similarity_ratio(text1, text2):
     norm1 = re.sub(r'[\W_]+', '', text1).lower()
     norm2 = re.sub(r'[\W_]+', '', text2).lower()
     if not norm1 or not norm2: return 0.0
-    ratio = difflib.SequenceMatcher(None, norm1, norm2).ratio()
-    
-    # Debug logging to diagnose consistent 0.67 issue
-    logging.debug(f"ASR Similarity Debug:")
-    logging.debug(f"  Original text: {text1[:100]}...")
-    logging.debug(f"  Transcribed: {text2[:100]}...")
-    logging.debug(f"  Normalized orig: {norm1[:100]}...")
-    logging.debug(f"  Normalized trans: {norm2[:100]}...")
-    logging.debug(f"  Ratio: {ratio:.4f}")
-    
-    return ratio
+    return difflib.SequenceMatcher(None, norm1, norm2).ratio()
 
 def worker_process_chunk(task_bundle):
     """The main function executed by each worker process to generate a single audio chunk."""
@@ -223,6 +213,9 @@ def worker_process_chunk(task_bundle):
             result = whisper_model.transcribe(temp_path_str, fp16=(whisper_model.device.type == 'cuda'))
             transcribed = result['text']
             
+            # Early debug: Log what Whisper returned
+            logging.warning(f"[DEBUG] Whisper returned for chunk #{sentence_number}, attempt {attempt_num+1}: '{transcribed}'")
+            
             # 1. Check for Non-Speech Artifacts (Balloon/Rubber/Static)
             # Short TTS clips usually result in 1 segment. If any segment is highly confident "no speech", we reject.
             # Use threshold 0.4 based on analysis (0.71 was observed for rubber noise).
@@ -247,11 +240,11 @@ def worker_process_chunk(task_bundle):
             # 3. Standard Text Similarity Check
             ratio = get_similarity_ratio(text_chunk, transcribed)
             
-            # Log transcription for debugging consistent 0.67 issue
-            logging.info(f"ASR Transcription for chunk #{sentence_number}, attempt {attempt_num+1}:")
-            logging.info(f"  Expected: '{text_chunk[:80]}...'")
-            logging.info(f"  Got:      '{transcribed[:80]}...'")
-            logging.info(f"  Similarity: {ratio:.4f}")
+            # Log transcription for debugging (using WARNING level to ensure visibility)
+            logging.warning(f"ASR Debug - Chunk #{sentence_number}, Attempt {attempt_num+1}:")
+            logging.warning(f"  Expected: '{text_chunk[:80]}'")
+            logging.warning(f"  Got:      '{transcribed[:80]}'")
+            
             
         except Exception as e:
             logging.error(f"Whisper transcription failed for {temp_path_str}: {e}")
