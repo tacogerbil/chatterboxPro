@@ -196,7 +196,9 @@ def worker_process_chunk(task_bundle):
             # 1. Check for Non-Speech Artifacts (Balloon/Rubber/Static)
             # Short TTS clips usually result in 1 segment. If any segment is highly confident "no speech", we reject.
             # Use threshold 0.4 based on analysis (0.71 was observed for rubber noise).
-            max_no_speech_prob = max((s.no_speech_prob for s in result['segments']), default=0.0)
+            # Whisper API change: segments are now dicts, not objects
+            max_no_speech_prob = max((s.get('no_speech_prob', 0.0) if isinstance(s, dict) else getattr(s, 'no_speech_prob', 0.0) 
+                                     for s in result.get('segments', [])), default=0.0)
             if max_no_speech_prob > 0.4:
                 logging.warning(f"ASR REJECTED: High No-Speech Probability ({max_no_speech_prob:.2f}) for chunk #{sentence_number}, attempt {attempt_num+1}")
                 # Treat as failure, do not even check text match
@@ -205,7 +207,8 @@ def worker_process_chunk(task_bundle):
 
             # 2. Check for Hallucination Loops (Screeching)
             # High compression ratio (>2.0) indicates repetitive loops, common in screeching/hallucinated outputs.
-            max_compression_ratio = max((s.compression_ratio for s in result['segments']), default=0.0)
+            max_compression_ratio = max((s.get('compression_ratio', 0.0) if isinstance(s, dict) else getattr(s, 'compression_ratio', 0.0)
+                                        for s in result.get('segments', [])), default=0.0)
             if max_compression_ratio > 2.0:
                 logging.warning(f"ASR REJECTED: High Compression Ratio ({max_compression_ratio:.2f}) for chunk #{sentence_number}, attempt {attempt_num+1}")
                 if Path(temp_path_str).exists(): os.remove(temp_path_str)
