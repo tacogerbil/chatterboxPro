@@ -274,7 +274,7 @@ class ChatterboxProGUI(ctk.CTk):
             if self.auto_assemble_after_run.get():
                 self.start_assembly_in_background()
             else:
-                self.start_stop_button.configure(text="Start Generation", fg_color=None, hover_color=None, state="normal")
+                self.start_stop_button.configure(text="Start Generation", fg_color=self.button_color, hover_color=self.button_hover_color, state="normal")
             return
 
         # We have failures. Check Stage.
