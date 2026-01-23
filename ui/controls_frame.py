@@ -59,6 +59,25 @@ class ControlsFrame(ctk.CTkFrame):
         ctk.CTkButton(playback_frame, text="▼ Move Down", command=lambda: self.app.move_selected_items(1), **button_kwargs).grid(row=1, column=1, padx=2, pady=2, sticky="ew")
         ctk.CTkButton(playback_frame, text="◄ Prev Error", command=lambda: self.app.find_next_item(-1, 'failed'), **button_kwargs).grid(row=1, column=2, padx=2, pady=2, sticky="ew")
         ctk.CTkButton(playback_frame, text="Next Error ►", command=lambda: self.app.find_next_item(1, 'failed'), **button_kwargs).grid(row=1, column=3, padx=2, pady=2, sticky="ew")
+        
+        # Search functionality
+        search_frame = ctk.CTkFrame(playback_frame, fg_color="transparent")
+        search_frame.grid(row=2, column=0, columnspan=4, padx=5, pady=(10, 5), sticky="ew")
+        search_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(search_frame, text="🔍", font=ctk.CTkFont(size=16)).grid(row=0, column=0, padx=(0, 5))
+        self.app.search_entry = ctk.CTkEntry(search_frame, placeholder_text="Search text...")
+        self.app.search_entry.grid(row=0, column=1, sticky="ew", padx=5)
+        self.app.search_entry.bind("<Return>", lambda e: self.app.search_text())
+        
+        self.app.search_prev_btn = ctk.CTkButton(search_frame, text="◄", width=30, command=self.app.search_prev, state="disabled")
+        self.app.search_prev_btn.grid(row=0, column=2, padx=2)
+        
+        self.app.search_next_btn = ctk.CTkButton(search_frame, text="►", width=30, command=self.app.search_next, state="disabled")
+        self.app.search_next_btn.grid(row=0, column=3, padx=2)
+        
+        self.app.search_match_label = ctk.CTkLabel(search_frame, text="0/0", width=50, text_color=self.app.text_color)
+        self.app.search_match_label.grid(row=0, column=4, padx=(5, 0))
 
         # --- Group 2: Chunk Editing & Status ---
         editing_collapsible = CollapsibleFrame(self, text="Chunk Editing & Status", start_open=False, **collapsible_kwargs)

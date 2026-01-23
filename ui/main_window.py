@@ -8,6 +8,7 @@ import gc
 import json
 import logging
 import re
+import sys
 from pathlib import Path
 import shutil
 import threading
@@ -118,6 +119,10 @@ class ChatterboxProGUI(ctk.CTk):
         # Dual-GPU detection and control
         self.gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
         self.use_dual_gpu = ctk.BooleanVar(value=False)  # Default to single GPU
+        
+        # Search state
+        self.search_matches = []
+        self.current_match_index = -1
 
         self.setup_ui()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -796,6 +801,67 @@ class ChatterboxProGUI(ctk.CTk):
         self.playlist_frame._update_all_visuals()
         # FIX: Update stats panel after navigating
         self.playlist_frame.update_stats_panel()
+    
+    def search_text(self):
+        """Search for text in sentences and update match list."""
+        query = self.search_entry.get().strip()
+        if not query:
+            self.search_matches = []
+            self.current_match_index = -1
+            self.search_match_label.configure(text="0/0")
+            self.search_prev_btn.configure(state="disabled")
+            self.search_next_btn.configure(state="disabled")
+            return
+        
+        # Find all matches (case-insensitive)
+        self.search_matches = [i for i, s in enumerate(self.sentences) 
+                              if query.lower() in s.get('original_sentence', '').lower()]
+        
+        if self.search_matches:
+            self.current_match_index = 0
+            self._jump_to_search_match()
+            self.search_prev_btn.configure(state="normal")
+            self.search_next_btn.configure(state="normal")
+        else:
+            self.current_match_index = -1
+            self.search_match_label.configure(text="0/0")
+            self.search_prev_btn.configure(state="disabled")
+            self.search_next_btn.configure(state="disabled")
+            messagebox.showinfo("No Results", f"No matches found for '{query}'")
+    
+    def search_next(self):
+        """Navigate to next search match."""
+        if not self.search_matches:
+            return
+        self.current_match_index = (self.current_match_index + 1) % len(self.search_matches)
+        self._jump_to_search_match()
+    
+    def search_prev(self):
+        """Navigate to previous search match."""
+        if not self.search_matches:
+            return
+        self.current_match_index = (self.current_match_index - 1) % len(self.search_matches)
+        self._jump_to_search_match()
+    
+    def _jump_to_search_match(self):
+        """Jump to current search match and update UI."""
+        if not self.search_matches or self.current_match_index < 0:
+            return
+        
+        target_index = self.search_matches[self.current_match_index]
+        items_per_page = self.playlist_frame.items_per_page
+        target_page = target_index // items_per_page
+        
+        if self.playlist_frame.current_page != target_page:
+            self.playlist_frame.display_page(target_page)
+        
+        self.playlist_frame.selected_indices = {target_index}
+        self.playlist_frame.last_clicked_index = target_index
+        self.playlist_frame._update_all_visuals()
+        self.playlist_frame.update_stats_panel()
+        
+        # Update match counter
+        self.search_match_label.configure(text=f"{self.current_match_index + 1}/{len(self.search_matches)}")
 
     def _get_indices_to_process(self):
         if self.apply_fix_to_all_failed.get():
