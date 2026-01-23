@@ -21,8 +21,18 @@ class ChaptersTab(ctk.CTkFrame):
         btn_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
         btn_frame.pack(side="right")
         
+        # Generate Selected button
         ctk.CTkButton(btn_frame, text="Generate Selected", command=self.generate_selected_chapters, 
                       fg_color="#D35400", hover_color="#A04000", width=140).pack(side="right", padx=(10, 0))
+        
+        # Auto-loop checkbox for chapter generation
+        self.app.auto_regen_main_checkbox = ctk.CTkCheckBox(
+            btn_frame, 
+            text="Auto-loop", 
+            variable=self.app.auto_regen_main,
+            text_color=self.app.text_color
+        )
+        self.app.auto_regen_main_checkbox.pack(side="right", padx=5)
         
         ctk.CTkButton(btn_frame, text="↻ Refresh List", command=self.refresh_chapters, width=100, text_color="black").pack(side="right", padx=5)
 

@@ -147,7 +147,23 @@ class GenerationOrchestrator:
                                     break
                                 try:
                                     result = future.result()
-                                    if result and 'original_index' in result:
+                                except concurrent.futures.process.BrokenProcessPool as e:
+                                    # Worker crashed - log details
+                                    task_info = futures.get(future, {})
+                                    logging.error(f"Worker crashed for task {task_info}: {e}")
+                                    # Mark as failed
+                                    if 'original_index' in task_info:
+                                        idx = task_info['original_index']
+                                        app.sentences[idx]['tts_generated'] = 'failed'
+                                        app.sentences[idx]['error_message'] = f"Worker crash: {e}"
+                                    continue
+                                except Exception as e:
+                                    # Other errors
+                                    task_info = futures.get(future, {})
+                                    logging.error(f"Error processing result for task {task_info}: {e}", exc_info=True)
+                                    continue
+                                    
+                                if result and 'original_index' in result:
                                         original_idx = result['original_index']
                                         
                                         app.sentences[original_idx].pop('similarity_ratio', None)
