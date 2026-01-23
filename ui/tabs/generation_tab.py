@@ -36,12 +36,49 @@ class GenerationTab(ctk.CTkFrame):
         engine_dropdown = ctk.CTkOptionMenu(
             engine_frame,
             variable=self.app.tts_engine,
-            values=["chatterbox", "xtts"],
+            values=["chatterbox", "xtts", "f5"],
             text_color="black",
             width=200
         )
         engine_dropdown.grid(row=0, column=1, padx=(5, 15), pady=10, sticky="w")
-        CTkToolTip(engine_dropdown, "Select TTS engine. Chatterbox = fast but British-biased. XTTS = better accent preservation.")
+        CTkToolTip(engine_dropdown, "Select TTS engine.\nChatterbox = fast but British-biased\nXTTS = better accent preservation\nF5-TTS = state-of-the-art quality")
+        
+        # Model Path Configuration
+        path_label = ctk.CTkLabel(engine_frame, text="Model Path:", 
+                                 text_color=self.text_color,
+                                 font=ctk.CTkFont(size=11))
+        path_label.grid(row=1, column=0, padx=15, pady=(0, 10), sticky="w")
+        
+        path_display_frame = ctk.CTkFrame(engine_frame, fg_color="transparent")
+        path_display_frame.grid(row=1, column=1, padx=(5, 15), pady=(0, 10), sticky="ew")
+        path_display_frame.grid_columnconfigure(0, weight=1)
+        
+        self.model_path_var = ctk.StringVar(value="Default")
+        self.model_path_label = ctk.CTkLabel(
+            path_display_frame, 
+            textvariable=self.model_path_var,
+            text_color="#666666",
+            font=ctk.CTkFont(size=10),
+            anchor="w"
+        )
+        self.model_path_label.grid(row=0, column=0, sticky="w", padx=(0, 5))
+        
+        self.set_path_btn = ctk.CTkButton(
+            path_display_frame,
+            text="📁 Set Path",
+            command=self._set_model_path,
+            width=100,
+            height=28,
+            fg_color="#4A90E2",
+            hover_color="#357ABD"
+        )
+        self.set_path_btn.grid(row=0, column=1, sticky="e")
+        CTkToolTip(self.set_path_btn, "Set custom model storage location for selected engine")
+        
+        # Update path display when engine changes
+        self.app.tts_engine.trace_add('write', lambda *args: self._update_path_display())
+        self._update_path_display()
+        
         row += 1
         
         # Reference Audio
@@ -268,4 +305,50 @@ class GenerationTab(ctk.CTkFrame):
         
         # Save Template Button
         ctk.CTkButton(self, text="💾 Save as Template...", command=self.app.save_generation_template, 
-                     text_color="black", height=35).grid(row=row, column=0, padx=10, pady=(10, 10), sticky="ew")
+                     text_color="black", height=35).grid(row=row, column=0, padx=10, pady=(10, 10), sticky="ew") 
+         d e f   _ u p d a t e _ p a t h _ d i s p l a y ( s e l f ) :  
+                 " " " U p d a t e   t h e   m o d e l   p a t h   d i s p l a y   w h e n   e n g i n e   c h a n g e s . " " "  
+                 e n g i n e   =   s e l f . a p p . t t s _ e n g i n e . g e t ( )  
+                 p a t h   =   s e l f . e n g i n e _ c o n f i g . g e t _ m o d e l _ p a t h ( e n g i n e )  
+                  
+                 i f   p a t h :  
+                         #   S h o w   s h o r t e n e d   p a t h  
+                         f r o m   p a t h l i b   i m p o r t   P a t h  
+                         p a t h _ o b j   =   P a t h ( p a t h )  
+                         i f   l e n ( s t r ( p a t h _ o b j ) )   >   4 0 :  
+                                 d i s p l a y   =   f " . . . { s t r ( p a t h _ o b j ) [ - 3 7 : ] } "  
+                         e l s e :  
+                                 d i s p l a y   =   s t r ( p a t h _ o b j )  
+                         s e l f . m o d e l _ p a t h _ v a r . s e t ( d i s p l a y )  
+                 e l s e :  
+                         s e l f . m o d e l _ p a t h _ v a r . s e t ( " D e f a u l t   ( s y s t e m   c a c h e ) " )  
+          
+         d e f   _ s e t _ m o d e l _ p a t h ( s e l f ) :  
+                 " " " O p e n   f o l d e r   d i a l o g   t o   s e t   m o d e l   p a t h   f o r   c u r r e n t   e n g i n e . " " "  
+                 e n g i n e   =   s e l f . a p p . t t s _ e n g i n e . g e t ( )  
+                  
+                 #   G e t   c u r r e n t   p a t h   o r   d e f a u l t  
+                 c u r r e n t _ p a t h   =   s e l f . e n g i n e _ c o n f i g . g e t _ m o d e l _ p a t h ( e n g i n e )  
+                 i f   n o t   c u r r e n t _ p a t h :  
+                         i m p o r t   o s  
+                         c u r r e n t _ p a t h   =   o s . p a t h . e x p a n d u s e r ( " ~ " )  
+                  
+                 #   O p e n   f o l d e r   d i a l o g  
+                 f o l d e r _ p a t h   =   f i l e d i a l o g . a s k d i r e c t o r y (  
+                         t i t l e = f " S e l e c t   M o d e l   S t o r a g e   L o c a t i o n   f o r   { e n g i n e . u p p e r ( ) } " ,  
+                         i n i t i a l d i r = c u r r e n t _ p a t h  
+                 )  
+                  
+                 i f   f o l d e r _ p a t h :  
+                         #   S a v e   t o   c o n f i g  
+                         s e l f . e n g i n e _ c o n f i g . s e t _ m o d e l _ p a t h ( e n g i n e ,   f o l d e r _ p a t h )  
+                         s e l f . _ u p d a t e _ p a t h _ d i s p l a y ( )  
+                          
+                         #   S h o w   c o n f i r m a t i o n  
+                         f r o m   t k i n t e r   i m p o r t   m e s s a g e b o x  
+                         m e s s a g e b o x . s h o w i n f o (  
+                                 " M o d e l   P a t h   U p d a t e d " ,  
+                                 f " { e n g i n e . u p p e r ( ) }   m o d e l s   w i l l   b e   s t o r e d   i n : \ n { f o l d e r _ p a t h } \ n \ n "  
+                                 f " T h i s   w i l l   t a k e   e f f e c t   o n   n e x t   m o d e l   l o a d . "  
+                         )  
+ 

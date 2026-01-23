@@ -49,7 +49,10 @@ auto-editor==27.1.1
 
 # --- TTS Engines ---
 # XTTS v2 for better accent preservation (optional, install if needed)
-# TTS>=0.22.0
+# pip install TTS
+
+# F5-TTS for state-of-the-art quality (optional, install if needed)
+# pip install git+https://github.com/SWivid/F5-TTS.git
 
 # =================================================================
 # System Dependencies (install separately):

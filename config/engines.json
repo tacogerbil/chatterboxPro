@@ -1,0 +1,14 @@
+{
+    "chatterbox": {
+        "model_path": "",
+        "enabled": true
+    },
+    "xtts": {
+        "model_path": "",
+        "enabled": true
+    },
+    "f5": {
+        "model_path": "",
+        "enabled": true
+    }
+}

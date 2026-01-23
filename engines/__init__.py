@@ -5,11 +5,13 @@ TTS Engine Registry and Factory.
 from .base_engine import BaseTTSEngine
 from .chatterbox_engine import ChatterboxEngine
 from .xtts_engine import XTTSEngine
+from .f5_engine import F5Engine
 
 # Engine registry
 AVAILABLE_ENGINES = {
     'chatterbox': ChatterboxEngine,
     'xtts': XTTSEngine,
+    'f5': F5Engine,
 }
 
 def get_engine(engine_name: str, device: str) -> BaseTTSEngine:
