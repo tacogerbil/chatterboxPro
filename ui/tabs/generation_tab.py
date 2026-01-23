@@ -141,17 +141,76 @@ class GenerationTab(ctk.CTkFrame):
         # Spacer
         ctk.CTkFrame(self, fg_color="transparent", height=20).grid(row=row, column=0); row += 1
         
+        # --- VOICE PREVIEW SECTION ---
+        preview_frame = ctk.CTkFrame(self, fg_color="#E8F4F8", corner_radius=8)
+        preview_frame.grid(row=row, column=0, padx=10, pady=10, sticky="ew")
+        preview_frame.grid_columnconfigure(0, weight=1)
+        
+        ctk.CTkLabel(preview_frame, text="🎤 Test Voice Settings", 
+                    font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color=self.text_color).grid(row=0, column=0, columnspan=2, pady=(10, 5), padx=10, sticky="w")
+        
+        ctk.CTkLabel(preview_frame, text="Sample Text:", 
+                    text_color=self.text_color).grid(row=1, column=0, padx=10, pady=5, sticky="nw")
+        
+        # Sample text entry
+        self.sample_text = ctk.StringVar(value="Hello! This is a test of the voice settings. How does it sound?")
+        sample_entry = ctk.CTkTextbox(preview_frame, height=60, wrap="word")
+        sample_entry.insert("1.0", self.sample_text.get())
+        sample_entry.grid(row=1, column=1, padx=(5, 10), pady=5, sticky="ew")
+        
+        # Update variable when text changes
+        def update_sample_text(event=None):
+            self.sample_text.set(sample_entry.get("1.0", "end-1c"))
+        sample_entry.bind("<KeyRelease>", update_sample_text)
+        
+        # Preview button
+        self.preview_button = ctk.CTkButton(
+            preview_frame, 
+            text="▶ Generate Preview", 
+            command=lambda: self.app.generate_voice_preview(self.sample_text.get()),
+            fg_color="#2E7D32", 
+            hover_color="#1B5E20",
+            height=35
+        )
+        self.preview_button.grid(row=2, column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
+        CTkToolTip(self.preview_button, "Generate a short audio preview with current settings. Audio will auto-play when ready.")
+        
+        row += 1
+        
+        # Spacer
+        ctk.CTkFrame(self, fg_color="transparent", height=20).grid(row=row, column=0); row += 1
+        
         # --- ADVANCED SETTINGS (Collapsible) ---
-        advanced_label = ctk.CTkLabel(self, text="▼ Advanced Settings", 
+        self.advanced_visible = ctk.BooleanVar(value=False)  # Start collapsed
+        
+        advanced_label = ctk.CTkLabel(self, text="▶ Advanced Settings", 
                                      font=ctk.CTkFont(size=13, weight="bold"),
                                      text_color=self.text_color, cursor="hand2")
         advanced_label.grid(row=row, column=0, padx=10, pady=5, sticky="w")
+        
+        def toggle_advanced():
+            """Toggle advanced settings visibility."""
+            is_visible = self.advanced_visible.get()
+            self.advanced_visible.set(not is_visible)
+            
+            if self.advanced_visible.get():
+                # Show
+                advanced_label.configure(text="▼ Advanced Settings")
+                self.advanced_frame.grid()
+            else:
+                # Hide
+                advanced_label.configure(text="▶ Advanced Settings")
+                self.advanced_frame.grid_remove()
+        
+        advanced_label.bind("<Button-1>", lambda e: toggle_advanced())
         row += 1
         
         # Advanced settings frame
         self.advanced_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.advanced_frame.grid(row=row, column=0, padx=20, pady=5, sticky="ew")
         self.advanced_frame.grid_columnconfigure(1, weight=1)
+        self.advanced_frame.grid_remove()  # Start hidden
         
         adv_row = 0
         def add_advanced_entry(label, var, tooltip):

@@ -890,6 +890,96 @@ class ChatterboxProGUI(ctk.CTk):
         # Update match counter
         self.search_match_label.configure(text=f"{self.current_match_index + 1}/{len(self.search_matches)}")
 
+    def generate_voice_preview(self, text):
+        """Generate a quick preview audio with current settings and auto-play it."""
+        if not text or not text.strip():
+            messagebox.showerror("Error", "Please enter some text to preview.")
+            return
+        
+        if not self.ref_audio_path.get() or not os.path.exists(self.ref_audio_path.get()):
+            messagebox.showerror("Error", "Please select a valid reference audio file first.")
+            return
+        
+        # Disable preview button during generation
+        if hasattr(self, 'generation_tab') and hasattr(self.generation_tab, 'preview_button'):
+            self.generation_tab.preview_button.configure(state="disabled", text="⏳ Generating...")
+        
+        # Generate in background thread
+        threading.Thread(target=self._generate_preview_threaded, args=(text.strip(),), daemon=True).start()
+
+    def _generate_preview_threaded(self, text):
+        """Background thread to generate preview audio."""
+        import uuid
+        from pathlib import Path
+        from workers.tts_worker import worker_process_chunk
+        
+        try:
+            # Create preview directory
+            preview_dir = Path(self.OUTPUTS_DIR) / "_preview"
+            preview_dir.mkdir(parents=True, exist_ok=True)
+            
+            preview_uuid = uuid.uuid4().hex
+            
+            # Build task bundle (same format as regular generation)
+            task_bundle = (
+                0,  # task_index
+                0,  # original_index
+                0,  # sentence_number
+                text,  # text_chunk
+                "cuda:0" if torch.cuda.is_available() else "cpu",  # device
+                0,  # master_seed (random)
+                self.ref_audio_path.get(),  # ref_audio_path
+                self.exaggeration.get(),  # exaggeration
+                self.temperature.get(),  # temperature
+                self.cfg_weight.get(),  # cfg_weight
+                self.disable_watermark.get(),  # disable_watermark
+                1,  # num_candidates
+                1,  # max_attempts
+                True,  # bypass_asr (skip validation for preview)
+                "_preview",  # session_name
+                0,  # run_idx
+                self.OUTPUTS_DIR,  # output_dir_str
+                preview_uuid,  # uuid
+                0.85,  # asr_threshold (not used since bypassing)
+                self.speed.get()  # speed
+            )
+            
+            # Generate audio
+            result = worker_process_chunk(task_bundle)
+            
+            if result and result.get('status') in ['success', 'failed_placeholder']:
+                preview_path = Path(result['path'])
+                
+                if preview_path.exists():
+                    # Auto-play the preview
+                    self.after(0, self._play_preview_audio, str(preview_path))
+                    self.after(0, lambda: messagebox.showinfo("Preview Ready", "Preview generated! Playing now..."))
+                else:
+                    self.after(0, lambda: messagebox.showerror("Error", "Preview file not found after generation."))
+            else:
+                error_msg = result.get('error_message', 'Unknown error') if result else 'No result returned'
+                self.after(0, lambda: messagebox.showerror("Generation Failed", f"Could not generate preview: {error_msg}"))
+        
+        except Exception as e:
+            logging.error(f"Preview generation failed: {e}", exc_info=True)
+            self.after(0, lambda: messagebox.showerror("Error", f"Preview generation failed: {e}"))
+        
+        finally:
+            # Re-enable preview button
+            if hasattr(self, 'generation_tab') and hasattr(self.generation_tab, 'preview_button'):
+                self.after(0, lambda: self.generation_tab.preview_button.configure(state="normal", text="▶ Generate Preview"))
+
+    def _play_preview_audio(self, audio_path):
+        """Play the preview audio file."""
+        try:
+            self.stop_playback()  # Stop any currently playing audio
+            sound = pygame.mixer.Sound(audio_path)
+            sound.play()
+            logging.info(f"Playing preview: {audio_path}")
+        except Exception as e:
+            logging.error(f"Failed to play preview: {e}")
+            messagebox.showerror("Playback Error", f"Could not play preview: {e}")
+
     def _get_indices_to_process(self):
         if self.apply_fix_to_all_failed.get():
             return [i for i, s in enumerate(self.sentences) if s.get('tts_generated') == 'failed']
