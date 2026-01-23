@@ -1,6 +1,7 @@
 # utils/text_processor.py
 import re
 import uuid
+import unicodedata
 from sentence_splitter import SentenceSplitter
 
 def punc_norm(text: str) -> str:
@@ -54,8 +55,23 @@ class TextPreprocessor:
             re.IGNORECASE
         )
 
+    def remove_accents(self, text: str) -> str:
+        """
+        Convert accented characters to their ASCII equivalents.
+        Examples: ñ → n, á → a, é → e, ü → u
+        This preserves pronunciation while making text TTS-safe.
+        """
+        # Normalize to NFD (decomposed form) where accents are separate characters
+        nfd_form = unicodedata.normalize('NFD', text)
+        # Filter out combining characters (accents)
+        ascii_text = ''.join(char for char in nfd_form if unicodedata.category(char) != 'Mn')
+        return ascii_text
+
     def clean_text_aggressively(self, text: str) -> str:
         """Removes characters not in a basic whitelist."""
+        # First, convert accented characters to ASCII equivalents
+        text = self.remove_accents(text)
+        # Then apply aggressive cleaning
         return self.aggressive_clean_re.sub('', text)
 
     def filter_non_english_words(self, text: str) -> str:
