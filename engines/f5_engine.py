@@ -10,6 +10,7 @@ from typing import Dict, Any
 import logging
 import tempfile
 import os
+import numpy as np
 
 from .base_engine import BaseTTSEngine
 
@@ -86,6 +87,10 @@ class F5Engine(BaseTTSEngine):
                 wav_tensor = result[0]  # Extract audio tensor
             else:
                 wav_tensor = result
+            
+            # Convert numpy array to tensor if needed
+            if isinstance(wav_tensor, np.ndarray):
+                wav_tensor = torch.from_numpy(wav_tensor).float()
             
             # Ensure correct shape (1, samples)
             if wav_tensor.dim() == 1:
