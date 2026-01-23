@@ -132,39 +132,50 @@ class GenerationOrchestrator:
                     ctx = multiprocessing.get_context('spawn')
                     with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
                         futures = {executor.submit(worker_process_chunk, task): task[1] for task in tasks}
-                        for future in as_completed(futures):
-                            if app.stop_flag.is_set():
-                                for f in futures.keys(): f.cancel()
-                                break
-                            try:
-                                result = future.result()
-                                if result and 'original_index' in result:
-                                    original_idx = result['original_index']
-                                    
-                                    app.sentences[original_idx].pop('similarity_ratio', None)
-                                    app.sentences[original_idx].pop('generation_seed', None)
+                        try:
+                            for future in as_completed(futures):
+                                if app.stop_flag.is_set():
+                                    logging.info("Stop flag detected - terminating all worker processes...")
+                                    # Cancel all pending futures
+                                    for f in futures.keys():
+                                        f.cancel()
+                                    # Force shutdown executor to kill running processes
+                                    executor.shutdown(wait=False, cancel_futures=True)
+                                    logging.info("All workers terminated.")
+                                    break
+                                try:
+                                    result = future.result()
+                                    if result and 'original_index' in result:
+                                        original_idx = result['original_index']
+                                        
+                                        app.sentences[original_idx].pop('similarity_ratio', None)
+                                        app.sentences[original_idx].pop('generation_seed', None)
 
-                                    status = result.get('status')
-                                    app.sentences[original_idx]['generation_seed'] = result.get('seed')
-                                    app.sentences[original_idx]['similarity_ratio'] = result.get('similarity_ratio')
+                                        status = result.get('status')
+                                        app.sentences[original_idx]['generation_seed'] = result.get('seed')
+                                        app.sentences[original_idx]['similarity_ratio'] = result.get('similarity_ratio')
 
-                                    if status == 'success':
-                                        app.sentences[original_idx]['tts_generated'] = 'yes'
-                                        app.sentences[original_idx]['marked'] = False
-                                    else:
-                                        app.sentences[original_idx]['tts_generated'] = 'failed'
-                                        app.sentences[original_idx]['marked'] = True
-                                        if status == 'failed_placeholder':
-                                            logging.warning(f"Chunk {app.sentences[original_idx]['sentence_number']} failed validation. A placeholder audio was saved. Marked for regeneration.")
-                                        else: 
-                                            logging.error(f"Chunk {app.sentences[original_idx]['sentence_number']} had a hard error during generation and was marked.")
-                                            
-                                    app.after(0, app.playlist_frame.update_item, original_idx)
-                            except Exception as e:
-                                logging.error(f"A worker process for index {futures[future]} failed: {e}", exc_info=True)
-                            finally:
-                                completed_count += 1
-                                app.after(0, app.update_progress_display, completed_count / len(tasks), completed_count, len(tasks))
+                                        if status == 'success':
+                                            app.sentences[original_idx]['tts_generated'] = 'yes'
+                                            app.sentences[original_idx]['marked'] = False
+                                        else:
+                                            app.sentences[original_idx]['tts_generated'] = 'failed'
+                                            app.sentences[original_idx]['marked'] = True
+                                            if status == 'failed_placeholder':
+                                                logging.warning(f"Chunk {app.sentences[original_idx]['sentence_number']} failed validation. A placeholder audio was saved. Marked for regeneration.")
+                                            else: 
+                                                logging.error(f"Chunk {app.sentences[original_idx]['sentence_number']} had a hard error during generation and was marked.")
+                                                
+                                        app.after(0, app.playlist_frame.update_item, original_idx)
+                                except Exception as e:
+                                    logging.error(f"A worker process for index {futures[future]} failed: {e}", exc_info=True)
+                                finally:
+                                    completed_count += 1
+                                    app.after(0, app.update_progress_display, completed_count / len(tasks), completed_count, len(tasks))
+                        except Exception as e:
+                            logging.error(f"Error during generation: {e}", exc_info=True)
+                            # Ensure executor shuts down even if there's an error
+                            executor.shutdown(wait=False, cancel_futures=True)
                     
                     # CRITICAL: Clean up memory after each chapter
                     self._cleanup_memory()
