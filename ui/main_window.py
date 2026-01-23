@@ -259,9 +259,14 @@ class ChatterboxProGUI(ctk.CTk):
         else:
             # Generation finished
             if self.stop_flag.is_set():
-                self.auto_fix_stage = "NONE" # User stopped manually
-            else:
+                self.auto_fix_stage = "NONE"  # User stopped manually
+            elif self.auto_regen_main.get():
+                # Only trigger auto-fix if checkbox is enabled
                 self.after(100, self._auto_fix_logic)
+            else:
+                # Auto-regen disabled - reset stage and stop
+                self.auto_fix_stage = "NONE"
+                logging.info("Generation complete. Auto-regeneration disabled.")
 
     def _auto_fix_logic(self):
         """State machine for auto-regeneration loops."""
