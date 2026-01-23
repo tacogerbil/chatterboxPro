@@ -3,12 +3,14 @@ import customtkinter as ctk
 from tkinter import filedialog
 from CTkToolTip import CTkToolTip
 from ui.components.labeled_slider import LabeledSlider
+from config import get_engine_config
 
 class GenerationTab(ctk.CTkFrame):
     def __init__(self, master, app_instance):
         super().__init__(master, fg_color="transparent")
         self.app = app_instance
         self.text_color = "#E0E0E0"
+        self.engine_config = get_engine_config()  # Initialize config
         
         self.grid_columnconfigure(0, weight=1)
         self.text_color = self.app.text_color
