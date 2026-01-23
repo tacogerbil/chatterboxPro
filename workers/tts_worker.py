@@ -221,11 +221,70 @@ def get_similarity_ratio(text1, text2):
     if not norm1 or not norm2: return 0.0
     return difflib.SequenceMatcher(None, norm1, norm2).ratio()
 
+def apply_speed_adjustment(audio_path, speed):
+    """Apply speed change using FFmpeg atempo filter.
+    
+    Args:
+        audio_path: Path to the audio file to adjust
+        speed: Speed multiplier (0.5 = half speed, 2.0 = double speed)
+    
+    FFmpeg's atempo filter supports 0.5x - 2.0x per filter.
+    For extreme speeds, we chain multiple filters.
+    """
+    import subprocess
+    
+    if speed == 1.0:
+        return  # No adjustment needed
+    
+    # Clamp speed to reasonable range
+    speed = max(0.5, min(2.0, speed))
+    
+    # Build FFmpeg filter chain
+    if 0.5 <= speed <= 2.0:
+        # Single pass
+        filters = f"atempo={speed}"
+    elif speed < 0.5:
+        # Chain for very slow: 0.25x = 0.5 * 0.5
+        filters = "atempo=0.5,atempo=0.5"
+    else:  # speed > 2.0
+        # Chain for very fast: 4.0x = 2.0 * 2.0
+        filters = "atempo=2.0,atempo=2.0"
+    
+    temp_path = Path(str(audio_path).replace('.wav', '_temp.wav'))
+    
+    try:
+        # Run FFmpeg
+        cmd = [
+            'ffmpeg', '-i', str(audio_path),
+            '-filter:a', filters,
+            '-y',  # Overwrite output
+            str(temp_path)
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        # Replace original with speed-adjusted version
+        if temp_path.exists():
+            audio_path.unlink()
+            temp_path.rename(audio_path)
+            logging.info(f"Applied {speed}x speed adjustment using FFmpeg")
+    
+    except subprocess.CalledProcessError as e:
+        logging.error(f"FFmpeg speed adjustment failed: {e.stderr}")
+        # Clean up temp file if it exists
+        if temp_path.exists():
+            temp_path.unlink()
+        # Don't fail the entire generation - just use original speed
+    except Exception as e:
+        logging.error(f"Unexpected error during speed adjustment: {e}")
+        if temp_path.exists():
+            temp_path.unlink()
+
 def worker_process_chunk(task_bundle):
     """The main function executed by each worker process to generate a single audio chunk."""
     (task_index, original_index, sentence_number, text_chunk, device_str, master_seed, ref_audio_path,
      exaggeration, temperature, cfg_weight, disable_watermark, num_candidates, max_attempts,
-     bypass_asr, session_name, run_idx, output_dir_str, uuid, asr_threshold) = task_bundle
+     bypass_asr, session_name, run_idx, output_dir_str, uuid, asr_threshold, speed) = task_bundle
 
     pid = os.getpid()
     logging.info(f"[Worker-{pid}] Starting chunk (Idx: {original_index}, #: {sentence_number}, UUID: {uuid[:8]}) on device {device_str}")
@@ -411,6 +470,13 @@ def worker_process_chunk(task_bundle):
         # Move the chosen file to the final destination
         if Path(chosen_candidate['path']).exists():
             shutil.move(chosen_candidate['path'], final_wav_path)
+            
+            # Apply speed adjustment if needed (FFmpeg post-processing)
+            if speed != 1.0:
+                try:
+                    apply_speed_adjustment(final_wav_path, speed)
+                except Exception as e:
+                    logging.warning(f"Speed adjustment failed for chunk #{sentence_number}: {e}. Using original speed.")
         
         # Clean up any other temporary candidate files that might still exist
         # This is for passed candidates that were not the shortest

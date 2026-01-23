@@ -122,7 +122,8 @@ class GenerationOrchestrator:
                             app.get_validated_int(app.max_attempts_str, 1),
                             not app.asr_validation_enabled.get(), app.session_name.get(),
                             run_idx, app.OUTPUTS_DIR, sentence_data['uuid'],
-                            app.get_validated_float(app.asr_threshold_str, 0.85)
+                            app.get_validated_float(app.asr_threshold_str, 0.85),
+                            app.speed.get()  # Speed parameter for FFmpeg post-processing
                         )
                         tasks.append(task)
 
