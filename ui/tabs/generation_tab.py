@@ -142,38 +142,45 @@ class GenerationTab(ctk.CTkFrame):
         ctk.CTkFrame(self, fg_color="transparent", height=20).grid(row=row, column=0); row += 1
         
         # --- VOICE PREVIEW SECTION ---
-        preview_frame = ctk.CTkFrame(self, fg_color="#E8F4F8", corner_radius=8)
+        preview_frame = ctk.CTkFrame(self, fg_color="#F5F5F5", corner_radius=6)
         preview_frame.grid(row=row, column=0, padx=10, pady=10, sticky="ew")
         preview_frame.grid_columnconfigure(0, weight=1)
         
+        # Header
         ctk.CTkLabel(preview_frame, text="🎤 Test Voice Settings", 
-                    font=ctk.CTkFont(size=14, weight="bold"),
-                    text_color=self.text_color).grid(row=0, column=0, columnspan=2, pady=(10, 5), padx=10, sticky="w")
+                    font=ctk.CTkFont(size=13, weight="bold"),
+                    text_color=self.text_color,
+                    anchor="w").grid(row=0, column=0, pady=(12, 5), padx=15, sticky="w")
         
+        # Sample Text Label
         ctk.CTkLabel(preview_frame, text="Sample Text:", 
-                    text_color=self.text_color).grid(row=1, column=0, padx=10, pady=5, sticky="nw")
+                    text_color=self.text_color,
+                    font=ctk.CTkFont(size=11),
+                    anchor="w").grid(row=1, column=0, padx=15, pady=(0, 3), sticky="w")
         
-        # Sample text entry
+        # Sample text entry (compact)
         self.sample_text = ctk.StringVar(value="Hello! This is a test of the voice settings. How does it sound?")
-        sample_entry = ctk.CTkTextbox(preview_frame, height=60, wrap="word")
+        sample_entry = ctk.CTkTextbox(preview_frame, height=50, wrap="word", 
+                                     fg_color="white", border_width=1, border_color="#CCCCCC")
         sample_entry.insert("1.0", self.sample_text.get())
-        sample_entry.grid(row=1, column=1, padx=(5, 10), pady=5, sticky="ew")
+        sample_entry.grid(row=2, column=0, padx=15, pady=(0, 10), sticky="ew")
         
         # Update variable when text changes
         def update_sample_text(event=None):
             self.sample_text.set(sample_entry.get("1.0", "end-1c"))
         sample_entry.bind("<KeyRelease>", update_sample_text)
         
-        # Preview button
+        # Preview button (full width, green)
         self.preview_button = ctk.CTkButton(
             preview_frame, 
             text="▶ Generate Preview", 
             command=lambda: self.app.generate_voice_preview(self.sample_text.get()),
-            fg_color="#2E7D32", 
-            hover_color="#1B5E20",
-            height=35
+            fg_color="#4CAF50", 
+            hover_color="#45A049",
+            height=40,
+            font=ctk.CTkFont(size=13)
         )
-        self.preview_button.grid(row=2, column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
+        self.preview_button.grid(row=3, column=0, padx=15, pady=(0, 15), sticky="ew")
         CTkToolTip(self.preview_button, "Generate a short audio preview with current settings. Audio will auto-play when ready.")
         
         row += 1
