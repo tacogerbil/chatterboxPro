@@ -142,9 +142,20 @@ def worker_process_chunk(task_bundle):
             seed = random.randint(1, 2**32 - 1)
         
         logging.info(f"[Worker-{pid}] Chunk #{sentence_number}, Attempt {attempt_num + 1}/{max_attempts} with seed {seed}")
+        
+        # CUDA State Validation: Check if GPU is in a valid state before attempting generation
+        if torch.cuda.is_available():
+            try:
+                torch.cuda.synchronize()  # This will fail if CUDA is in a bad state
+            except Exception as cuda_check_error:
+                logging.error(f"CUDA state check failed before chunk #{sentence_number}, attempt {attempt_num+1}: {cuda_check_error}")
+                logging.error("GPU is in an invalid state. Aborting remaining attempts.")
+                break  # Exit the retry loop - GPU is corrupted
+        
         set_seed(seed)
         
         temp_path_str = str(base_candidate_path_prefix) + f"_{attempt_num+1}_seed{seed}.wav"
+
 
         try:
             wav_tensor = tts_model.generate(text_chunk, cfg_weight=cfg_weight, temperature=temperature, apply_watermark=not disable_watermark)
@@ -176,6 +187,15 @@ def worker_process_chunk(task_bundle):
         except Exception as e:
             logging.error(f"Generation crashed for chunk #{sentence_number}, attempt {attempt_num+1}: {e}", exc_info=True)
             if Path(temp_path_str).exists(): os.remove(temp_path_str) # Clean up partial file
+            
+            # GPU State Recovery: Reset CUDA state after crashes to prevent cascading errors
+            if torch.cuda.is_available():
+                try:
+                    torch.cuda.synchronize()  # Wait for all CUDA operations to complete
+                    torch.cuda.empty_cache()  # Clear GPU memory cache
+                    logging.info(f"GPU state reset after crash on chunk #{sentence_number}, attempt {attempt_num+1}")
+                except Exception as reset_error:
+                    logging.error(f"Failed to reset GPU state: {reset_error}")
             continue
 
         current_candidate_data = {"path": temp_path_str, "duration": duration, "seed": seed}
