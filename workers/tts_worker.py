@@ -370,7 +370,7 @@ def worker_process_chunk(task_bundle):
             
             # --- Signal Processing Check (Pre-Whisper) ---
             # Reject obvious garbage before wasting time saving to disk or running Whisper
-            is_valid_signal, signal_error = validate_audio_signal(wav_tensor.cpu(), tts_model.sr)
+            is_valid_signal, signal_error = validate_audio_signal(wav_tensor.cpu(), tts_engine.sr)
             if not is_valid_signal:
                 logging.warning(f"Signal Rejected inside worker chunk #{sentence_number}, attempt {attempt_num+1}: {signal_error}")
                 if Path(temp_path_str).exists(): os.remove(temp_path_str) # Cleanup if we wrote it (logic above wrote sf.write first)
