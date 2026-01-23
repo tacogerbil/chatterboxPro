@@ -99,7 +99,17 @@ def get_similarity_ratio(text1, text2):
     norm1 = re.sub(r'[\W_]+', '', text1).lower()
     norm2 = re.sub(r'[\W_]+', '', text2).lower()
     if not norm1 or not norm2: return 0.0
-    return difflib.SequenceMatcher(None, norm1, norm2).ratio()
+    ratio = difflib.SequenceMatcher(None, norm1, norm2).ratio()
+    
+    # Debug logging to diagnose consistent 0.67 issue
+    logging.debug(f"ASR Similarity Debug:")
+    logging.debug(f"  Original text: {text1[:100]}...")
+    logging.debug(f"  Transcribed: {text2[:100]}...")
+    logging.debug(f"  Normalized orig: {norm1[:100]}...")
+    logging.debug(f"  Normalized trans: {norm2[:100]}...")
+    logging.debug(f"  Ratio: {ratio:.4f}")
+    
+    return ratio
 
 def worker_process_chunk(task_bundle):
     """The main function executed by each worker process to generate a single audio chunk."""
@@ -236,6 +246,12 @@ def worker_process_chunk(task_bundle):
             
             # 3. Standard Text Similarity Check
             ratio = get_similarity_ratio(text_chunk, transcribed)
+            
+            # Log transcription for debugging consistent 0.67 issue
+            logging.info(f"ASR Transcription for chunk #{sentence_number}, attempt {attempt_num+1}:")
+            logging.info(f"  Expected: '{text_chunk[:80]}...'")
+            logging.info(f"  Got:      '{transcribed[:80]}...'")
+            logging.info(f"  Similarity: {ratio:.4f}")
             
         except Exception as e:
             logging.error(f"Whisper transcription failed for {temp_path_str}: {e}")
