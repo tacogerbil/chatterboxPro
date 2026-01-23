@@ -74,12 +74,18 @@ class F5Engine(BaseTTSEngine):
         
         try:
             # F5-TTS generates directly to tensor
-            wav_tensor = self.model.infer(
+            result = self.model.infer(
                 ref_file=ref_audio_path,
                 ref_text="",  # F5 can auto-transcribe reference
                 gen_text=text,
                 cross_fade_duration=cross_fade_duration
             )
+            
+            # F5-TTS returns (wav, sr, spectrogram) tuple
+            if isinstance(result, tuple):
+                wav_tensor = result[0]  # Extract audio tensor
+            else:
+                wav_tensor = result
             
             # Ensure correct shape (1, samples)
             if wav_tensor.dim() == 1:
