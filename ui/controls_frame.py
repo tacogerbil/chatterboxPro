@@ -108,6 +108,10 @@ class ControlsFrame(ctk.CTkFrame):
 
         ctk.CTkButton(fixit_frame, text="Split All Failed", command=self.app.split_all_failed_chunks, **button_kwargs).grid(row=2, column=0, columnspan=3, padx=5, pady=2, sticky="ew")
 
-        ctk.CTkButton(fixit_frame, text="↻ Regenerate Marked", command=self.app.regenerate_marked_sentences, fg_color="#A40000", hover_color="#800000", text_color="white").grid(row=3, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
+        # Regenerate button and auto-loop checkbox on same row
+        ctk.CTkButton(fixit_frame, text="↻ Regenerate Marked", command=self.app.regenerate_marked_sentences, fg_color="#A40000", hover_color="#800000", text_color="white").grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+        self.app.auto_regen_sub_checkbox = ctk.CTkCheckBox(fixit_frame, text="Auto-loop", variable=self.app.auto_regen_sub, text_color=self.app.text_color)
+        self.app.auto_regen_sub_checkbox.grid(row=3, column=2, padx=5, pady=5, sticky="w")
+        
         self.app.reassemble_after_regen_checkbox = ctk.CTkCheckBox(fixit_frame, text="Re-Assemble Audiobook After Regeneration", variable=self.app.reassemble_after_regen, text_color=self.app.text_color)
         self.app.reassemble_after_regen_checkbox.grid(row=4, column=0, columnspan=3, padx=10, pady=(0,5), sticky="w")

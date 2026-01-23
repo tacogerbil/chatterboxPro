@@ -274,6 +274,9 @@ class ChatterboxProGUI(ctk.CTk):
         
         if not failed_indices:
             self.auto_fix_stage = "NONE"
+            # Reset SUB_LOOP split flag
+            if hasattr(self, '_sub_loop_split_done'):
+                self._sub_loop_split_done = False
             logging.info("Auto-Fix: All clear. Generation complete.")
             # Trigger assembly if enabled
             if self.auto_assemble_after_run.get():
@@ -313,8 +316,27 @@ class ChatterboxProGUI(ctk.CTk):
             self.start_generation_orchestrator(failed_indices)
 
         elif self.auto_fix_stage == "SUB_LOOP":
-             logging.info(f"Auto-Fix (Sub-Loop): {len(failed_indices)} failures remain. Retrying...")
-             self.start_generation_orchestrator(failed_indices)
+            # Manual regeneration auto-loop
+            # First iteration: split failed chunks
+            # Subsequent iterations: just regenerate
+            logging.info(f"Auto-Fix (Sub-Loop): {len(failed_indices)} failures remain.")
+            
+            # Check if this is the first iteration (need to split)
+            # We can detect this by checking if we just came from regenerate_marked_sentences
+            # For now, let's add a flag to track if we've split yet
+            if not hasattr(self, '_sub_loop_split_done'):
+                self._sub_loop_split_done = False
+            
+            if not self._sub_loop_split_done:
+                logging.info("Auto-Fix (Sub-Loop): First iteration - splitting failed chunks...")
+                self._sub_loop_split_done = True
+                self.split_all_failed_chunks(confirm=False)
+                # After splitting, regenerate the new pieces
+                new_failed = [i for i, s in enumerate(self.sentences) if s.get('marked')]
+                self.start_generation_orchestrator(new_failed)
+            else:
+                logging.info("Auto-Fix (Sub-Loop): Continuing loop - regenerating marked chunks...")
+                self.start_generation_orchestrator(failed_indices)
         
         else:
              # No auto-fix active, just update button
