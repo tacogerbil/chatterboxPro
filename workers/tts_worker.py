@@ -37,24 +37,35 @@ if os.name == 'nt':  # Check if we are on Windows
 # --------------------------
 
 # --- Worker-Specific Globals ---
-_WORKER_TTS_MODEL, _WORKER_WHISPER_MODEL = None, None
+_WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL = None, None
+_CURRENT_ENGINE_NAME = None
 
-def get_or_init_worker_models(device_str: str):
+def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox'):
     """Initializes models once per worker process to save memory and time."""
-    global _WORKER_TTS_MODEL, _WORKER_WHISPER_MODEL
+    global _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL, _CURRENT_ENGINE_NAME
     pid = os.getpid()
-    if _WORKER_TTS_MODEL is None:
-        logging.info(f"[Worker-{pid}] Initializing models for device: {device_str}")
+    
+    # Check if we need to switch engines
+    if _WORKER_TTS_ENGINE is not None and _CURRENT_ENGINE_NAME != engine_name:
+        logging.info(f"[Worker-{pid}] Switching from {_CURRENT_ENGINE_NAME} to {engine_name}")
+        _WORKER_TTS_ENGINE.cleanup()
+        _WORKER_TTS_ENGINE = None
+    
+    if _WORKER_TTS_ENGINE is None:
+        logging.info(f"[Worker-{pid}] Initializing {engine_name} engine on device: {device_str}")
         try:
-            _WORKER_TTS_MODEL = ChatterboxTTS.from_pretrained(device_str)
+            from engines import get_engine
+            _WORKER_TTS_ENGINE = get_engine(engine_name, device_str)
+            _CURRENT_ENGINE_NAME = engine_name
+            
             whisper_device = torch.device(device_str if "cuda" in device_str and torch.cuda.is_available() else "cpu")
             _WORKER_WHISPER_MODEL = whisper.load_model("base.en", device=whisper_device, download_root=str(Path.home() / ".cache" / "whisper"))
-            logging.info(f"[Worker-{pid}] Models loaded successfully on {device_str}.")
+            logging.info(f"[Worker-{pid}] {engine_name} engine loaded successfully on {device_str}.")
         except Exception as e:
             logging.critical(f"[Worker-{pid}] CRITICAL ERROR: Failed to initialize models: {e}", exc_info=True)
-            _WORKER_TTS_MODEL, _WORKER_WHISPER_MODEL = None, None
+            _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL = None, None
             raise
-    return _WORKER_TTS_MODEL, _WORKER_WHISPER_MODEL
+    return _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL
 
 def set_seed(seed: int):
     """Sets random seeds for reproducibility."""
@@ -284,17 +295,17 @@ def worker_process_chunk(task_bundle):
     """The main function executed by each worker process to generate a single audio chunk."""
     (task_index, original_index, sentence_number, text_chunk, device_str, master_seed, ref_audio_path,
      exaggeration, temperature, cfg_weight, disable_watermark, num_candidates, max_attempts,
-     bypass_asr, session_name, run_idx, output_dir_str, uuid, asr_threshold, speed) = task_bundle
+     bypass_asr, session_name, run_idx, output_dir_str, uuid, asr_threshold, speed, engine_name) = task_bundle
 
     pid = os.getpid()
     logging.info(f"[Worker-{pid}] Starting chunk (Idx: {original_index}, #: {sentence_number}, UUID: {uuid[:8]}) on device {device_str}")
 
     try:
-        tts_model, whisper_model = get_or_init_worker_models(device_str)
-        if tts_model is None or whisper_model is None:
-            raise RuntimeError(f"Model initialization failed for device {device_str}")
+        tts_engine, whisper_model = get_or_init_worker_models(device_str, engine_name)
+        if tts_engine is None or whisper_model is None:
+            raise RuntimeError(f"Engine initialization failed for device {device_str}")
     except Exception as e_model_load:
-        return {"original_index": original_index, "status": "error", "error_message": f"Model Load Fail: {e_model_load}"}
+        return {"original_index": original_index, "status": "error", "error_message": f"Engine Load Fail: {e_model_load}"}
 
     run_temp_dir = Path(output_dir_str) / session_name / f"run_{run_idx+1}_temp"
     run_temp_dir.mkdir(exist_ok=True, parents=True)
@@ -302,10 +313,10 @@ def worker_process_chunk(task_bundle):
     base_candidate_path_prefix = run_temp_dir.resolve() / f"c_{uuid}_cand"
 
     try:
-        tts_model.prepare_conditionals(ref_audio_path, exaggeration=min(exaggeration, 1.0), use_cache=True)
+        tts_engine.prepare_reference(ref_audio_path, exaggeration=min(exaggeration, 1.0))
     except Exception as e:
-        logging.error(f"[Worker-{pid}] Failed to prepare conditionals for chunk {sentence_number}: {e}", exc_info=True)
-        return {"original_index": original_index, "status": "error", "error_message": f"Conditional Prep Fail: {e}"}
+        logging.error(f"[Worker-{pid}] Failed to prepare reference for chunk {sentence_number}: {e}", exc_info=True)
+        return {"original_index": original_index, "status": "error", "error_message": f"Reference Prep Fail: {e}"}
 
     passed_candidates = []
     best_failed_candidate = None
@@ -337,18 +348,25 @@ def worker_process_chunk(task_bundle):
 
 
         try:
-            wav_tensor = tts_model.generate(text_chunk, cfg_weight=cfg_weight, temperature=temperature, apply_watermark=not disable_watermark)
-            if not (torch.is_tensor(wav_tensor) and wav_tensor.numel() > tts_model.sr * 0.1):
+            wav_tensor = tts_engine.generate(
+                text_chunk, 
+                ref_audio_path,
+                exaggeration=exaggeration,
+                temperature=temperature,
+                cfg_weight=cfg_weight,
+                apply_watermark=not disable_watermark
+            )
+            if not (torch.is_tensor(wav_tensor) and wav_tensor.numel() > tts_engine.sr * 0.1):
                 logging.warning(f"Generation failed (empty audio) for chunk #{sentence_number}, attempt {attempt_num+1}.")
                 continue
             
-#            torchaudio.save(temp_path_str, wav_tensor.cpu(), tts_model.sr, backend="soundfile")
+#            torchaudio.save(temp_path_str, wav_tensor.cpu(), tts_engine.sr, backend="soundfile")
             audio_data = wav_tensor.cpu().numpy()
             if len(audio_data.shape) > 1:
                 audio_data = audio_data.T
-            sf.write(temp_path_str, audio_data, tts_model.sr)
+            sf.write(temp_path_str, audio_data, tts_engine.sr)
 
-            duration = wav_tensor.shape[-1] / tts_model.sr
+            duration = wav_tensor.shape[-1] / tts_engine.sr
             
             # --- Signal Processing Check (Pre-Whisper) ---
             # Reject obvious garbage before wasting time saving to disk or running Whisper

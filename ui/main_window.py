@@ -110,6 +110,7 @@ class ChatterboxProGUI(ctk.CTk):
         self.aggro_clean_on_parse = ctk.BooleanVar(value=False)
         self.apply_fix_to_all_failed = ctk.BooleanVar(value=False)
         self.auto_assemble_after_run = ctk.BooleanVar(value=True)
+        self.tts_engine = ctk.StringVar(value="chatterbox")  # TTS engine selection
         
         # Auto-Regeneration Control Variables
         self.auto_regen_main = ctk.BooleanVar(value=False)
@@ -941,7 +942,8 @@ class ChatterboxProGUI(ctk.CTk):
                 self.OUTPUTS_DIR,  # output_dir_str
                 preview_uuid,  # uuid
                 0.85,  # asr_threshold (not used since bypassing)
-                self.speed.get()  # speed
+                self.speed.get(),  # speed
+                self.tts_engine.get()  # engine
             )
             
             # Generate audio

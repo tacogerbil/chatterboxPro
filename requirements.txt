@@ -47,6 +47,10 @@ ffmpeg-python==0.2.0
 # For silence removal (optional but recommended)
 auto-editor==27.1.1
 
+# --- TTS Engines ---
+# XTTS v2 for better accent preservation (optional, install if needed)
+# TTS>=0.22.0
+
 # =================================================================
 # System Dependencies (install separately):
 # - FFmpeg: Required for audio normalization and assembly

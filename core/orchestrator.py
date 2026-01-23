@@ -123,7 +123,8 @@ class GenerationOrchestrator:
                             not app.asr_validation_enabled.get(), app.session_name.get(),
                             run_idx, app.OUTPUTS_DIR, sentence_data['uuid'],
                             app.get_validated_float(app.asr_threshold_str, 0.85),
-                            app.speed.get()  # Speed parameter for FFmpeg post-processing
+                            app.speed.get(),  # Speed parameter for FFmpeg post-processing
+                            app.tts_engine.get()  # TTS engine selection
                         )
                         tasks.append(task)
 

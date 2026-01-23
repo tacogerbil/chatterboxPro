@@ -24,6 +24,26 @@ class GenerationTab(ctk.CTkFrame):
         
         row = 1
         
+        # --- TTS ENGINE SELECTION ---
+        engine_frame = ctk.CTkFrame(self, fg_color="#FFF9E6", corner_radius=6)
+        engine_frame.grid(row=row, column=0, padx=10, pady=(0, 10), sticky="ew")
+        engine_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(engine_frame, text="TTS Engine:", 
+                    text_color=self.text_color,
+                    font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
+        
+        engine_dropdown = ctk.CTkOptionMenu(
+            engine_frame,
+            variable=self.app.tts_engine,
+            values=["chatterbox", "xtts"],
+            text_color="black",
+            width=200
+        )
+        engine_dropdown.grid(row=0, column=1, padx=(5, 15), pady=10, sticky="w")
+        CTkToolTip(engine_dropdown, "Select TTS engine. Chatterbox = fast but British-biased. XTTS = better accent preservation.")
+        row += 1
+        
         # Reference Audio
         ctk.CTkLabel(self, text="Reference Audio:", text_color=self.text_color).grid(row=row, column=0, padx=10, pady=5, sticky="w")
         ref_entry_frame = ctk.CTkFrame(self, fg_color="transparent")
