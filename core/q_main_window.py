@@ -1,8 +1,12 @@
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTabWidget, QLabel, QHBoxLayout, QSplitter
+from PySide6.QtCore import Qt
+from qt_material import apply_stylesheet
+from core.state import AppState
+
 from ui.views.generation_view import GenerationView
 from ui.views.chapters_view import ChaptersView
 from ui.views.setup_view import SetupView
 from ui.views.playlist_view import PlaylistView
-from PySide6.QtWidgets import QSplitter
 
 class QChatterboxMainWindow(QMainWindow):
     def __init__(self, app_state: AppState):
