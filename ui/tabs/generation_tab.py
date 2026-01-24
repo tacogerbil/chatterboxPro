@@ -305,7 +305,7 @@ class GenerationTab(ctk.CTkFrame):
         # --- ADVANCED SETTINGS (Collapsible) ---
         self.advanced_visible = ctk.BooleanVar(value=False)  # Start collapsed
         
-        advanced_label = ctk.CTkFrame(self.scroll_container, text="▶ Advanced Settings", 
+        advanced_label = ctk.CTkLabel(self.scroll_container, text="▶ Advanced Settings", 
                                      font=ctk.CTkFont(size=13, weight="bold"),
                                      text_color=self.text_color, cursor="hand2")
         advanced_label.grid(row=row, column=0, padx=10, pady=5, sticky="w")
