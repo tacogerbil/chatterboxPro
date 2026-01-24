@@ -1,3 +1,4 @@
+import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTabWidget, QLabel, QHBoxLayout, QSplitter
 from PySide6.QtCore import Qt
 from qt_material import apply_stylesheet
