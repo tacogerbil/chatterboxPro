@@ -1,7 +1,8 @@
 from ui.views.generation_view import GenerationView
 from ui.views.chapters_view import ChaptersView
-
 from ui.views.setup_view import SetupView
+from ui.views.playlist_view import PlaylistView
+from PySide6.QtWidgets import QSplitter
 
 class QChatterboxMainWindow(QMainWindow):
     def __init__(self, app_state: AppState):
@@ -9,18 +10,37 @@ class QChatterboxMainWindow(QMainWindow):
         self.app_state = app_state
         
         self.setWindowTitle("Chatterbox Pro (Qt Edition)")
-        self.resize(1280, 800)
+        self.resize(1400, 900)
         
-        # Central Widget & Main Layout
+        # Central Widget
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
-        self.main_layout = QVBoxLayout(self.central_widget)
         
-        # Tab Widget
+        # Main Layout (Horizontal Split)
+        self.main_layout = QHBoxLayout(self.central_widget)
+        
+        # Splitter to allow resizing
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.main_layout.addWidget(self.splitter)
+        
+        # Left Side (Tabs)
         self.tabs = QTabWidget()
-        self.main_layout.addWidget(self.tabs)
+        self.splitter.addWidget(self.tabs)
         
-        # Add Placeholders for Tabs
+        # Right Side (Playlist)
+        self.playlist_view = PlaylistView(self.app_state)
+        # Wrap playlist in a widget to set min width or style if needed
+        self.playlist_container = QWidget()
+        pl_layout = QVBoxLayout(self.playlist_container)
+        pl_layout.setContentsMargins(0, 0, 0, 0)
+        pl_layout.addWidget(self.playlist_view)
+        
+        self.splitter.addWidget(self.playlist_container)
+        
+        # Set initial sizes (Tabs check roughly 65%, Playlist 35%)
+        self.splitter.setSizes([900, 500])
+        
+        # Add Tabs contents
         self._init_tabs()
         
         # Status Bar
