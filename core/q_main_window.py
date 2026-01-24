@@ -1,10 +1,4 @@
-import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTabWidget, QLabel
-from PySide6.QtCore import Qt
-from qt_material import apply_stylesheet
-
-# Import our decoupled State
-from core.state import AppState
+from ui.views.generation_view import GenerationView
 
 class QChatterboxMainWindow(QMainWindow):
     def __init__(self, app_state: AppState):
@@ -45,11 +39,8 @@ class QChatterboxMainWindow(QMainWindow):
         chapters_layout.addStretch()
         self.tabs.addTab(chapters_tab, "2. Chapters")
         
-        # 3. Generation Tab (Placeholder)
-        gen_tab = QWidget()
-        gen_layout = QVBoxLayout(gen_tab)
-        gen_layout.addWidget(QLabel("Generation Tab Placeholder"))
-        gen_layout.addStretch()
+        # 3. Generation Tab (Implemented)
+        gen_tab = GenerationView(self.app_state)
         self.tabs.addTab(gen_tab, "3. Generation")
 
 def launch_qt_app():
