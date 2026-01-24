@@ -361,7 +361,8 @@ class GenerationTab(ctk.CTkFrame):
         ctk.CTkFrame(self.scroll_container,  fg_color="transparent", height=20).grid(row=row, column=0); row += 1
         
         # Save Template Button
-        ctk.CTkLabel(self.scroll_container,  text="💾 Save as Template...", command=self.app.save_generation_template,
+        # Save Template Button
+        ctk.CTkButton(self.scroll_container,  text="💾 Save as Template...", command=self.app.save_generation_template,
                      text_color="black", height=35).grid(row=row, column=0, padx=10, pady=(10, 10), sticky="ew")
     def _update_path_display(self):
         """Update the model path display when engine changes."""
