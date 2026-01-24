@@ -34,7 +34,19 @@ class ChaptersTab(ctk.CTkFrame):
         )
         self.app.auto_regen_main_checkbox.pack(side="right", padx=5)
         
+        # Reset Generation button
+        ctk.CTkButton(
+            btn_frame, 
+            text="🔄 Reset Generation", 
+            command=self.reset_generation,
+            fg_color="#C0392B",
+            hover_color="#A93226",
+            width=140,
+            text_color="white"
+        ).pack(side="right", padx=5)
+        
         ctk.CTkButton(btn_frame, text="↻ Refresh List", command=self.refresh_chapters, width=100, text_color="black").pack(side="right", padx=5)
+
 
         # Selection Helpers
         sel_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -148,3 +160,22 @@ class ChaptersTab(ctk.CTkFrame):
         self.app.playlist_frame.last_clicked_index = index
         self.app.playlist_frame._update_all_visuals()
         self.app.playlist_frame.update_stats_panel()
+    
+    def reset_generation(self):
+        """Reset all generation status and delete audio files."""
+        from tkinter import messagebox
+        
+        # Confirm with user
+        response = messagebox.askyesno(
+            "Reset Generation?",
+            "This will:\n\n"
+            "• Clear all generation status flags\n"
+            "• Delete all generated audio files\n"
+            "• Reset marked/failed flags\n\n"
+            "Text content and settings will NOT be affected.\n\n"
+            "This action cannot be undone. Continue?",
+            icon='warning'
+        )
+        
+        if response:
+            self.app.reset_all_generation_status()

@@ -112,10 +112,16 @@ class ChatterboxProGUI(ctk.CTk):
         self.auto_assemble_after_run = ctk.BooleanVar(value=True)
         self.tts_engine = ctk.StringVar(value="chatterbox")  # TTS engine selection
         
+        # Voice Effects Parameters
+        self.pitch_shift = ctk.DoubleVar(value=0.0)  # -12 to +12 semitones
+        self.timbre_shift = ctk.DoubleVar(value=0.0)  # -3 to +3 formant shift
+        self.gruffness = ctk.DoubleVar(value=0.0)  # 0.0 to 1.0 intensity
+        
         # Auto-Regeneration Control Variables
         self.auto_regen_main = ctk.BooleanVar(value=False)
         self.auto_regen_sub = ctk.BooleanVar(value=False)
         self.auto_fix_stage = "NONE"  # NONE, MAIN_INITIAL, MAIN_RETRY_1, MAIN_SPLIT, MAIN_LOOP, SUB_LOOP
+
         
         # Dual-GPU detection and control
         self.gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
@@ -157,6 +163,56 @@ class ChatterboxProGUI(ctk.CTk):
                 logging.info(f"Deleted orphaned audio file: {f_path.name}")
             except OSError as e:
                 logging.error(f"Failed to delete audio file {f_path}: {e}")
+    
+    def reset_all_generation_status(self):
+        """Reset all generation status flags and delete all audio files."""
+        if not self.sentences:
+            messagebox.showinfo("No Data", "No text loaded to reset.")
+            return
+        
+        try:
+            # Reset all sentence flags
+            for item in self.sentences:
+                item['tts_generated'] = None
+                item['marked'] = False
+                item.pop('error_message', None)
+                item.pop('similarity_ratio', None)
+                item.pop('generation_seed', None)
+            
+            # Delete all audio files in session directory
+            if self.session_name.get():
+                audio_dir = Path(self.OUTPUTS_DIR) / self.session_name.get() / "Sentence_wavs"
+                if audio_dir.exists():
+                    deleted_count = 0
+                    for audio_file in audio_dir.glob("audio_*.wav"):
+                        try:
+                            audio_file.unlink()
+                            deleted_count += 1
+                        except OSError as e:
+                            logging.error(f"Failed to delete {audio_file}: {e}")
+                    
+                    logging.info(f"Deleted {deleted_count} audio files")
+                    messagebox.showinfo(
+                        "Reset Complete",
+                        f"Generation status reset successfully.\n\n"
+                        f"• Cleared {len(self.sentences)} chunk statuses\n"
+                        f"• Deleted {deleted_count} audio files\n\n"
+                        f"You can now start generation from scratch."
+                    )
+                else:
+                    messagebox.showinfo(
+                        "Reset Complete",
+                        f"Generation status reset successfully.\n\n"
+                        f"• Cleared {len(self.sentences)} chunk statuses\n"
+                        f"• No audio files found to delete"
+                    )
+            
+            # Refresh playlist view
+            self.playlist_frame.refresh_view()
+            
+        except Exception as e:
+            logging.error(f"Error during reset: {e}", exc_info=True)
+            messagebox.showerror("Reset Failed", f"An error occurred during reset: {e}")
 
     def on_closing(self):
         if not messagebox.askokcancel("Quit", "Do you want to quit? This will stop any ongoing processes."):
@@ -971,9 +1027,52 @@ class ChatterboxProGUI(ctk.CTk):
             if hasattr(self, 'generation_tab') and hasattr(self.generation_tab, 'preview_button'):
                 self.after(0, lambda: self.generation_tab.preview_button.configure(state="normal", text="▶ Generate Preview"))
 
+    def _apply_voice_effects_to_preview(self, preview_path):
+        """Apply voice effects to preview audio if any are set."""
+        from utils.voice_effects import apply_voice_effects
+        
+        pitch = self.pitch_shift.get()
+        timbre = self.timbre_shift.get()
+        gruffness = self.gruffness.get()
+        
+        # Only apply if effects are non-zero
+        if pitch == 0 and timbre == 0 and gruffness == 0:
+            return preview_path
+        
+        try:
+            # Create temp output path
+            preview_path_obj = Path(preview_path)
+            effects_path = preview_path_obj.parent / f"{preview_path_obj.stem}_effects{preview_path_obj.suffix}"
+            
+            # Apply effects
+            success = apply_voice_effects(
+                str(preview_path),
+                str(effects_path),
+                pitch=pitch,
+                timbre=timbre,
+                gruffness=gruffness
+            )
+            
+            if success and effects_path.exists():
+                # Delete original, rename effects version
+                preview_path_obj.unlink()
+                effects_path.rename(preview_path)
+                logging.info(f"Applied voice effects to preview: pitch={pitch}, timbre={timbre}, gruffness={gruffness}")
+            else:
+                logging.warning("Voice effects failed, using original preview")
+            
+            return preview_path
+            
+        except Exception as e:
+            logging.error(f"Error applying voice effects to preview: {e}")
+            return preview_path
+
     def _play_preview_audio(self, audio_path):
         """Play the preview audio file."""
         try:
+            # Apply voice effects before playing
+            audio_path = self._apply_voice_effects_to_preview(audio_path)
+            
             self.stop_playback()  # Stop any currently playing audio
             sound = pygame.mixer.Sound(audio_path)
             sound.play()
@@ -981,6 +1080,7 @@ class ChatterboxProGUI(ctk.CTk):
         except Exception as e:
             logging.error(f"Failed to play preview: {e}")
             messagebox.showerror("Playback Error", f"Could not play preview: {e}")
+
 
     def _get_indices_to_process(self):
         if self.apply_fix_to_all_failed.get():
@@ -1094,6 +1194,10 @@ class ChatterboxProGUI(ctk.CTk):
             "metadata_artist": self.metadata_artist_str.get(), "metadata_album": self.metadata_album_str.get(),
             "metadata_title": self.metadata_title_str.get(),
             "auto_assemble_after_run": self.auto_assemble_after_run.get(),
+            # Voice Effects
+            "pitch_shift": self.pitch_shift.get(),
+            "timbre_shift": self.timbre_shift.get(),
+            "gruffness": self.gruffness.get(),
         }
         return settings
 
@@ -1116,6 +1220,10 @@ class ChatterboxProGUI(ctk.CTk):
             'metadata_artist': self.metadata_artist_str, 'metadata_album': self.metadata_album_str,
             'metadata_title': self.metadata_title_str,
             'auto_assemble_after_run': self.auto_assemble_after_run,
+            # Voice Effects
+            'pitch_shift': self.pitch_shift,
+            'timbre_shift': self.timbre_shift,
+            'gruffness': self.gruffness,
         }
         for key, var in all_settings_map.items():
             if key in settings:

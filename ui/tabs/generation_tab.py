@@ -161,6 +161,60 @@ class GenerationTab(ctk.CTkFrame):
         speed_slider.grid(row=row, column=0, padx=10, pady=8, sticky="ew"); row += 1
         
         # Spacer
+        ctk.CTkFrame(self, fg_color="transparent", height=10).grid(row=row, column=0); row += 1
+        
+        # --- VOICE EFFECTS SECTION ---
+        ctk.CTkLabel(self, text="🎛️ Voice Effects (FFmpeg Post-Processing)", 
+                    font=ctk.CTkFont(size=13, weight="bold"), 
+                    text_color=self.text_color).grid(row=row, column=0, pady=(5, 5), padx=10, sticky="w")
+        row += 1
+        
+        # Pitch Shift Slider
+        pitch_slider = LabeledSlider(
+            self,
+            label_text="Pitch Shift:",
+            variable=self.app.pitch_shift,
+            from_value=-12.0,
+            to_value=12.0,
+            left_label="Lower",
+            right_label="Higher",
+            tooltip="Shift voice pitch. Negative = deeper voice, Positive = higher voice, 0 = no change. Range: ±12 semitones (1 octave).",
+            number_of_steps=240,
+            text_color=self.text_color
+        )
+        pitch_slider.grid(row=row, column=0, padx=10, pady=8, sticky="ew"); row += 1
+        
+        # Timbre Slider
+        timbre_slider = LabeledSlider(
+            self,
+            label_text="Timbre:",
+            variable=self.app.timbre_shift,
+            from_value=-3.0,
+            to_value=3.0,
+            left_label="Warmer",
+            right_label="Brighter",
+            tooltip="Adjust vocal character/formants. Negative = warmer/darker tone, Positive = brighter/thinner tone, 0 = no change.",
+            number_of_steps=60,
+            text_color=self.text_color
+        )
+        timbre_slider.grid(row=row, column=0, padx=10, pady=8, sticky="ew"); row += 1
+        
+        # Gruffness Slider
+        gruffness_slider = LabeledSlider(
+            self,
+            label_text="Gruffness:",
+            variable=self.app.gruffness,
+            from_value=0.0,
+            to_value=1.0,
+            left_label="Smooth",
+            right_label="Gravelly",
+            tooltip="Add vocal texture/rasp. 0 = clean voice, 1 = maximum gruffness/gravelly texture.",
+            number_of_steps=100,
+            text_color=self.text_color
+        )
+        gruffness_slider.grid(row=row, column=0, padx=10, pady=8, sticky="ew"); row += 1
+        
+        # Spacer
         ctk.CTkFrame(self, fg_color="transparent", height=15).grid(row=row, column=0); row += 1
         
         # Generation Order
