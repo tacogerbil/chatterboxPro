@@ -26,6 +26,8 @@ from ui.tabs.chapters_tab import ChaptersTab
 
 from core.orchestrator import GenerationOrchestrator
 from core.audio_manager import AudioManager
+from core.services.project_service import ProjectService
+from core.state import AppState
 from utils.text_processor import TextPreprocessor
 
 try: from bs4 import BeautifulSoup
@@ -61,6 +63,10 @@ class ChatterboxProGUI(ctk.CTk):
             self.iconbitmap("assets/icon.ico")
         except tk.TclError:
             logging.warning("assets/icon.ico not found.")
+
+        # Core Services & State
+        self.app_state = AppState()
+        self.project_service = ProjectService(outputs_dir="Outputs_Pro")
 
         self.orchestrator = GenerationOrchestrator(self)
         self.audio_manager = AudioManager(self)
@@ -156,13 +162,8 @@ class ChatterboxProGUI(ctk.CTk):
         if not self.session_name.get() or not uuid_to_delete:
             return
             
-        f_path = Path(self.OUTPUTS_DIR) / self.session_name.get() / "Sentence_wavs" / f"audio_{uuid_to_delete}.wav"
-        if f_path.exists():
-            try:
-                os.remove(f_path)
-                logging.info(f"Deleted orphaned audio file: {f_path.name}")
-            except OSError as e:
-                logging.error(f"Failed to delete audio file {f_path}: {e}")
+        # Use Service
+        self.project_service.delete_audio_file(self.session_name.get(), uuid_to_delete)
     
     def reset_all_generation_status(self):
         """Reset all generation status flags and delete all audio files."""
@@ -185,49 +186,19 @@ class ChatterboxProGUI(ctk.CTk):
         if not response:
             return
         
-        try:
-            # Reset all sentence flags
-            for item in self.sentences:
-                item['tts_generated'] = None
-                item['marked'] = False
-                item.pop('error_message', None)
-                item.pop('similarity_ratio', None)
-                item.pop('generation_seed', None)
+        # Use Service
+        stats = self.project_service.reset_generation_status(self.sentences, self.session_name.get())
+        
+        # UI Feedback
+        msg = (f"Reset Complete:\n"
+               f"- Processed {stats['reset_count']} items\n"
+               f"- Deleted {stats['deleted_files']} audio files")
+        
+        if stats['errors'] > 0:
+            msg += f"\n- Encountered {stats['errors']} deletion errors (check log)"
             
-            # Delete all audio files in session directory
-            if self.session_name.get():
-                audio_dir = Path(self.OUTPUTS_DIR) / self.session_name.get() / "Sentence_wavs"
-                if audio_dir.exists():
-                    deleted_count = 0
-                    for audio_file in audio_dir.glob("audio_*.wav"):
-                        try:
-                            audio_file.unlink()
-                            deleted_count += 1
-                        except OSError as e:
-                            logging.error(f"Failed to delete {audio_file}: {e}")
-                    
-                    logging.info(f"Deleted {deleted_count} audio files")
-                    messagebox.showinfo(
-                        "Reset Complete",
-                        f"Generation status reset successfully.\n\n"
-                        f"• Cleared {len(self.sentences)} chunk statuses\n"
-                        f"• Deleted {deleted_count} audio files\n\n"
-                        f"You can now start generation from scratch."
-                    )
-                else:
-                    messagebox.showinfo(
-                        "Reset Complete",
-                        f"Generation status reset successfully.\n\n"
-                        f"• Cleared {len(self.sentences)} chunk statuses\n"
-                        f"• No audio files found to delete"
-                    )
-            
-            # Refresh playlist view
-            self.playlist_frame.refresh_view()
-            
-        except Exception as e:
-            logging.error(f"Error during reset: {e}", exc_info=True)
-            messagebox.showerror("Reset Failed", f"An error occurred during reset: {e}")
+        messagebox.showinfo("Reset Complete", msg)
+        self.playlist_frame.refresh_view()
 
 
     def on_closing(self):
