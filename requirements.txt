@@ -31,6 +31,11 @@ CTkToolTip==0.8
 CTkMessagebox==2.7
 pygame==2.6.1
 
+# --- Qt Migration ---
+PySide6==6.8.1
+pyqtgraph==0.13.7
+qt-material==2.14
+
 # --- Text & File Processing ---
 sentence-splitter==1.4
 pdftextract==0.0.5
