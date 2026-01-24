@@ -105,7 +105,7 @@ class GenerationTab(ctk.CTkFrame):
         
         # Exaggeration Slider
         exag_slider = LabeledSlider(
-            self, 
+            self.scroll_container, 
             label_text="Exaggeration:",
             variable=self.app.exaggeration,
             from_value=0.0,
@@ -120,7 +120,7 @@ class GenerationTab(ctk.CTkFrame):
         
         # CFG Weight Slider
         cfg_slider = LabeledSlider(
-            self,
+            self.scroll_container,
             label_text="Voice Similarity:",
             variable=self.app.cfg_weight,
             from_value=0.0,
@@ -135,7 +135,7 @@ class GenerationTab(ctk.CTkFrame):
         
         # Temperature Slider
         temp_slider = LabeledSlider(
-            self,
+            self.scroll_container,
             label_text="Temperature:",
             variable=self.app.temperature,
             from_value=0.5,
@@ -150,7 +150,7 @@ class GenerationTab(ctk.CTkFrame):
         
         # Speed Slider
         speed_slider = LabeledSlider(
-            self,
+            self.scroll_container,
             label_text="Speed:",
             variable=self.app.speed,
             from_value=0.5,
@@ -174,7 +174,7 @@ class GenerationTab(ctk.CTkFrame):
         
         # Pitch Shift Slider
         pitch_slider = LabeledSlider(
-            self,
+            self.scroll_container,
             label_text="Pitch Shift:",
             variable=self.app.pitch_shift,
             from_value=-12.0,
@@ -189,7 +189,7 @@ class GenerationTab(ctk.CTkFrame):
         
         # Timbre Slider
         timbre_slider = LabeledSlider(
-            self,
+            self.scroll_container,
             label_text="Timbre:",
             variable=self.app.timbre_shift,
             from_value=-3.0,
@@ -204,7 +204,7 @@ class GenerationTab(ctk.CTkFrame):
         
         # Gruffness Slider
         gruffness_slider = LabeledSlider(
-            self,
+            self.scroll_container,
             label_text="Gruffness:",
             variable=self.app.gruffness,
             from_value=0.0,
