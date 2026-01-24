@@ -1,17 +1,35 @@
 from ui.views.generation_view import GenerationView
 from ui.views.chapters_view import ChaptersView
 
+from ui.views.setup_view import SetupView
+
 class QChatterboxMainWindow(QMainWindow):
     def __init__(self, app_state: AppState):
-        # ... (same) ...
+        super().__init__()
+        self.app_state = app_state
+        
+        self.setWindowTitle("Chatterbox Pro (Qt Edition)")
+        self.resize(1280, 800)
+        
+        # Central Widget & Main Layout
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+        
+        # Tab Widget
+        self.tabs = QTabWidget()
+        self.main_layout.addWidget(self.tabs)
+        
+        # Add Placeholders for Tabs
+        self._init_tabs()
+        
+        # Status Bar
+        self.statusBar().showMessage("Ready")
 
     def _init_tabs(self):
         """Initialize the tabs (Setup, Chapters, Generation, etc.)"""
-        # 1. Setup Tab (Placeholder)
-        setup_tab = QWidget()
-        setup_layout = QVBoxLayout(setup_tab)
-        setup_layout.addWidget(QLabel("Setup Tab Placeholder"))
-        setup_layout.addStretch()
+        # 1. Setup Tab (Implemented)
+        setup_tab = SetupView(self.app_state)
         self.tabs.addTab(setup_tab, "1. Setup")
         
         # 2. Chapters Tab (Implemented)
