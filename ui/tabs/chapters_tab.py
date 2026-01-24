@@ -1,13 +1,15 @@
 import customtkinter as ctk
+from core.services.chapter_service import ChapterService
 
 class ChaptersTab(ctk.CTkFrame):
     def __init__(self, master, app_instance):
         super().__init__(master, fg_color="transparent")
         self.app = app_instance
+        self.chapter_service = ChapterService() # Initialize Service
         self.chapter_vars = [] # Store IntVar/BooleanVar for checkboxes
         self.found_chapters_indices = [] # Store tuples (real_index, item)
 
-        # Grid layout
+        # ... (Grid layout and Header implementation same as before) ...
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
@@ -64,9 +66,8 @@ class ChaptersTab(ctk.CTkFrame):
             ctk.CTkLabel(self.scroll_frame, text="No text loaded.", text_color="gray").pack(pady=20)
             return
 
-        for i, item in enumerate(self.app.sentences):
-            if item.get('is_chapter_heading'):
-                self.found_chapters_indices.append((i, item))
+        # Use Service to detect chapters
+        self.found_chapters_indices = self.chapter_service.detect_chapters(self.app.sentences)
 
         if not self.found_chapters_indices:
             ctk.CTkLabel(self.scroll_frame, text="No chapters detected.\n\nUse 'Insert Chapter' in the Editing panel to mark them manually.", text_color="gray").pack(pady=20)
@@ -109,24 +110,12 @@ class ChaptersTab(ctk.CTkFrame):
         if not messagebox.askyesno("Confirm Generation", f"Generate audio for {len(selected_indices)} selected chapter(s)?"):
             return
 
-        # Calculate range of sentence indices
-        indices_to_process = []
-        
-        for ch_idx in selected_indices:
-            # Start is the index of the chapter heading
-            start_real_index = self.found_chapters_indices[ch_idx][0]
-            
-            # End is the index of the next chapter heading, or the end of the list
-            if ch_idx + 1 < len(self.found_chapters_indices):
-                end_real_index = self.found_chapters_indices[ch_idx + 1][0]
-            else:
-                end_real_index = len(self.app.sentences)
-                
-            # Collect all indices in [start, end)
-            indices_to_process.extend(range(start_real_index, end_real_index))
-            
-        # Ensure unique and sorted (though typical selection should be disjoint)
-        indices_to_process = sorted(list(set(indices_to_process)))
+        # Use Service to get range of indices
+        indices_to_process = self.chapter_service.get_indices_for_chapters(
+            self.app.sentences,
+            self.found_chapters_indices,
+            selected_indices
+        )
         
         if not indices_to_process:
             messagebox.showerror("Error", "Selected chapters appear to be empty ranges.")
