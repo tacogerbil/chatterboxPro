@@ -93,7 +93,8 @@ class ControlsFrame(ctk.CTkFrame):
 
         ctk.CTkButton(editing_frame, text="M Mark", command=self.app.mark_current_sentence, **button_kwargs).grid(row=1, column=0, padx=2, pady=2, sticky="ew")
         ctk.CTkButton(editing_frame, text="✓ Mark Passed", command=self.app.mark_as_passed, fg_color="#2ECC71", hover_color="#27AE60", **button_kwargs).grid(row=1, column=1, padx=2, pady=2, sticky="ew")
-        ctk.CTkButton(editing_frame, text="❌ Delete", command=self.app.delete_selected_blocks, fg_color="#E59866", hover_color="#D35400", **button_kwargs).grid(row=1, column=2, columnspan=2, padx=2, pady=2, sticky="ew")
+        ctk.CTkButton(editing_frame, text="🔄 Reset Generation", command=self.app.reset_all_generation_status, fg_color="#C0392B", hover_color="#A93226", text_color="white").grid(row=1, column=2, columnspan=2, padx=2, pady=2, sticky="ew")
+        ctk.CTkButton(editing_frame, text="❌ Delete", command=self.app.delete_selected_blocks, fg_color="#E59866", hover_color="#D35400", **button_kwargs).grid(row=1, column=4, padx=2, pady=2, sticky="ew")
 
         # --- Group 3: Batch Fix & Regeneration ---
         fixit_collapsible = CollapsibleFrame(self, text="Batch Fix & Regeneration", start_open=False, **collapsible_kwargs)

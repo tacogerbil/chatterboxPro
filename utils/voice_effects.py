@@ -130,22 +130,26 @@ def apply_gruffness(input_path: str, output_path: str, intensity: float) -> bool
         return True
     
     try:
-        # Simulate gruffness with:
-        # 1. Subtle distortion (overdrive)
+        # Simulate gruffness with universally available filters:
+        # 1. Boost volume slightly for saturation effect
         # 2. High-pass filter to emphasize breathiness
-        # 3. Slight compression
+        # 3. Bass boost for depth
+        # 4. Treble boost for edge
         
         # Scale intensity to effect parameters
-        overdrive_gain = 1 + (intensity * 5)  # 1-6 gain
-        overdrive_color = 10 + (intensity * 20)  # 10-30 color
+        volume_boost = 1 + (intensity * 0.5)  # 1.0-1.5x volume
+        bass_boost = intensity * 6  # 0-6dB bass boost
+        treble_boost = intensity * 4  # 0-4dB treble boost
         
         filters = [
-            # Subtle overdrive for harmonic distortion
-            f'overdrive=gain={overdrive_gain}:colour={overdrive_color}',
+            # Slight volume boost for saturation
+            f'volume={volume_boost}',
             # High-pass to emphasize breathiness
-            f'highpass=f=100',
-            # Compression to even out dynamics
-            f'acompressor=threshold=-20dB:ratio=3:attack=5:release=50'
+            f'highpass=f=120',
+            # Bass boost for depth/gruffness
+            f'bass=g={bass_boost}:f=200:w=1',
+            # Treble boost for edge/rasp
+            f'treble=g={treble_boost}:f=4000:w=1'
         ]
         
         filter_chain = ','.join(filters)
@@ -219,12 +223,14 @@ def apply_voice_effects(
         
         # Gruffness
         if gruffness > 0:
-            overdrive_gain = 1 + (gruffness * 5)
-            overdrive_color = 10 + (gruffness * 20)
+            volume_boost = 1 + (gruffness * 0.5)
+            bass_boost = gruffness * 6
+            treble_boost = gruffness * 4
             filters.extend([
-                f'overdrive=gain={overdrive_gain}:colour={overdrive_color}',
-                'highpass=f=100',
-                'acompressor=threshold=-20dB:ratio=3:attack=5:release=50'
+                f'volume={volume_boost}',
+                'highpass=f=120',
+                f'bass=g={bass_boost}:f=200:w=1',
+                f'treble=g={treble_boost}:f=4000:w=1'
             ])
         
         # Combine all filters

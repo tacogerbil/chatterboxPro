@@ -170,6 +170,21 @@ class ChatterboxProGUI(ctk.CTk):
             messagebox.showinfo("No Data", "No text loaded to reset.")
             return
         
+        # Confirm with user
+        response = messagebox.askyesno(
+            "Reset Generation?",
+            "This will:\n\n"
+            "• Clear all generation status flags\n"
+            "• Delete all generated audio files\n"
+            "• Reset marked/failed flags\n\n"
+            "Text content and settings will NOT be affected.\n\n"
+            "This action cannot be undone. Continue?",
+            icon='warning'
+        )
+        
+        if not response:
+            return
+        
         try:
             # Reset all sentence flags
             for item in self.sentences:
@@ -213,6 +228,7 @@ class ChatterboxProGUI(ctk.CTk):
         except Exception as e:
             logging.error(f"Error during reset: {e}", exc_info=True)
             messagebox.showerror("Reset Failed", f"An error occurred during reset: {e}")
+
 
     def on_closing(self):
         if not messagebox.askokcancel("Quit", "Do you want to quit? This will stop any ongoing processes."):

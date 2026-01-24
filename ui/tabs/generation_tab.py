@@ -9,23 +9,26 @@ class GenerationTab(ctk.CTkFrame):
     def __init__(self, master, app_instance):
         super().__init__(master, fg_color="transparent")
         self.app = app_instance
-        self.text_color = "#E0E0E0"
+        self.text_color = self.app.text_color
         self.engine_config = get_engine_config()  # Initialize config
         
-        self.grid_columnconfigure(0, weight=1)
-        self.text_color = self.app.text_color
-
-        self.grid_columnconfigure(0, weight=1)
+        # Create scrollable container for all content
+        self.scroll_container = ctk.CTkScrollableFrame(
+            self, 
+            fg_color="transparent"
+        )
+        self.scroll_container.pack(fill="both", expand=True, padx=5, pady=5)
+        self.scroll_container.grid_columnconfigure(0, weight=1)
         
         # Header
-        ctk.CTkLabel(self, text="TTS Generation Parameters", 
+        ctk.CTkLabel(self.scroll_container, text="TTS Generation Parameters", 
                     font=ctk.CTkFont(size=16, weight="bold"), 
                     text_color=self.text_color).grid(row=0, column=0, pady=10, padx=10, sticky="w")
         
         row = 1
         
         # --- TTS ENGINE SELECTION ---
-        engine_frame = ctk.CTkFrame(self, fg_color="#FFF9E6", corner_radius=6)
+        engine_frame =.CTk, fg_color="#FFF9E6", corner_radius=6)
         engine_frame.grid(row=row, column=0, padx=10, pady=(0, 10), sticky="ew")
         engine_frame.grid_columnconfigure(1, weight=1)
         
@@ -82,8 +85,8 @@ class GenerationTab(ctk.CTkFrame):
         row += 1
         
         # Reference Audio
-        ctk.CTkLabel(self, text="Reference Audio:", text_color=self.text_color).grid(row=row, column=0, padx=10, pady=5, sticky="w")
-        ref_entry_frame = ctk.CTkFrame(self, fg_color="transparent")
+.CTk, text="Reference Audio:", text_color=self.text_color).grid(row=row, column=0, padx=10, pady=5, sticky="w")
+        ref_entry_frame =.CTk, fg_color="transparent")
         ref_entry_frame.grid(row=row, column=0, padx=10, pady=5, sticky="ew")
         ref_entry_frame.grid_columnconfigure(0, weight=1)
         ref_entry = ctk.CTkEntry(ref_entry_frame, textvariable=self.app.ref_audio_path, text_color=self.text_color)
@@ -96,7 +99,7 @@ class GenerationTab(ctk.CTkFrame):
         row += 1
         
         # Spacer
-        ctk.CTkFrame(self, fg_color="transparent", height=15).grid(row=row, column=0); row += 1
+.CTk, fg_color="transparent", height=15).grid(row=row, column=0); row += 1
         
         # --- SLIDER CONTROLS ---
         
@@ -161,10 +164,10 @@ class GenerationTab(ctk.CTkFrame):
         speed_slider.grid(row=row, column=0, padx=10, pady=8, sticky="ew"); row += 1
         
         # Spacer
-        ctk.CTkFrame(self, fg_color="transparent", height=10).grid(row=row, column=0); row += 1
+.CTk, fg_color="transparent", height=10).grid(row=row, column=0); row += 1
         
         # --- VOICE EFFECTS SECTION ---
-        ctk.CTkLabel(self, text="🎛️ Voice Effects (FFmpeg Post-Processing)", 
+.CTk, text="🎛️ Voice Effects (FFmpeg Post-Processing)", 
                     font=ctk.CTkFont(size=13, weight="bold"), 
                     text_color=self.text_color).grid(row=row, column=0, pady=(5, 5), padx=10, sticky="w")
         row += 1
@@ -215,10 +218,10 @@ class GenerationTab(ctk.CTkFrame):
         gruffness_slider.grid(row=row, column=0, padx=10, pady=8, sticky="ew"); row += 1
         
         # Spacer
-        ctk.CTkFrame(self, fg_color="transparent", height=15).grid(row=row, column=0); row += 1
+.CTk, fg_color="transparent", height=15).grid(row=row, column=0); row += 1
         
         # Generation Order
-        order_frame = ctk.CTkFrame(self, fg_color="transparent")
+        order_frame =.CTk, fg_color="transparent")
         order_frame.grid(row=row, column=0, padx=10, pady=5, sticky="ew")
         order_frame.grid_columnconfigure(1, weight=1)
         
@@ -230,7 +233,7 @@ class GenerationTab(ctk.CTkFrame):
         row += 1
 
         # Items Per Page
-        page_size_frame = ctk.CTkFrame(self, fg_color="transparent")
+        page_size_frame =.CTk, fg_color="transparent")
         page_size_frame.grid(row=row, column=0, padx=10, pady=5, sticky="ew")
 
         ctk.CTkLabel(page_size_frame, text="Items Per Page:", text_color=self.text_color).pack(side="left", padx=(0, 10))
@@ -250,10 +253,10 @@ class GenerationTab(ctk.CTkFrame):
         row += 1
         
         # Spacer
-        ctk.CTkFrame(self, fg_color="transparent", height=20).grid(row=row, column=0); row += 1
+.CTk, fg_color="transparent", height=20).grid(row=row, column=0); row += 1
         
         # --- VOICE PREVIEW SECTION ---
-        preview_frame = ctk.CTkFrame(self, fg_color="#F5F5F5", corner_radius=6)
+        preview_frame =.CTk, fg_color="#F5F5F5", corner_radius=6)
         preview_frame.grid(row=row, column=0, padx=10, pady=10, sticky="ew")
         preview_frame.grid_columnconfigure(0, weight=1)
         
@@ -297,12 +300,12 @@ class GenerationTab(ctk.CTkFrame):
         row += 1
         
         # Spacer
-        ctk.CTkFrame(self, fg_color="transparent", height=20).grid(row=row, column=0); row += 1
+.CTk, fg_color="transparent", height=20).grid(row=row, column=0); row += 1
         
         # --- ADVANCED SETTINGS (Collapsible) ---
         self.advanced_visible = ctk.BooleanVar(value=False)  # Start collapsed
         
-        advanced_label = ctk.CTkLabel(self, text="▶ Advanced Settings", 
+        advanced_label =.CTk, text="▶ Advanced Settings", 
                                      font=ctk.CTkFont(size=13, weight="bold"),
                                      text_color=self.text_color, cursor="hand2")
         advanced_label.grid(row=row, column=0, padx=10, pady=5, sticky="w")
@@ -325,7 +328,7 @@ class GenerationTab(ctk.CTkFrame):
         row += 1
         
         # Advanced settings frame
-        self.advanced_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.advanced_frame =.CTk, fg_color="transparent")
         self.advanced_frame.grid(row=row, column=0, padx=20, pady=5, sticky="ew")
         self.advanced_frame.grid_columnconfigure(1, weight=1)
         self.advanced_frame.grid_remove()  # Start hidden
@@ -355,10 +358,10 @@ class GenerationTab(ctk.CTkFrame):
         row += 1
         
         # Spacer
-        ctk.CTkFrame(self, fg_color="transparent", height=20).grid(row=row, column=0); row += 1
+.CTk, fg_color="transparent", height=20).grid(row=row, column=0); row += 1
         
         # Save Template Button
-        ctk.CTkButton(self, text="💾 Save as Template...", command=self.app.save_generation_template, 
+.CTk, text="💾 Save as Template...", command=self.app.save_generation_template, 
                      text_color="black", height=35).grid(row=row, column=0, padx=10, pady=(10, 10), sticky="ew")
     def _update_path_display(self):
         """Update the model path display when engine changes."""
