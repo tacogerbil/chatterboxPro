@@ -7,7 +7,9 @@ from core.state import AppState
 from ui.views.generation_view import GenerationView
 from ui.views.chapters_view import ChaptersView
 from ui.views.setup_view import SetupView
+from ui.views.playlist_view import PlaylistView
 from ui.views.controls_view import ControlsView
+from ui.views.finalize_view import FinalizeView
 
 class QChatterboxMainWindow(QMainWindow):
     def __init__(self, app_state: AppState):
