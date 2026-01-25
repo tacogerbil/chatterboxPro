@@ -7,7 +7,7 @@ from core.state import AppState
 from ui.views.generation_view import GenerationView
 from ui.views.chapters_view import ChaptersView
 from ui.views.setup_view import SetupView
-from ui.views.playlist_view import PlaylistView
+from ui.views.controls_view import ControlsView
 
 class QChatterboxMainWindow(QMainWindow):
     def __init__(self, app_state: AppState):
@@ -32,13 +32,19 @@ class QChatterboxMainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.splitter.addWidget(self.tabs)
         
-        # Right Side (Playlist)
-        self.playlist_view = PlaylistView(self.app_state)
-        # Wrap playlist in a widget to set min width or style if needed
+        # Right Side (Playlist + Controls)
         self.playlist_container = QWidget()
         pl_layout = QVBoxLayout(self.playlist_container)
         pl_layout.setContentsMargins(0, 0, 0, 0)
-        pl_layout.addWidget(self.playlist_view)
+        
+        self.playlist_view = PlaylistView(self.app_state)
+        self.controls_view = ControlsView(self.app_state)
+        
+        # Connect Signals
+        self.controls_view.refresh_requested.connect(self.playlist_view.refresh)
+        
+        pl_layout.addWidget(self.playlist_view, stretch=2)
+        pl_layout.addWidget(self.controls_view, stretch=0) # Let it take natural height? No, stretch 0 means minimal necessary.
         
         self.splitter.addWidget(self.playlist_container)
         
@@ -64,6 +70,10 @@ class QChatterboxMainWindow(QMainWindow):
         # 3. Generation Tab (Implemented)
         gen_tab = GenerationView(self.app_state)
         self.tabs.addTab(gen_tab, "3. Generation")
+        
+        # 4. Finalize Tab (Implemented)
+        final_tab = FinalizeView(self.app_state)
+        self.tabs.addTab(final_tab, "4. Finalize")
 
 def launch_qt_app():
     """Entry point for the Qt application."""
