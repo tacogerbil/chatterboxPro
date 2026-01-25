@@ -158,3 +158,79 @@ class PlaylistService:
     def _renumber(self):
         for i, item in enumerate(self.state.sentences):
             item['sentence_number'] = str(i + 1)
+
+    def merge_failed_down(self) -> int:
+        """Merges failed chunks into the chunk below them."""
+        # Ported from legacy controls_frame.py logic (inferred) / main_window.py
+        merged_count = 0
+        i = 0
+        while i < len(self.state.sentences) - 1:
+            curr = self.state.sentences[i]
+            if curr.get('tts_generated') == 'failed':
+                next_item = self.state.sentences[i+1]
+                
+                # Merge text
+                merged_text = (curr.get('original_sentence', '') + " " + next_item.get('original_sentence', '')).strip()
+                next_item['original_sentence'] = merged_text
+                next_item['tts_generated'] = 'no'
+                next_item['marked'] = True
+                
+                # Remove current
+                self.state.sentences.pop(i)
+                merged_count += 1
+                # Don't increment i, check this index again (which is now the next_item)
+            else:
+                i += 1
+                
+        if merged_count > 0:
+            self._renumber()
+        return merged_count
+
+    def split_all_failed(self) -> int:
+        """Splits all failed chunks using the sentence splitter."""
+        split_count = 0
+        i = 0
+        while i < len(self.state.sentences):
+            item = self.state.sentences[i]
+            if item.get('tts_generated') == 'failed':
+                text = item.get('original_sentence', '')
+                split_sentences = self.processor.splitter.split(text)
+                
+                if len(split_sentences) > 1:
+                     new_items = []
+                     for s in split_sentences:
+                        if not s.strip(): continue
+                        new_items.append({
+                            "uuid": uuid.uuid4().hex,
+                            "original_sentence": s.strip(),
+                            "paragraph": "no",
+                            "tts_generated": "no",
+                            "marked": True,
+                            "is_chapter_heading": bool(self.processor.chapter_regex.match(s.strip()))
+                        })
+                     
+                     self.state.sentences[i:i+1] = new_items
+                     split_count += 1
+                     i += len(new_items) # Skip over new items
+                     continue
+            i += 1
+            
+        if split_count > 0:
+            self._renumber()
+        return split_count
+
+    def clean_special_chars_selected(self, indices: List[int]) -> int:
+        """Removes special chars from selected items."""
+        count = 0
+        for idx in indices:
+            if 0 <= idx < len(self.state.sentences):
+                item = self.state.sentences[idx]
+                text = item.get('original_sentence', '')
+                # Use TextPreprocessor's clean_text_aggressively
+                cleaned = self.processor.clean_text_aggressively(text)
+                if cleaned != text:
+                    item['original_sentence'] = cleaned
+                    item['tts_generated'] = 'no'
+                    item['marked'] = True
+                    count += 1
+        return count

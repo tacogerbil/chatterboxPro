@@ -93,11 +93,32 @@ class ControlsView(QWidget):
         page3 = QWidget()
         p3_layout = QVBoxLayout(page3)
         
-        btn_merge = QPushButton("Merge Failed Down (TODO)")
-        btn_regen = QPushButton("↻ Regenerate Marked")
-        btn_regen.setStyleSheet("background-color: #D35400; color: white;")
+        # Failed Chunk Fixes
+        btn_merge = QPushButton("Merge Failed Down")
+        btn_merge.clicked.connect(self.merge_failed_down)
+        
+        btn_split_failed = QPushButton("Split All Failed")
+        btn_split_failed.clicked.connect(self.split_all_failed)
         
         p3_layout.addWidget(btn_merge)
+        p3_layout.addWidget(btn_split_failed)
+        p3_layout.addWidget(QLabel("---"))
+        
+        # Cleaning Tools
+        clean_layout = QHBoxLayout()
+        btn_clean = QPushButton("Clean Special Chars")
+        btn_clean.clicked.connect(self.clean_selected)
+        # Filter Non-English (logic pending in Service but button ready)
+        # btn_filter = QPushButton("Filter Non-English")
+        
+        clean_layout.addWidget(btn_clean)
+        p3_layout.addLayout(clean_layout)
+        p3_layout.addWidget(QLabel("---"))
+        
+        btn_regen = QPushButton("↻ Regenerate Marked")
+        btn_regen.setStyleSheet("background-color: #D35400; color: white; font-weight: bold;")
+        btn_regen.clicked.connect(self.regenerate_marked)
+        
         p3_layout.addWidget(btn_regen)
         p3_layout.addStretch()
         
@@ -110,6 +131,34 @@ class ControlsView(QWidget):
         self.curr_search_idx = -1
 
     # --- Actions ---
+    def merge_failed_down(self):
+        count = self.service.merge_failed_down()
+        if count > 0:
+            QMessageBox.information(self, "Success", f"Merged {count} failed chunks.")
+            self.refresh_requested.emit()
+        else:
+            QMessageBox.information(self, "Info", "No failed chunks found to merge.")
+            
+    def split_all_failed(self):
+        count = self.service.split_all_failed()
+        if count > 0:
+            QMessageBox.information(self, "Success", f"Split {count} failed chunks.")
+            self.refresh_requested.emit()
+        else:
+            QMessageBox.information(self, "Info", "No valid splittable failed chunks found.")
+
+    def clean_selected(self):
+        # Determine selection... (Currently defaulting to all failed? No, originally was selection)
+        # But without selection wiring, let's offer "Clean All Failed" or just "Clean Current"?
+        # For parity, user might expect "Clean Selected".
+        # Since selection isn't wired, we'll implement "Clean All Marked" for now as a fallback?
+        # Or just show "Selection Wiring Needed" to be honest.
+        QMessageBox.information(self, "Clean", "Selection wiring pending. (Logic ready)")
+        
+    def regenerate_marked(self):
+        # Signal main window to start? Or just emit signal?
+        QMessageBox.information(self, "Regenerate", "Batch regen logic pending Phase 5 wiring.")
+
     def get_selected_indices(self):
         # This view doesn't own the selection. 
         # Ideally it should receive it or query the main window/state.

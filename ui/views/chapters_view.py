@@ -62,11 +62,9 @@ class ChaptersView(QWidget):
         
         footer_layout.addStretch()
         
-        # Generate Button
-        self.gen_btn = QPushButton("Generate Selected")
-        self.gen_btn.setStyleSheet("background-color: #D35400; color: white; font-weight: bold;")
-        self.gen_btn.clicked.connect(self.generate_selected)
-        footer_layout.addWidget(self.gen_btn)
+        # Generate Button (Removed - duplicate of Header)
+        # self.gen_btn = QPushButton("Generate Selected") ...
+        pass
         
         layout.addLayout(footer_layout)
 
