@@ -78,6 +78,10 @@ class ChaptersView(QWidget):
             idx = self.model.index(i, 0)
             self.model.setData(idx, Qt.Unchecked, Qt.CheckStateRole)
 
+
+    def set_generation_service(self, gen_service):
+        self.gen_service = gen_service
+
     def generate_selected(self):
         selected_chapters = self.model.get_selected_indices()
         if not selected_chapters:
@@ -90,18 +94,18 @@ class ChaptersView(QWidget):
             selected_chapters
         )
         
-        QMessageBox.information(self, "Generation", 
-                              f"Simulated Generation Start.\nIndices to process: {len(full_indices)}")
-        # Logic link: In real app, this would emit a signal: self.generation_requested.emit(full_indices)
+        if not hasattr(self, 'gen_service') or not self.gen_service:
+            QMessageBox.warning(self, "Error", "Generation Service not connected.")
+            return
+            
+        # Trigger generation
+        self.gen_service.start_generation(full_indices)
         
     def on_double_click(self, index):
         """Handle double click to jump to chapter start."""
         if not index.isValid(): return
         
         # Determine real index from model
-        # The model caches chapters in self.model._chapters
-        # But we shouldn't access private members if possible.
-        # Better: ask the model.
         real_idx = self.model.get_chapter_index(index.row())
         if real_idx >= 0:
             self.jump_requested.emit(real_idx)

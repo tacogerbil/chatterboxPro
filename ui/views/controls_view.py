@@ -143,6 +143,30 @@ class ControlsView(QWidget):
         """Stores reference to playlist for selection fetching."""
         self.playlist_view = playlist_view
 
+    def set_audio_service(self, audio_service):
+        """Stores reference to audio service for playback."""
+        self.audio_service = audio_service
+        # Verify connection
+        self.playback_requested.connect(self._handle_playback_request)
+
+    def _handle_playback_request(self, cmd):
+        """Internal handler to route signals to AudioService."""
+        if not hasattr(self, 'audio_service'): return
+        
+        if cmd == "play":
+            # Play selected or first
+            indices = self.get_selected_indices()
+            if indices:
+                uuid_str = self.state.sentences[indices[0]].get('uuid')
+                self.audio_service.play_audio(uuid_str)
+            else:
+                 QMessageBox.information(self, "Info", "Select an item to play.")
+        elif cmd == "stop":
+            self.audio_service.stop_playback()
+        elif cmd == "play_from":
+             # Logic for play from...
+             pass
+
     def get_selected_indices(self):
         """Retrieves selected indices from the PlaylistView."""
         if hasattr(self, 'playlist_view') and self.playlist_view:

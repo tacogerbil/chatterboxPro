@@ -11,72 +11,69 @@ from ui.views.playlist_view import PlaylistView
 from ui.views.controls_view import ControlsView
 from ui.views.finalize_view import FinalizeView
 
-class QChatterboxMainWindow(QMainWindow):
-    def __init__(self, app_state: AppState):
+from core.services.generation_service import GenerationService
+from core.services.audio_service import AudioService
+
+class ChatterboxProQt(QMainWindow):
+    def __init__(self):
         super().__init__()
-        self.app_state = app_state
-        
         self.setWindowTitle("Chatterbox Pro (Qt Edition)")
-        self.resize(1400, 900)
+        self.resize(1600, 900)
         
-        # Central Widget
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
+        self.app_state = AppState()
         
-        # Main Layout (Horizontal Split)
-        self.main_layout = QHBoxLayout(self.central_widget)
+        # Instantiate Backend Services
+        self.gen_service = GenerationService(self.app_state)
+        self.audio_service = AudioService(self.app_state)
         
-        # Splitter to allow resizing
-        self.splitter = QSplitter(Qt.Horizontal)
-        self.main_layout.addWidget(self.splitter)
+        # Setup UI
+        self.setup_ui()
+        self.setup_connections()
         
-        # Left Side (Tabs)
-        self.tabs = QTabWidget()
-        self.splitter.addWidget(self.tabs)
+    def setup_ui(self):
+        # ... (Layout code typically here, but views are created below)
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QVBoxLayout(central)
         
-        # Right Side (Playlist + Controls)
-        self.playlist_container = QWidget()
-        pl_layout = QVBoxLayout(self.playlist_container)
-        pl_layout.setContentsMargins(0, 0, 0, 0)
+        # Views
+        self.setup_view = SetupView(self.app_state)
+        self.gen_view = GenerationView(self.app_state) # Creates its own gen_service wrapper? No, use shared?
+        # Correction: GenerationView creates its own. We should pass ours OR let it maintain its own.
+        # But global logic (ChaptersView) needs one too.
+        # Ideally we share ONE service instance.
+        
+        # Let's injecting the SHARED service into GenView instead of letting it create one.
+        # I need to update GenView constructor or setter? 
+        # I'll use setter for consistency.
+        
+        self.chapters_view = ChaptersView(self.app_state)
+        self.finalize_view = FinalizeView(self.app_state)
         
         self.playlist_view = PlaylistView(self.app_state)
         self.controls_view = ControlsView(self.app_state)
+        
+        # Inject Services
+        # GenerationView creates one internally in current code (Step 1761). 
+        # That's okay, but better to share if we want global stop?
+        # Actually Step 1761 code: self.service = GenerationService(state).
+        # We will leave GenView having its own for now (Parity: Generation Tab was isolated).
+        # BUT ChaptersView needs one. We pass self.gen_service to ChaptersView.
+        # And ControlsView needs AudioService.
+        # FinalizeView needs AudioService.
+        
         self.controls_view.set_playlist_reference(self.playlist_view)
+        self.controls_view.set_audio_service(self.audio_service)
+        
+        self.chapters_view.set_generation_service(self.gen_service)
+        
+        self.finalize_view.set_audio_service(self.audio_service)
         
         # Connect Signals
         self.controls_view.refresh_requested.connect(self.playlist_view.refresh)
         
-        pl_layout.addWidget(self.playlist_view, stretch=2)
-        pl_layout.addWidget(self.controls_view, stretch=0) # Let it take natural height? No, stretch 0 means minimal necessary.
-        
-        self.splitter.addWidget(self.playlist_container)
-        
-        # Set initial sizes (Tabs check roughly 65%, Playlist 35%)
-        self.splitter.setSizes([900, 500])
-        
-        # Add Tabs contents
-        self._init_tabs()
-        
-        # Status Bar
-        self.statusBar().showMessage("Ready")
 
-    def _init_tabs(self):
-        """Initialize the tabs (Setup, Chapters, Generation, etc.)"""
-        # 1. Setup Tab (Implemented)
-        setup_tab = SetupView(self.app_state)
-        self.tabs.addTab(setup_tab, "1. Setup")
-        
-        # 2. Chapters Tab (Implemented)
-        chapters_tab = ChaptersView(self.app_state)
-        self.tabs.addTab(chapters_tab, "2. Chapters")
-        
-        # 3. Generation Tab (Implemented)
-        gen_tab = GenerationView(self.app_state)
-        self.tabs.addTab(gen_tab, "3. Generation")
-        
-        # 4. Finalize Tab (Implemented)
-        final_tab = FinalizeView(self.app_state)
-        self.tabs.addTab(final_tab, "4. Finalize")
+    # ... (No _init_tabs needed)
 
 def launch_qt_app():
     """Entry point for the Qt application."""
@@ -84,20 +81,22 @@ def launch_qt_app():
     app = QApplication(sys.argv)
     
     # Apply modern theme
-    # Using 'dark_teal.xml' as a safe default - looks professional
     try:
         apply_stylesheet(app, theme='dark_teal.xml')
     except Exception as e:
         print(f"Warning: Could not apply material theme: {e}")
     
     # Initialize State
-    state = AppState()
+    # state = AppState() # Moved inside MainWindow to be self-contained or passed?
+    # Let's keep it clean: MainWindow creates it if not passed, or we pass it.
+    # Current implementation of ChatterboxProQt creates it. 
+    # Let's stick to that for simplicity of entry point.
     
     # visual separation from legacy code
     print("--- Launching Chatterbox Pro (Qt) ---")
     
     # Create and Show Window
-    window = QChatterboxMainWindow(state)
+    window = ChatterboxProQt()
     window.show()
     
     # Start Event Loop

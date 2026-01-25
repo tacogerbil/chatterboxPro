@@ -26,9 +26,7 @@ resemble-perth==1.0.1
 soundfile==0.12.1
 
 # --- GUI Libraries ---
-customtkinter==5.2.2
-CTkToolTip==0.8
-CTkMessagebox==2.7
+# customtkinter lines removed
 pygame==2.6.1
 
 # --- Qt Migration ---

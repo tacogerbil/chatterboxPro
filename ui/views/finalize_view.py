@@ -99,8 +99,52 @@ class FinalizeView(QWidget):
             self.silence_chk.setEnabled(False)
             self.silence_chk.setText("Silence Removal (auto-editor Missing)")
 
+
+    def set_audio_service(self, audio_service):
+        self.audio_service = audio_service
+        # Connect signals? Currently service signals are general, not View-specific.
+        # Ideally we listen to 'assembly_finished' etc to show msgbox here?
+        # For MVP we might rely on global notification or sync calls if threaded.
+        # The service uses Signals, so we should connect them to slots here to show UI feedback.
+
     def assemble(self):
-        QMessageBox.information(self, "Assemble", "Assembly logic pending Phase 5 wiring.\n(Metadata collected)")
+        if not hasattr(self, 'audio_service'): return
+        
+        # Open file dialog here to get path OR let service do it?
+        # Service logic had filedialog. But services shouldn't have UI.
+        # We must open FileDialog HERE.
+        
+        # We need imports for QFileDialog
+        from PySide6.QtWidgets import QFileDialog
+        
+        # Get path
+        path, _ = QFileDialog.getSaveFileName(self, "Assemble Audiobook", 
+                                              f"{self.state.session_name}_audiobook.mp3", 
+                                              "MP3 Files (*.mp3);;WAV Files (*.wav)")
+        if not path: return
+        
+        # Call Service
+        # Note: assembly might be slow. Should be threaded. 
+        # For parity, legacy ran on main thread (blocking). We'll keep it blocking or implement thread later.
+        # Wait, the porting plan said "Service is backend". 
+        # AudioService.assemble_audiobook IS implemented as blocking logic in the port.
+        # In a real app we'd thread this. For MVP parity, we block.
+        
+        self.audio_service.assemble_audiobook(path, is_for_acx=False)
 
     def export_chapters(self):
-        QMessageBox.information(self, "Export", "Export logic pending Phase 5 wiring.")
+        if not hasattr(self, 'audio_service'): return
+        
+        from PySide6.QtWidgets import QFileDialog
+        
+        path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
+        if not path: return
+        
+        # Note: AudioService logic for export_by_chapter was NOT ported in step 1751?
+        # Let me check AudioService... NO, I missed 'export_by_chapter' in step 1751?
+        # I only see 'assemble_audiobook'.
+        # I need to add 'export_by_chapter' to AudioService!
+        
+        # Blocked: AudioService missing method.
+        # I will leave this placeholder and Fix AudioService next.
+        QMessageBox.information(self, "Export", "Export by Chapter requires service update (pending).")
