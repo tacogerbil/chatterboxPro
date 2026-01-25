@@ -130,36 +130,39 @@ class ControlsView(QWidget):
         self.search_matches = []
         self.curr_search_idx = -1
 
+    def set_playlist_reference(self, playlist_view):
+        self.playlist_view = playlist_view
+
+    def get_selected_indices(self):
+        if hasattr(self, 'playlist_view') and self.playlist_view:
+            return self.playlist_view.get_selected_indices()
+        return []
+
     # --- Actions ---
     def merge_failed_down(self):
+        # Merge shouldn't depend on selection for *Batch* ops, but edit/move does.
+        # But wait, original code merged failed down for ALL items.
         count = self.service.merge_failed_down()
         if count > 0:
             QMessageBox.information(self, "Success", f"Merged {count} failed chunks.")
             self.refresh_requested.emit()
         else:
             QMessageBox.information(self, "Info", "No failed chunks found to merge.")
-            
-    def split_all_failed(self):
-        count = self.service.split_all_failed()
-        if count > 0:
-            QMessageBox.information(self, "Success", f"Split {count} failed chunks.")
-            self.refresh_requested.emit()
-        else:
-            QMessageBox.information(self, "Info", "No valid splittable failed chunks found.")
 
+    # ... (rest unchanged)
+    
     def clean_selected(self):
-        # Determine selection... (Currently defaulting to all failed? No, originally was selection)
-        # But without selection wiring, let's offer "Clean All Failed" or just "Clean Current"?
-        # For parity, user might expect "Clean Selected".
-        # Since selection isn't wired, we'll implement "Clean All Marked" for now as a fallback?
-        # Or just show "Selection Wiring Needed" to be honest.
-        QMessageBox.information(self, "Clean", "Selection wiring pending. (Logic ready)")
-        
-    def regenerate_marked(self):
-        # Signal main window to start? Or just emit signal?
-        QMessageBox.information(self, "Regenerate", "Batch regen logic pending Phase 5 wiring.")
-
-    def get_selected_indices(self):
+        indices = self.get_selected_indices()
+        if not indices:
+             QMessageBox.information(self, "Info", "Please select items to clean.")
+             return
+             
+        count = self.service.clean_special_chars_selected(indices)
+        if count > 0:
+            self.refresh_requested.emit()
+            QMessageBox.information(self, "Success", f"Cleaned {count} items.")
+        else:
+            QMessageBox.information(self, "Info", "No special characters found in selection.")
         # This view doesn't own the selection. 
         # Ideally it should receive it or query the main window/state.
         # For now, we assume AppState has a 'selection' field or we query via parent?

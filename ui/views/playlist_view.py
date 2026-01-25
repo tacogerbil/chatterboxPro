@@ -62,6 +62,7 @@ class PlaylistView(QWidget):
         self.list_view = QListView()
         self.list_view.setModel(self.model)
         self.list_view.setItemDelegate(PlaylistDelegate()) # Use Custom Delegate
+        self.list_view.setSelectionMode(QListView.ExtendedSelection) # Enable Ctrl/Shift Click
         self.list_view.selectionModel().selectionChanged.connect(self.update_stats)
         left_layout.addWidget(self.list_view)
         
@@ -116,6 +117,11 @@ class PlaylistView(QWidget):
             ratio = item.get('similarity_ratio')
             self.lbl_asr.setText(f"{ratio:.2%}" if ratio else "N/A")
         else:
-            self.lbl_status.setText("--")
-            self.lbl_seed.setText("--")
             self.lbl_asr.setText("--")
+            
+    def get_selected_indices(self) -> list[int]:
+        """Returns a list of selected sentence indices (ints)."""
+        indexes = self.list_view.selectionModel().selectedIndexes()
+        # Filter for column 0 to avoid duplicates if multiple columns exist (though listview usually has 1)
+        valid_indices = sorted([idx.row() for idx in indexes if idx.column() == 0])
+        return valid_indices

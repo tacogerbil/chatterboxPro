@@ -41,6 +41,7 @@ class QChatterboxMainWindow(QMainWindow):
         
         self.playlist_view = PlaylistView(self.app_state)
         self.controls_view = ControlsView(self.app_state)
+        self.controls_view.set_playlist_reference(self.playlist_view)
         
         # Connect Signals
         self.controls_view.refresh_requested.connect(self.playlist_view.refresh)
