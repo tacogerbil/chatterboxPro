@@ -1,6 +1,7 @@
 import os
 import shutil
 import logging
+import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -70,3 +71,59 @@ class ProjectService:
                 logging.error(f"Failed to delete audio file {f_path}: {e}")
                 return False
         return False
+
+    def save_session(self, session_name: str, data: Dict[str, Any]) -> bool:
+        """
+        Saves session data to JSON.
+        Data dict should contain: 'source_file_path', 'sentences', 'generation_settings'.
+        """
+        if not session_name:
+            logging.error("Cannot save session: No session name provided.")
+            return False
+            
+        session_path = Path(self.outputs_dir) / session_name
+        try:
+            session_path.resolve().mkdir(parents=True, exist_ok=True)
+            
+            json_path = session_path / f"{session_name}_session.json"
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4)
+                
+            logging.info(f"Session '{session_name}' saved to {json_path}")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to save session '{session_name}': {e}")
+            return False
+
+    def load_session(self, session_dir_path: str) -> Optional[Dict[str, Any]]:
+        """
+        Loads session data from a directory.
+        Returns a dict with 'session_name', 'source_file_path', 'sentences', 'generation_settings', etc.
+        """
+        path = Path(session_dir_path)
+        if not path.exists():
+            logging.error(f"Session path not found: {path}")
+            return None
+            
+        json_path = path / f"{path.name}_session.json"
+        
+        # Fallback: try finding any json if naming convention differs
+        if not json_path.exists():
+             jsons = list(path.glob("*_session.json"))
+             if jsons:
+                 json_path = jsons[0]
+        
+        if not json_path.exists():
+            logging.error(f"Session JSON not found in {path}")
+            return None
+            
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Enrich with determined name
+            data['session_name'] = path.name
+            return data
+        except Exception as e:
+            logging.error(f"Failed to load session from {json_path}: {e}")
+            return None

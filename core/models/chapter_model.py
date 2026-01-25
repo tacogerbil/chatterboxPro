@@ -76,3 +76,9 @@ class ChapterModel(QAbstractListModel):
     def get_selected_indices(self):
         """Returns list of selected CHAPTER indices (0, 1, 3 etc)."""
         return sorted(list(self._checked_state))
+
+    def get_chapter_index(self, row: int) -> int:
+        """Returns the real sentence index for the chapter at row."""
+        if 0 <= row < len(self._chapters):
+            return self._chapters[row][0]
+        return -1

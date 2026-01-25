@@ -1,11 +1,13 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListView, 
                                QPushButton, QLabel, QMessageBox, QCheckBox)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal, Signal
 from core.state import AppState
 from core.models.chapter_model import ChapterModel
 from core.services.chapter_service import ChapterService
 
 class ChaptersView(QWidget):
+    jump_requested = Signal(int)
+
     def __init__(self, app_state: AppState, parent=None):
         super().__init__(parent)
         self.app_state = app_state
@@ -19,7 +21,7 @@ class ChaptersView(QWidget):
         
         # Header / Controls
         header_layout = QHBoxLayout()
-        header_layout.addWidget(QLabel("Detected Chapters"))
+        header_layout.addWidget(QLabel("Detected Chapters (Double-click to Jump)"))
         header_layout.addStretch()
         
         # Generate Selected button
@@ -44,7 +46,7 @@ class ChaptersView(QWidget):
         self.list_view = QListView()
         self.list_view.setModel(self.model)
         self.list_view.setAlternatingRowColors(True)
-        # self.list_view.setSelectionMode(QListView.ExtendedSelection) # Using checkboxes instead
+        self.list_view.doubleClicked.connect(self.on_double_click)
         layout.addWidget(self.list_view)
         
         # Footer Selection Controls
@@ -93,4 +95,16 @@ class ChaptersView(QWidget):
         QMessageBox.information(self, "Generation", 
                               f"Simulated Generation Start.\nIndices to process: {len(full_indices)}")
         # Logic link: In real app, this would emit a signal: self.generation_requested.emit(full_indices)
+        
+    def on_double_click(self, index):
+        """Handle double click to jump to chapter start."""
+        if not index.isValid(): return
+        
+        # Determine real index from model
+        # The model caches chapters in self.model._chapters
+        # But we shouldn't access private members if possible.
+        # Better: ask the model.
+        real_idx = self.model.get_chapter_index(index.row())
+        if real_idx >= 0:
+            self.jump_requested.emit(real_idx)
         

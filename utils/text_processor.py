@@ -2,7 +2,29 @@
 import re
 import uuid
 import unicodedata
+import os
 from sentence_splitter import SentenceSplitter
+
+# Optional imports for file extraction (match legacy behavior)
+try:
+    from pdftextract import XPdf
+except ImportError:
+    XPdf = None
+try:
+    import ebooklib
+    from ebooklib import epub
+except ImportError:
+    ebooklib = None
+    epub = None
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+try:
+    import pypandoc
+except ImportError:
+    pypandoc = None
+
 
 def punc_norm(text: str) -> str:
     """Quick cleanup func for punctuation from LLMs or containing chars not seen often in the dataset."""
@@ -158,6 +180,51 @@ class TextPreprocessor:
             chunk['sentence_number'] = str(i + 1)
         
         return chunks
+
+    def extract_text_from_file(self, file_path: str) -> str:
+        """
+        Extracts raw text from various file formats (.txt, .pdf, .epub, .docx, .mobi).
+        Dependencies (XPdf, ebooklib, etc.) must be installed for non-txt files.
+        """
+        path = str(file_path)
+        ext = os.path.splitext(path)[1].lower()
+        text = ""
+
+        try:
+            if ext == '.txt':
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                    text = f.read()
+            
+            elif ext == '.pdf':
+                if XPdf:
+                    text = XPdf(path).to_text()
+                else:
+                    return f"Error: pdftextract not installed. Cannot read {ext}."
+            
+            elif ext == '.epub':
+                if ebooklib and BeautifulSoup:
+                    book = epub.read_epub(path)
+                    html_content = "".join([item.get_body_content().decode('utf-8', 'ignore') 
+                                          for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT)])
+                    soup = BeautifulSoup(html_content, 'html.parser')
+                    text = soup.get_text("\n\n", strip=True)
+                else:
+                    return f"Error: EbookLib or BeautifulSoup not installed. Cannot read {ext}."
+            
+            elif ext in ['.docx', '.mobi']:
+                if pypandoc:
+                    # pypandoc might require system pandoc installed
+                    text = pypandoc.convert_file(path, 'plain', encoding='utf-8')
+                else:
+                    return f"Error: pypandoc not installed. Cannot read {ext}."
+            
+            else:
+                return f"Error: Unsupported file extension '{ext}'"
+                
+        except Exception as e:
+            return f"Error processing file: {str(e)}"
+            
+        return text
 
     def preprocess_text(self, text, is_edited_text=False, aggressive_clean=False):
         """Splits raw text into sentences and identifies paragraph breaks."""
