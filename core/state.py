@@ -60,6 +60,9 @@ class AppState:
     current_playing_index: int = -1
     generation_active: bool = False
     
+    # UI State Persisted
+    auto_regen_main: bool = False # For Chapters Tab "Auto-loop" logic
+    
     def update_settings(self, **kwargs):
         """Update settings from a dictionary."""
         for key, value in kwargs.items():

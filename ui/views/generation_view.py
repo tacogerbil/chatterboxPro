@@ -1,4 +1,5 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QGroupBox, QFormLayout
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QGroupBox, QFormLayout, 
+                               QPushButton, QHBoxLayout, QMessageBox)
 from PySide6.QtCore import Qt
 from core.state import AppState
 from ui.components.q_labeled_slider import QLabeledSlider
@@ -8,6 +9,10 @@ class GenerationView(QWidget):
         super().__init__(parent)
         self.state = state
         self.setup_ui()
+        
+    def save_template(self):
+        # Placeholder for now
+        QMessageBox.information(self, "Save Template", "Template saving will be implemented in the polishing phase.")
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -19,6 +24,15 @@ class GenerationView(QWidget):
         font.setPointSize(14)
         header.setFont(font)
         layout.addWidget(header)
+        
+        button_layout = QHBoxLayout()
+        # Save Template Button
+        self.save_tpl_btn = QPushButton("💾 Save as Template...")
+        self.save_tpl_btn.clicked.connect(self.save_template)
+        button_layout.addWidget(self.save_tpl_btn)
+        button_layout.addStretch()
+        
+        layout.addLayout(button_layout)
         
         # Group: Voice Parameters
         voice_group = QGroupBox("Voice Settings")

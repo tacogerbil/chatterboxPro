@@ -6,11 +6,11 @@
 # --- Core PyTorch Libraries ---
 # The extra index URL helps pip find the correct PyTorch version for your system
 --extra-index-url https://download.pytorch.org/whl/cu121
-torch==2.7.0
-torchaudio==2.7.0
+torch>=2.0.0
+torchaudio>=2.0.0
 
 # --- Core ML & TTS Model Libraries ---
-transformers==4.46.3
+transformers>=4.46.3
 diffusers==0.29.0
 openai-whisper==20240930
 s3tokenizer==0.1.7
