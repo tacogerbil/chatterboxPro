@@ -1,106 +1,7 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                               QLabel, QLineEdit, QToolBox, QMessageBox, QGridLayout, QInputDialog)
-
-# ... (Previous Imports)
-    
-    # ... (In setup_ui, line 58)
-        self.btn_s_prev = QPushButton("◄"); self.btn_s_prev.clicked.connect(self.search_prev)
-        self.btn_s_prev.setEnabled(False) # Default disabled
-        self.btn_s_next = QPushButton("►"); self.btn_s_next.clicked.connect(self.search_next)
-        self.btn_s_next.setEnabled(False) # Default disabled
-        
-    # (In perform_search)
-    def perform_search(self):
-        query = self.search_input.text()
-        self.search_matches = self.service.search(query)
-        if self.search_matches:
-            self.curr_search_idx = 0
-            self.btn_s_prev.setEnabled(True) # Enable
-            self.btn_s_next.setEnabled(True) # Enable
-            self.search_next()
-        else:
-            self.btn_s_prev.setEnabled(False) # Disable
-            self.btn_s_next.setEnabled(False) # Disable
-            QMessageBox.information(self, "Search", "No matches found.")
-
-    # --- Editing ---
-    def edit_current(self):
-        indices = self.get_selected_indices()
-        if len(indices) != 1:
-            QMessageBox.information(self, "Info", "Please select exactly one item to edit.")
-            return
-            
-        idx = indices[0]
-        item = self.service.get_selected_item(idx)
-        if not item: return
-        
-        current_text = item.get('original_sentence', '')
-        
-        # Use QInputDialog for multiline? PySide6 InputDialog multiline is getMultiLineText
-        new_text, ok = QInputDialog.getMultiLineText(self, "Edit Text", "Content:", current_text)
-        
-        if ok and new_text != current_text:
-            if self.service.edit_text(idx, new_text):
-                self.refresh_requested.emit()
-        
-    def split_current(self):
-        indices = self.get_selected_indices()
-        if len(indices) != 1:
-            QMessageBox.information(self, "Info", "Please select exactly one item to split.")
-            return
-            
-        idx = indices[0]
-        if self.service.split_chunk(idx):
-            self.refresh_requested.emit()
-        else:
-            QMessageBox.information(self, "Info", "Could not split this chunk (too specific? or 1 sentence).")
-        
-    def mark_current(self):
-        indices = self.get_selected_indices()
-        for idx in indices:
-            item = self.state.sentences[idx]
-            item['marked'] = True
-            item['tts_generated'] = 'no'
-        if indices:
-            self.refresh_requested.emit()
-
-    def delete_current(self):
-        indices = self.get_selected_indices()
-        if not indices: return
-        
-        if QMessageBox.question(self, "Confirm", f"Delete {len(indices)} items?") == QMessageBox.Yes:
-            self.service.delete_items(indices)
-            self.refresh_requested.emit()
-        
-    def insert_text(self):
-        idx = 0
-        indices = self.get_selected_indices()
-        if indices: idx = indices[0]
-        
-        text, ok = QInputDialog.getText(self, "Insert Text", "New Text:")
-        if ok and text:
-            self.service.insert_item(idx, text)
-            self.refresh_requested.emit()
-        
-    def insert_pause(self):
-        idx = 0
-        indices = self.get_selected_indices()
-        if indices: idx = indices[0]
-        
-        dur, ok = QInputDialog.getInt(self, "Insert Pause", "Duration (ms):", 500, 100, 10000)
-        if ok:
-            self.service.insert_item(idx, "--- PAUSE ---", is_pause=True, duration=dur)
-            self.refresh_requested.emit()
-        
-    def insert_chapter(self):
-        idx = 0
-        indices = self.get_selected_indices()
-        if indices: idx = indices[0]
-        
-        name, ok = QInputDialog.getText(self, "Insert Chapter", "Chapter Name:")
-        if ok and name:
-            self.service.insert_item(idx, name, is_chapter=True)
-            self.refresh_requested.emit()
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
+    QLineEdit, QToolBox, QMessageBox, QGridLayout, QInputDialog
+)
 from PySide6.QtCore import Qt, Signal
 from core.state import AppState
 from core.services.playlist_service import PlaylistService
@@ -109,6 +10,9 @@ class ControlsView(QWidget):
     """
     The Editing Suite: Playback, Search, Editing, and Batch operations.
     Replaces legacy ControlsFrame.
+    
+    This view acts as a Controller for the PlaylistService, triggering
+    state mutations based on user input (buttons/dialogs).
     """
     # Signals to request App actions
     refresh_requested = Signal() # Request playlist view refresh
@@ -118,9 +22,13 @@ class ControlsView(QWidget):
         super().__init__(parent)
         self.state = app_state
         self.service = PlaylistService(app_state)
+        self.search_matches = []
+        self.curr_search_idx = -1
+        self.playlist_view = None
         self.setup_ui()
         
     def setup_ui(self):
+        """Initializes the layout with collapsible groups (QToolBox)."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0) # Tight fit
         
@@ -156,8 +64,12 @@ class ControlsView(QWidget):
         self.search_input.setPlaceholderText("Search text...")
         self.search_input.returnPressed.connect(self.perform_search)
         search_layout.addWidget(self.search_input)
+        
         self.btn_s_prev = QPushButton("◄"); self.btn_s_prev.clicked.connect(self.search_prev)
+        self.btn_s_prev.setEnabled(False) # Default disabled
         self.btn_s_next = QPushButton("►"); self.btn_s_next.clicked.connect(self.search_next)
+        self.btn_s_next.setEnabled(False) # Default disabled
+        
         search_layout.addWidget(self.btn_s_prev); search_layout.addWidget(self.btn_s_next)
         p1_layout.addLayout(search_layout)
         
@@ -168,7 +80,7 @@ class ControlsView(QWidget):
         page2 = QWidget()
         p2_layout = QGridLayout(page2)
         
-        # Edit/Split/Insert
+        # Tools: Edit / Split / Mark / Delete
         btn_edit = QPushButton("✎ Edit"); btn_edit.clicked.connect(self.edit_current)
         btn_split = QPushButton("➗ Split"); btn_split.clicked.connect(self.split_current)
         btn_mark = QPushButton("M Mark"); btn_mark.clicked.connect(self.mark_current)
@@ -226,33 +138,38 @@ class ControlsView(QWidget):
         self.toolbox.addItem(page3, "Batch Operations")
         
         layout.addWidget(self.toolbox)
-        
-        # Internal Search State
-        self.search_matches = []
-        self.curr_search_idx = -1
 
     def set_playlist_reference(self, playlist_view):
+        """Stores reference to playlist for selection fetching."""
         self.playlist_view = playlist_view
 
     def get_selected_indices(self):
+        """Retrieves selected indices from the PlaylistView."""
         if hasattr(self, 'playlist_view') and self.playlist_view:
             return self.playlist_view.get_selected_indices()
         return []
 
-    # --- Actions ---
+    # --- Batch Actions ---
     def merge_failed_down(self):
-        # Merge shouldn't depend on selection for *Batch* ops, but edit/move does.
-        # But wait, original code merged failed down for ALL items.
+        """Attempts to merge all failed chunks with their successors."""
         count = self.service.merge_failed_down()
         if count > 0:
             QMessageBox.information(self, "Success", f"Merged {count} failed chunks.")
             self.refresh_requested.emit()
         else:
             QMessageBox.information(self, "Info", "No failed chunks found to merge.")
+            
+    def split_all_failed(self):
+        """Attempts to split all failed chunks using the text splitter."""
+        count = self.service.split_all_failed()
+        if count > 0:
+            QMessageBox.information(self, "Success", f"Split {count} failed chunks.")
+            self.refresh_requested.emit()
+        else:
+            QMessageBox.information(self, "Info", "No valid splittable failed chunks found.")
 
-    # ... (rest unchanged)
-    
     def clean_selected(self):
+        """Cleans special characters from selected items."""
         indices = self.get_selected_indices()
         if not indices:
              QMessageBox.information(self, "Info", "Please select items to clean.")
@@ -264,45 +181,63 @@ class ControlsView(QWidget):
             QMessageBox.information(self, "Success", f"Cleaned {count} items.")
         else:
             QMessageBox.information(self, "Info", "No special characters found in selection.")
-        # This view doesn't own the selection. 
-        # Ideally it should receive it or query the main window/state.
-        # For now, we assume AppState has a 'selection' field or we query via parent?
-        # NO. We should emit signals or rely on shared state.
-        # But 'selected_indices' isn't in AppState yet. It was in PlaylistFrame.
-        # SHORTCUT: Only operate if we can get selection.
-        # For this MVP, we will rely on single-item actions via dialogs or similar.
-        pass
         
+    def regenerate_marked(self):
+        """Trigger generation for marked items."""
+        # Signal main window to start? Or just emit signal?
+        QMessageBox.information(self, "Regenerate", "Batch regen logic pending Phase 5 wiring.")
+
+    # --- Navigation Actions ---
     def move_item(self, direction):
-        # Currently difficult without knowing selection from PlaylistView.
-        QMessageBox.information(self, "Info", "Select items in playlist first (Wiring pending).")
+        """Moves selected items up or down."""
+        indices = self.get_selected_indices()
+        if not indices:
+            QMessageBox.information(self, "Info", "Select items in playlist first.")
+            return
+            
+        new_indices = self.service.move_items(indices, direction)
+        if new_indices != indices:
+            self.refresh_requested.emit()
+            # Restore selection (requires PlaylistView method to set selection)
+            # self.playlist_view.set_selection(new_indices) # TODO: Implement set_selection
 
     def find_error(self, direction):
-        # We need to know where we are.
-        # Just searching from 0 for now or using service.
-        idx = self.service.find_next_status(-1, direction, 'failed')
+        """Finds next/prev failed item."""
+        # Currently defaults to searching from 0.
+        # Ideally should search from current selection.
+        indices = self.get_selected_indices()
+        start = indices[0] if indices else -1
+        
+        idx = self.service.find_next_status(start, direction, 'failed')
         if idx >= 0:
-            QMessageBox.information(self, "Found", f"Found error at index {idx}. (Selection wiring needed)")
+            QMessageBox.information(self, "Found", f"Found error at index {idx}. (Selection jump pending)")
         else:
              QMessageBox.information(self, "Info", "No errors found.")
 
+    # --- Search ---
     def perform_search(self):
+        """Executes search and updates navigation buttons."""
         query = self.search_input.text()
         self.search_matches = self.service.search(query)
         if self.search_matches:
             self.curr_search_idx = 0
+            self.btn_s_prev.setEnabled(True) # Enable
+            self.btn_s_next.setEnabled(True) # Enable
             self.search_next()
         else:
+            self.btn_s_prev.setEnabled(False) # Disable
+            self.btn_s_next.setEnabled(False) # Disable
             QMessageBox.information(self, "Search", "No matches found.")
             
     def search_next(self):
+        """Jumps to next search match."""
         if not self.search_matches: return
         idx = self.search_matches[self.curr_search_idx]
         self.curr_search_idx = (self.curr_search_idx + 1) % len(self.search_matches)
-        # Emit signal to select this index
         QMessageBox.information(self, "Search", f"Found at {idx}. (Jump not wired)")
 
     def search_prev(self):
+        """Jumps to previous search match."""
         if not self.search_matches: return
         self.curr_search_idx = (self.curr_search_idx - 1) % len(self.search_matches)
         idx = self.search_matches[self.curr_search_idx]
@@ -310,26 +245,85 @@ class ControlsView(QWidget):
 
     # --- Editing ---
     def edit_current(self):
-        QMessageBox.information(self, "Edit", "Edit dialog would open here.")
+        """Opens dialog to edit the text of the single selected item."""
+        indices = self.get_selected_indices()
+        if len(indices) != 1:
+            QMessageBox.information(self, "Info", "Please select exactly one item to edit.")
+            return
+            
+        idx = indices[0]
+        item = self.service.get_selected_item(idx)
+        if not item: return
+        
+        current_text = item.get('original_sentence', '')
+        
+        new_text, ok = QInputDialog.getMultiLineText(self, "Edit Text", "Content:", current_text)
+        
+        if ok and new_text != current_text:
+            if self.service.edit_text(idx, new_text):
+                self.refresh_requested.emit()
         
     def split_current(self):
-        # Simulating split of index 0 for testing if no selection
-        QMessageBox.information(self, "Split", "Split logic ready in Service, need selection wiring.")
+        """Splits the selected chunk using the text splitter."""
+        indices = self.get_selected_indices()
+        if len(indices) != 1:
+            QMessageBox.information(self, "Info", "Please select exactly one item to split.")
+            return
+            
+        idx = indices[0]
+        if self.service.split_chunk(idx):
+            self.refresh_requested.emit()
+        else:
+            QMessageBox.information(self, "Info", "Could not split this chunk (too specific? or 1 sentence).")
         
     def mark_current(self):
-        pass
+        """Marks selected items for regeneration."""
+        indices = self.get_selected_indices()
+        for idx in indices:
+            item = self.state.sentences[idx]
+            item['marked'] = True
+            item['tts_generated'] = 'no'
+        if indices:
+            self.refresh_requested.emit()
 
     def delete_current(self):
-        pass
+        """Deletes selected items after confirmation."""
+        indices = self.get_selected_indices()
+        if not indices: return
+        
+        if QMessageBox.question(self, "Confirm", f"Delete {len(indices)} items?") == QMessageBox.Yes:
+            self.service.delete_items(indices)
+            self.refresh_requested.emit()
         
     def insert_text(self):
-        self.service.insert_item(0, "New Text Block")
-        self.refresh_requested.emit()
+        """Inserts a new text block at the selected position."""
+        idx = 0
+        indices = self.get_selected_indices()
+        if indices: idx = indices[0]
+        
+        text, ok = QInputDialog.getText(self, "Insert Text", "New Text:")
+        if ok and text:
+            self.service.insert_item(idx, text)
+            self.refresh_requested.emit()
         
     def insert_pause(self):
-        self.service.insert_item(0, "--- PAUSE ---", is_pause=True, duration=500)
-        self.refresh_requested.emit()
+        """Inserts a pause block at the selected position."""
+        idx = 0
+        indices = self.get_selected_indices()
+        if indices: idx = indices[0]
+        
+        dur, ok = QInputDialog.getInt(self, "Insert Pause", "Duration (ms):", 500, 100, 10000)
+        if ok:
+            self.service.insert_item(idx, "--- PAUSE ---", is_pause=True, duration=dur)
+            self.refresh_requested.emit()
         
     def insert_chapter(self):
-        self.service.insert_item(0, "Chapter X", is_chapter=True)
-        self.refresh_requested.emit()
+        """Inserts a chapter marker at the selected position."""
+        idx = 0
+        indices = self.get_selected_indices()
+        if indices: idx = indices[0]
+        
+        name, ok = QInputDialog.getText(self, "Insert Chapter", "Chapter Name:")
+        if ok and name:
+            self.service.insert_item(idx, name, is_chapter=True)
+            self.refresh_requested.emit()
