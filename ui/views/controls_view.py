@@ -1,5 +1,106 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                               QLabel, QLineEdit, QGroupBox, QGridLayout, QMessageBox, QFrame, QToolBox)
+                               QLabel, QLineEdit, QToolBox, QMessageBox, QGridLayout, QInputDialog)
+
+# ... (Previous Imports)
+    
+    # ... (In setup_ui, line 58)
+        self.btn_s_prev = QPushButton("◄"); self.btn_s_prev.clicked.connect(self.search_prev)
+        self.btn_s_prev.setEnabled(False) # Default disabled
+        self.btn_s_next = QPushButton("►"); self.btn_s_next.clicked.connect(self.search_next)
+        self.btn_s_next.setEnabled(False) # Default disabled
+        
+    # (In perform_search)
+    def perform_search(self):
+        query = self.search_input.text()
+        self.search_matches = self.service.search(query)
+        if self.search_matches:
+            self.curr_search_idx = 0
+            self.btn_s_prev.setEnabled(True) # Enable
+            self.btn_s_next.setEnabled(True) # Enable
+            self.search_next()
+        else:
+            self.btn_s_prev.setEnabled(False) # Disable
+            self.btn_s_next.setEnabled(False) # Disable
+            QMessageBox.information(self, "Search", "No matches found.")
+
+    # --- Editing ---
+    def edit_current(self):
+        indices = self.get_selected_indices()
+        if len(indices) != 1:
+            QMessageBox.information(self, "Info", "Please select exactly one item to edit.")
+            return
+            
+        idx = indices[0]
+        item = self.service.get_selected_item(idx)
+        if not item: return
+        
+        current_text = item.get('original_sentence', '')
+        
+        # Use QInputDialog for multiline? PySide6 InputDialog multiline is getMultiLineText
+        new_text, ok = QInputDialog.getMultiLineText(self, "Edit Text", "Content:", current_text)
+        
+        if ok and new_text != current_text:
+            if self.service.edit_text(idx, new_text):
+                self.refresh_requested.emit()
+        
+    def split_current(self):
+        indices = self.get_selected_indices()
+        if len(indices) != 1:
+            QMessageBox.information(self, "Info", "Please select exactly one item to split.")
+            return
+            
+        idx = indices[0]
+        if self.service.split_chunk(idx):
+            self.refresh_requested.emit()
+        else:
+            QMessageBox.information(self, "Info", "Could not split this chunk (too specific? or 1 sentence).")
+        
+    def mark_current(self):
+        indices = self.get_selected_indices()
+        for idx in indices:
+            item = self.state.sentences[idx]
+            item['marked'] = True
+            item['tts_generated'] = 'no'
+        if indices:
+            self.refresh_requested.emit()
+
+    def delete_current(self):
+        indices = self.get_selected_indices()
+        if not indices: return
+        
+        if QMessageBox.question(self, "Confirm", f"Delete {len(indices)} items?") == QMessageBox.Yes:
+            self.service.delete_items(indices)
+            self.refresh_requested.emit()
+        
+    def insert_text(self):
+        idx = 0
+        indices = self.get_selected_indices()
+        if indices: idx = indices[0]
+        
+        text, ok = QInputDialog.getText(self, "Insert Text", "New Text:")
+        if ok and text:
+            self.service.insert_item(idx, text)
+            self.refresh_requested.emit()
+        
+    def insert_pause(self):
+        idx = 0
+        indices = self.get_selected_indices()
+        if indices: idx = indices[0]
+        
+        dur, ok = QInputDialog.getInt(self, "Insert Pause", "Duration (ms):", 500, 100, 10000)
+        if ok:
+            self.service.insert_item(idx, "--- PAUSE ---", is_pause=True, duration=dur)
+            self.refresh_requested.emit()
+        
+    def insert_chapter(self):
+        idx = 0
+        indices = self.get_selected_indices()
+        if indices: idx = indices[0]
+        
+        name, ok = QInputDialog.getText(self, "Insert Chapter", "Chapter Name:")
+        if ok and name:
+            self.service.insert_item(idx, name, is_chapter=True)
+            self.refresh_requested.emit()
 from PySide6.QtCore import Qt, Signal
 from core.state import AppState
 from core.services.playlist_service import PlaylistService

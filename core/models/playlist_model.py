@@ -29,11 +29,13 @@ class PlaylistModel(QAbstractListModel):
             
         elif role == self.StatusRole:
             # Return status string for View delegate to colorize
-            if item.get('tts_generated'):
-                return "success"
-            elif item.get('failed'):
-                return "failed"
+            status = item.get('tts_generated', 'no')
+            if status == 'yes': return "success"
+            if status == 'failed': return "failed"
             return "pending"
+            
+        elif role == Qt.ToolTipRole:
+            return item.get('original_sentence', '')
             
         return None
         
