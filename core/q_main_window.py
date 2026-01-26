@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTabWidget, QSplitter
-from qt_material import apply_stylesheet
+
 from core.state import AppState
 
 from ui.views.generation_view import GenerationView
@@ -103,11 +103,12 @@ def launch_qt_app():
     # Create the Application
     app = QApplication(sys.argv)
     
-    # Apply modern theme
+    # Apply modern theme (pyqtdarktheme)
     try:
-        apply_stylesheet(app, theme='dark_teal.xml')
+        import qdarktheme
+        qdarktheme.setup_theme("dark", custom_colors={"primary": "#27AE60"}) # Using our green accent
     except Exception as e:
-        print(f"Warning: Could not apply material theme: {e}")
+        print(f"Warning: Could not apply qdarktheme: {e}")
 
     print("--- Launching Chatterbox Pro (Qt) ---")
     
