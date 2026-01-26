@@ -50,6 +50,12 @@ class ChaptersView(QWidget):
         sel_none.clicked.connect(self.deselect_all)
         footer_layout.addWidget(sel_none)
         
+        # New Feature: Check Highlighted
+        check_high = QPushButton("Check Highlighted")
+        check_high.setToolTip("Check the boxes for all currently highlighted rows")
+        check_high.clicked.connect(self.check_highlighted)
+        footer_layout.addWidget(check_high)
+        
         footer_layout.addStretch()
         
         # Auto-loop Checkbox
@@ -76,6 +82,21 @@ class ChaptersView(QWidget):
         for i in range(self.model.rowCount()):
             idx = self.model.index(i, 0)
             self.model.setData(idx, Qt.Unchecked, Qt.CheckStateRole)
+
+    def check_highlighted(self):
+        """Checks the checkboxes for all currently highlighted rows in the list."""
+        selected_indexes = self.list_view.selectionModel().selectedIndexes()
+        if not selected_indexes:
+            QMessageBox.information(self, "Info", "No rows highlighted. Click to highlight rows first.")
+            return
+            
+        count = 0
+        for index in selected_indexes:
+            # Check the box
+            self.model.setData(index, Qt.Checked, Qt.CheckStateRole)
+            count += 1
+            
+        # Optional: Feedback? No, visual feedback is enough.
 
 
     def set_generation_service(self, gen_service):
