@@ -95,7 +95,7 @@ class ChatterboxProQt(QMainWindow):
         self.gen_service.auto_fix_status.connect(self.statusBar().showMessage)
         
         # Wire Template Loading
-        self.setup_view.template_loaded.connect(self.generation_view.refresh_values)
+        self.setup_view.template_loaded.connect(self.gen_view.refresh_values)
         
         # Optional: Status Bar
         self.statusBar().showMessage("Ready")
