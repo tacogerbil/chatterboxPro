@@ -81,7 +81,7 @@ class GenerationView(QWidget):
         path_layout.addWidget(self.set_path_btn)
         form.addRow("Model Path:", path_layout)
         
-        self.save_tpl_btn = QPushButton("💾 Save as Template...")
+        self.save_tpl_btn = QPushButton("💾 Save as Voice...")
         self.save_tpl_btn.clicked.connect(self.save_template)
         form.addRow("", self.save_tpl_btn)
 
@@ -267,7 +267,7 @@ class GenerationView(QWidget):
         self.engine_combo.setCurrentText(s.tts_engine)
 
     def save_template(self):
-        name, ok = QInputDialog.getText(self, "Save Template", "Template Name:")
+        name, ok = QInputDialog.getText(self, "Save Voice", "Voice Name:")
         if ok and name:
             import dataclasses
             data = dataclasses.asdict(self.state.settings)
