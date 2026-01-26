@@ -1,4 +1,5 @@
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Slot
+from typing import List, Set, Tuple, Any, Union, Optional
 from core.state import AppState
 from core.services.chapter_service import ChapterService
 
@@ -7,30 +8,33 @@ class ChapterModel(QAbstractListModel):
     Qt Model for displaying "Detected Chapters".
     It does not copy data; it wraps AppState.sentences (via ChapterService detection).
     """
-    NameRole = Qt.UserRole + 1
-    RealIndexRole = Qt.UserRole + 2
-    CheckedRole = Qt.UserRole + 3
+    NameRole: int = Qt.UserRole + 1
+    RealIndexRole: int = Qt.UserRole + 2
+    CheckedRole: int = Qt.UserRole + 3
 
-    def __init__(self, app_state: AppState, parent=None):
+    def __init__(self, app_state: AppState, parent: Optional[Any] = None) -> None:
         super().__init__(parent)
-        self.app_state = app_state
-        self.chapter_service = ChapterService()
+        self.app_state: AppState = app_state
+        self.chapter_service: ChapterService = ChapterService()
         
         # Internal cache of (real_index, item)
-        self._chapters = []
-        self._checked_state = set() # Stores row indices that are checked
+        self._chapters: List[Tuple[int, Dict[str, Any]]] = []
+        self._checked_state: Set[int] = set() # Stores row indices that are checked
         
         # Initial scan
         self.refresh()
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._chapters)
 
-    def data(self, index, role):
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if not index.isValid():
             return None
         
         row = index.row()
+        if row >= len(self._chapters): 
+             return None
+             
         real_idx, item = self._chapters[row]
         
         if role == Qt.DisplayRole or role == self.NameRole:
@@ -46,7 +50,7 @@ class ChapterModel(QAbstractListModel):
             
         return None
 
-    def setData(self, index, value, role):
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.EditRole) -> bool:
         if not index.isValid():
             return False
             
@@ -61,19 +65,19 @@ class ChapterModel(QAbstractListModel):
             
         return False
 
-    def flags(self, index):
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         if not index.isValid():
             return Qt.NoItemFlags
         return Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Re-scan sentences for chapters."""
         self.beginResetModel()
         self._chapters = self.chapter_service.detect_chapters(self.app_state.sentences)
         self._checked_state.clear() # Clear selection on refresh
         self.endResetModel()
 
-    def get_selected_indices(self):
+    def get_selected_indices(self) -> List[int]:
         """Returns list of selected CHAPTER indices (0, 1, 3 etc)."""
         return sorted(list(self._checked_state))
 

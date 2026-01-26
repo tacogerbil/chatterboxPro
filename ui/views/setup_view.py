@@ -1,35 +1,50 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QFormLayout, QLineEdit, 
-                               QPushButton, QHBoxLayout, QFileDialog, QMessageBox, QLabel, QGroupBox, QGridLayout, QComboBox, QCheckBox)
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, QHBoxLayout, 
+    QFileDialog, QMessageBox, QLabel, QGroupBox, QComboBox, QCheckBox, QLayout
+)
 from PySide6.QtCore import Qt, Signal
-from core.state import AppState
-from utils.text_processor import TextPreprocessor
-from core.services.project_service import ProjectService
-from core.services.template_service import TemplateService
+from typing import Optional, List, Dict, Any
 import os
 import shutil
 import dataclasses
 import torch
 
+from core.state import AppState
+from utils.text_processor import TextPreprocessor
+from core.services.project_service import ProjectService
+from core.services.template_service import TemplateService
+
 class SetupView(QWidget):
     template_loaded = Signal()
 
-    def __init__(self, app_state: AppState, parent=None):
+    def __init__(self, app_state: AppState, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.state = app_state
         self.processor = TextPreprocessor()
         self.project_service = ProjectService()
         self.template_service = TemplateService()
+        
         self.setup_ui()
-        self.populate_templates() # Load templates on init
-        self.check_system() # Run system check on init
-        
-    def setup_ui(self):
+        self.populate_templates()
+        self.check_system()
+
+    def setup_ui(self) -> None:
         layout = QVBoxLayout(self)
-        
+        self.setup_header(layout)
+        self.setup_session_controls(layout)
+        self.setup_processing_controls(layout)
+        self.setup_voice_controls(layout)
+        self.setup_main_controls(layout)
+        self.setup_system_check(layout)
+        layout.addStretch()
+
+    def setup_header(self, layout: QVBoxLayout) -> None:
         # --- Session Header ---
         header_layout = QHBoxLayout()
         header = QLabel("Session & Source")
-        font = header.font(); font.setPointSize(14); font.setBold(True)
+        font = header.font()
+        font.setPointSize(14)
+        font.setBold(True)
         header.setFont(font)
         layout.addWidget(header)
         header_layout.addStretch()
@@ -42,7 +57,8 @@ class SetupView(QWidget):
         header_layout.addWidget(new_btn)
         header_layout.addWidget(load_btn)
         layout.addLayout(header_layout)
-        
+
+    def setup_session_controls(self, layout: QVBoxLayout) -> None:
         form_layout = QFormLayout()
         
         # Session Name
@@ -63,9 +79,8 @@ class SetupView(QWidget):
         form_layout.addRow("Source Text:", file_layout)
         
         layout.addLayout(form_layout)
-        
-        layout.addLayout(form_layout)
-        
+
+    def setup_processing_controls(self, layout: QVBoxLayout) -> None:
         # Load/Process Button
         self.load_btn = QPushButton("Edit Source Text")
         self.load_btn.setStyleSheet("background-color: #2E86C1; color: white; padding: 10px; font-weight: bold;")
@@ -75,14 +90,16 @@ class SetupView(QWidget):
         # Aggro Clean Switch
         self.aggro_chk = QCheckBox("Remove all special characters on processing")
         self.aggro_chk.setChecked(self.state.aggro_clean_on_parse)
-        self.aggro_chk.stateChanged.connect(lambda s: setattr(self.state, 'aggro_clean_on_parse', s == Qt.Checked))
+        self.aggro_chk.stateChanged.connect(
+            lambda s: setattr(self.state, 'aggro_clean_on_parse', s == Qt.Checked or s == 2)
+        )
         layout.addWidget(self.aggro_chk)
 
-        # --- Voices ---
+    def setup_voice_controls(self, layout: QVBoxLayout) -> None:
         tpl_group = QGroupBox("Generation Voices")
         t_layout = QHBoxLayout(tpl_group)
         self.template_combo = QComboBox()
-        self.template_combo.addItems(["No voices found"]) # Placeholder
+        self.template_combo.addItems(["No voices found"]) 
         
         self.load_tpl_btn = QPushButton("Load Voice")
         self.load_tpl_btn.clicked.connect(self.load_template)
@@ -96,21 +113,25 @@ class SetupView(QWidget):
         t_layout.addWidget(self.load_tpl_btn)
         t_layout.addWidget(self.del_tpl_btn)
         layout.addWidget(tpl_group)
-        
-        # --- Main Controls ---
+
+    def setup_main_controls(self, layout: QVBoxLayout) -> None:
         ctrl_group = QGroupBox("Main Controls")
         c_layout = QVBoxLayout(ctrl_group)
         
         # Auto Assemble
         self.auto_asm_chk = QCheckBox("Re-Assemble After Full Run")
         self.auto_asm_chk.setChecked(self.state.auto_assemble_after_run)
-        self.auto_asm_chk.stateChanged.connect(lambda s: setattr(self.state, 'auto_assemble_after_run', s == Qt.Checked))
+        self.auto_asm_chk.stateChanged.connect(
+            lambda s: setattr(self.state, 'auto_assemble_after_run', s == Qt.Checked or s == 2)
+        )
         c_layout.addWidget(self.auto_asm_chk)
 
         # Auto Regen
         self.auto_reg_chk = QCheckBox("Continue to Regenerate until all files pass")
         self.auto_reg_chk.setChecked(self.state.auto_regen_main)
-        self.auto_reg_chk.stateChanged.connect(lambda s: setattr(self.state, 'auto_regen_main', s == Qt.Checked))
+        self.auto_reg_chk.stateChanged.connect(
+            lambda s: setattr(self.state, 'auto_regen_main', s == Qt.Checked or s == 2)
+        )
         c_layout.addWidget(self.auto_reg_chk)
 
         # Dual GPU Checkbox (Conditional)
@@ -121,7 +142,6 @@ class SetupView(QWidget):
              
         if gpu_count >= 2:
             self.dual_gpu_chk = QCheckBox(f"Use Both GPUs ({gpu_count} detected)")
-            # Check if current setting has comma
             is_dual = "," in self.state.settings.target_gpus
             self.dual_gpu_chk.setChecked(is_dual)
             self.dual_gpu_chk.stateChanged.connect(self.toggle_dual_gpu)
@@ -133,8 +153,8 @@ class SetupView(QWidget):
         c_layout.addWidget(self.start_btn)
         
         layout.addWidget(ctrl_group)
-        
-        # --- System Check ---
+
+    def setup_system_check(self, layout: QVBoxLayout) -> None:
         sys_group = QGroupBox("System Check")
         s_layout = QFormLayout(sys_group)
         self.lbl_ffmpeg = QLabel("Checking...")
@@ -146,21 +166,16 @@ class SetupView(QWidget):
         s_layout.addRow("GPU Mode:", self.lbl_gpu)
         
         layout.addWidget(sys_group)
-        
-        layout.addStretch()
 
-    def check_system(self):
+    def check_system(self) -> None:
         ffmpeg = shutil.which('ffmpeg')
         self.lbl_ffmpeg.setText("Found" if ffmpeg else "Not Found (Required)")
         self.lbl_ffmpeg.setStyleSheet("color: green" if ffmpeg else "color: red")
         
-        # Auto-editor check (mocked or check pip)
-        # In reality, we'd check if 'auto-editor' command exists
         ae = shutil.which('auto-editor')
         self.lbl_auto.setText("Found" if ae else "Not Found (Optional)")
         self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
 
-        # GPU Check
         try:
             if torch.cuda.is_available():
                 count = torch.cuda.device_count()
@@ -175,14 +190,13 @@ class SetupView(QWidget):
              self.lbl_gpu.setText("Error Checking GPU")
              self.lbl_gpu.setStyleSheet("color: red")
 
-    def toggle_dual_gpu(self, state):
-        if state == Qt.Checked:
-            # Set to first two GPUs
+    def toggle_dual_gpu(self, state: int) -> None:
+        if state == Qt.Checked or state == 2:
             self.state.settings.target_gpus = "cuda:0,cuda:1"
         else:
             self.state.settings.target_gpus = "cuda:0"
 
-    def browse_file(self):
+    def browse_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Select Text Source", "", 
                                             "Text/Ebook (*.txt *.epub *.pdf *.docx *.mobi)")
         if path:
@@ -193,61 +207,57 @@ class SetupView(QWidget):
                 self.session_name_edit.setText(name)
                 self.state.session_name = name
 
-    def process_text(self):
-        # ... logic unchanged except for using self.processor.extract_text_from_file if logic moved ...
-        # For now, keeping the simplified logic but adding file reading support
-        if not self.state.source_file_path: return
+    def process_text(self) -> None:
+        if not self.state.source_file_path: 
+            return
         
         try:
-            # Use new extraction logic
             raw_text = self.processor.extract_text_from_file(self.state.source_file_path)
             if raw_text.startswith("Error"):
                 QMessageBox.critical(self, "Error", raw_text)
                 return
             
-            # --- REVIEW DIALOG ---
+            # Use dynamic import to avoid circular dependencies if any
             from ui.dialogs.review_text_dialog import ReviewTextDialog
             dlg = ReviewTextDialog(raw_text, self)
             if dlg.exec():
-                raw_text = dlg.result_text
-            else:
-                return # User cancelled
+                final_text = dlg.result_text
+                self._perform_text_processing(final_text)
                 
-            # Step 1: Preprocess (Split sentences + clean)
-            sentences = self.processor.preprocess_text(
-                raw_text, 
-                aggressive_clean=self.state.aggro_clean_on_parse
-            )
-            
-            # Step 2: Chunking (if enabled)
-            if self.state.settings.chunking_enabled:
-                sentences = self.processor.group_sentences_into_chunks(
-                    sentences, 
-                    max_chars=self.state.settings.max_chunk_chars
-                )
-            
-            self.state.sentences = sentences
-            QMessageBox.information(self, "Success", f"Loaded {len(sentences)} chunks.")
-            
-            # Save Session
-            self.project_service.save_session(self.state.session_name, {
-                "source_file_path": self.state.source_file_path,
-                "sentences": self.state.sentences,
-                "generation_settings": dataclasses.asdict(self.state.settings)
-            })
-            
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 
-    def new_session(self):
-        # Reset state logic
+    def _perform_text_processing(self, text: str) -> None:
+        """Helper to handle the logic of processing text after user review."""
+        # Step 1: Preprocess (Split sentences + clean)
+        sentences = self.processor.preprocess_text(
+            text, 
+            aggressive_clean=self.state.aggro_clean_on_parse
+        )
+        
+        # Step 2: Chunking (if enabled)
+        if self.state.settings.chunking_enabled:
+            sentences = self.processor.group_sentences_into_chunks(
+                sentences, 
+                max_chars=self.state.settings.max_chunk_chars
+            )
+        
+        self.state.sentences = sentences
+        QMessageBox.information(self, "Success", f"Loaded {len(sentences)} chunks.")
+        
+        # Save Session
+        self.project_service.save_session(self.state.session_name, {
+            "source_file_path": self.state.source_file_path,
+            "sentences": self.state.sentences,
+            "generation_settings": dataclasses.asdict(self.state.settings)
+        })
+
+    def new_session(self) -> None:
         self.session_name_edit.clear()
         self.file_path_edit.clear()
         self.state.sentences = []
-
-        # Signal a refresh?
         
-    def load_session_dialog(self):
+    def load_session_dialog(self) -> None:
         dir_path = QFileDialog.getExistingDirectory(self, "Select Session Folder", "Outputs_Pro")
         if dir_path:
             data = self.project_service.load_session(dir_path)
@@ -257,52 +267,47 @@ class SetupView(QWidget):
                 self.state.sentences = data.get('sentences', [])
                 self.file_path_edit.setText(data.get('source_file_path', ''))
                 
-                # Update settings from loaded session if available
-                # Note: ProjectService.load_session might return just data dict
-                # We should update state.settings
                 if 'generation_settings' in data:
                      self.state.update_settings(**data['generation_settings'])
-                
                 
                 QMessageBox.information(self, "Loaded", f"Session loaded with {len(self.state.sentences)} chunks.")
             else:
                 QMessageBox.warning(self, "Error", "Failed to load session.")
 
-    def toggle_generation(self):
+    def toggle_generation(self) -> None:
         QMessageBox.information(self, "Start", "Generation started! (Wiring pending in Phase 5)")
 
-    def populate_templates(self):
+    def populate_templates(self) -> None:
         templates = self.template_service.list_templates()
         self.template_combo.clear()
         if templates:
             self.template_combo.addItems(templates)
         else:
-            self.template_combo.addItem("No templates found")
+            self.template_combo.addItem("No voices found")
 
-    def load_template(self):
+    def load_template(self) -> None:
         name = self.template_combo.currentText()
-        if not name or "found" in name: return
+        if not name or "found" in name: 
+            return
         
         data = self.template_service.load_template(name)
         if data:
-            # Update state settings
             try:
-                # We iterate keys to ensure safety
                 for key, value in data.items():
                     if hasattr(self.state.settings, key):
-                        # Handle potential type mismatches if needed, but assuming JSON types match
                         setattr(self.state.settings, key, value)
                 
                 QMessageBox.information(self, "Success", f"Loaded voice '{name}'.")
-                self.template_loaded.emit() # Signal other views to refresh
+                self.template_loaded.emit() 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to apply voice: {e}")
         else:
             QMessageBox.warning(self, "Error", "Failed to load voice data.")
 
-    def delete_template(self):
+    def delete_template(self) -> None:
         name = self.template_combo.currentText()
-        if not name or "found" in name: return
+        if not name or "found" in name: 
+            return
         
         reply = QMessageBox.question(self, "Confirm Delete", 
                                    f"Are you sure you want to delete voice '{name}'?",
@@ -311,6 +316,6 @@ class SetupView(QWidget):
         if reply == QMessageBox.Yes:
             if self.template_service.delete_template(name):
                 QMessageBox.information(self, "Deleted", f"Voice '{name}' deleted.")
-                self.populate_templates() # Refresh list
+                self.populate_templates()
             else:
                 QMessageBox.critical(self, "Error", f"Failed to delete voice '{name}'.")

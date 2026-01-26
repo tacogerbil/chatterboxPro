@@ -1,15 +1,19 @@
 import logging
 import random
-import shutil
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from pathlib import Path
+from typing import List, Dict, Any, Tuple, Optional, Union
 import torch
 
 from PySide6.QtCore import QObject, Signal, QThread, Slot
 from workers.tts_worker import worker_process_chunk
 from utils.text_processor import punc_norm
 from core.state import AppState
+
+# Constants for Status
+STATUS_YES = 'yes'
+STATUS_FAILED = 'failed'
+STATUS_NO = 'no'
 
 class GenerationThread(QThread):
     """
@@ -23,26 +27,25 @@ class GenerationThread(QThread):
     error_occurred = Signal(str)
     stopped = Signal()
 
-    def __init__(self, state_snapshot: dict, tasks: list, max_workers: int, outputs_dir: str):
+    def __init__(self, tasks: List[Tuple], max_workers: int, outputs_dir: str) -> None:
         super().__init__()
-        self.state_settings = state_snapshot # Dict of settings
         self.tasks = tasks
         self.max_workers = max_workers
         self.outputs_dir = outputs_dir
         self.stop_requested = multiprocessing.Event()
-        self.executor = None
+        self.executor: Optional[ProcessPoolExecutor] = None
 
-    def request_stop(self):
+    def request_stop(self) -> None:
         self.stop_requested.set()
 
-    def _cleanup_memory(self):
+    def _cleanup_memory(self) -> None:
         import gc
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
-    def run(self):
+    def run(self) -> None:
         """The main blocking loop runs here, in a separate thread."""
         try:
             completed_count = 0
@@ -52,7 +55,8 @@ class GenerationThread(QThread):
             ctx = multiprocessing.get_context('spawn')
             with ProcessPoolExecutor(max_workers=self.max_workers, mp_context=ctx) as executor:
                 self.executor = executor
-                futures = {executor.submit(worker_process_chunk, task): task[1] for task in self.tasks}
+                # Map future -> task info (index 1 is original_index)
+                futures = {executor.submit(worker_process_chunk, task): task for task in self.tasks}
                 
                 for future in as_completed(futures):
                     if self.stop_requested.is_set():
@@ -68,9 +72,6 @@ class GenerationThread(QThread):
                     except Exception as e:
                         logging.error(f"Worker task error: {e}")
                         # Don't abort entire run for one chunk failure unless critical?
-                        # Taking parity with legacy: Log and marked as failed
-                        # But exception here means CRASH in worker logic before returning payload
-                        # We can emit a failure payload manually if needed
                         pass
                     
                     completed_count += 1
@@ -86,19 +87,13 @@ class GenerationThread(QThread):
         except Exception as e:
             logging.error(f"GenerationThread crashed: {e}", exc_info=True)
             self.error_occurred.emit(str(e))
-        finally:
-            # Cleanup temp dirs? Managed by Service usually?
-            # Or define temp dir usage here.
-            # Legacy logic handled `run_temp_dir` cleanup after loop.
-            # We can't easily clean it here without knowing which run it was.
-            # For this MVP refactor, we rely on standard cleanup.
-            pass
 
 class GenerationService(QObject):
     """
     Handles the multi-process TTS generation.
     Decoupled from UI, uses Signals for updates.
     Manages a QThread to keep UI responsive.
+    MCCC Compliant: SRP, Explicit Interfaces.
     """
     
     # Signals
@@ -110,20 +105,20 @@ class GenerationService(QObject):
     error_occurred = Signal(str)
     
     # Auto-Fix Signals
-    auto_fix_status = Signal(str) # "Splitting failed chunks...", "Retrying...", etc.
+    auto_fix_status = Signal(str) # Status message for UI
     
-    def __init__(self, app_state: AppState):
+    def __init__(self, app_state: AppState) -> None:
         super().__init__()
         self.state = app_state
-        self.worker_thread = None
-        self.playlist_service = None # Injected dependency for splitting
-        self.auto_fix_stage = "NONE" # NONE, MAIN_INITIAL, MAIN_RETRY_1, MAIN_SPLIT, MAIN_LOOP
-        self._loop_iteration = 0
+        self.worker_thread: Optional[GenerationThread] = None
+        self.playlist_service: Optional[Any] = None # Injected dependency
+        self.auto_fix_stage: str = "NONE" 
+        self._loop_iteration: int = 0
 
-    def set_playlist_service(self, service):
+    def set_playlist_service(self, service: Any) -> None:
         self.playlist_service = service
 
-    def request_stop(self):
+    def request_stop(self) -> None:
         """Sets the stop flag to terminate generation."""
         self.auto_fix_stage = "NONE" # Hard stop breaks loop
         if self.worker_thread and self.worker_thread.isRunning():
@@ -132,22 +127,21 @@ class GenerationService(QObject):
         else:
             self.stopped.emit()
 
-    def _auto_fix_logic(self):
+    def _auto_fix_logic(self) -> None:
         """
         State machine for auto-regeneration loops.
-        Ported from Legacy main_window.py _auto_fix_logic.
+        Handles retries, splitting, and infinite looping for stubborn chunks.
         """
         # 1. Identify Failures
-        failed_indices = [i for i, s in enumerate(self.state.sentences) if s.get('tts_generated') == 'failed']
+        failed_indices = [
+            i for i, s in enumerate(self.state.sentences) 
+            if s.get('tts_generated') == STATUS_FAILED
+        ]
         
         if not failed_indices:
             self.auto_fix_stage = "NONE"
             logging.info("Auto-Fix: All clear.")
-            self.finished.emit() # Real finish
-            
-            # Check Auto-Assemble
-            if self.state.auto_assemble_after_run:
-                pass # TODO: Emit signal to trigger assembly? Or handle elsewhere.
+            self.finished.emit() 
             return
 
         # 2. State Transition
@@ -167,15 +161,8 @@ class GenerationService(QObject):
             self.auto_fix_stage = "MAIN_SPLIT"
             self.auto_fix_status.emit(f"Auto-Fix: Splitting {len(failed_indices)} failed items...")
             
-            # Call Splitting Logic
             if self.playlist_service:
-                # We split ALL failed chunks.
-                # Note: This modifies indices, so we must be careful with recursive calls.
                 count = self.playlist_service.split_all_failed(confirm=False)
-                if count == 0:
-                     # Could not split (maybe too short). Force loop or stop?
-                     # Legacy behavior: Move to Loop anyway.
-                     pass
             
             # After splitting, identify new marked items (the pieces)
             new_marked = [i for i, s in enumerate(self.state.sentences) if s.get('marked')]
@@ -189,19 +176,20 @@ class GenerationService(QObject):
             self.start_generation(failed_indices)
 
         elif self.auto_fix_stage == "MAIN_LOOP":
-            # Infinite loop untill success or stop
+            # Infinite loop until success or stop
             self._loop_iteration += 1
             self.auto_fix_status.emit(f"Auto-Fix: Loop Iteration {self._loop_iteration} ({len(failed_indices)} items)...")
             self.start_generation(failed_indices)
             
         else:
-            # Should not happen if logic is correct, or stage was NONE
             self.finished.emit()
 
-    def _get_chapter_ranges(self):
+    def _get_chapter_ranges(self) -> List[Tuple[int, int]]:
         """Returns list of (start_idx, end_idx) for each chapter."""
-        chapter_starts = [i for i, s in enumerate(self.state.sentences) 
-                          if s.get('is_chapter_heading')]
+        chapter_starts = [
+            i for i, s in enumerate(self.state.sentences) 
+            if s.get('is_chapter_heading')
+        ]
         
         if not chapter_starts:
             return [(0, len(self.state.sentences))]
@@ -212,10 +200,70 @@ class GenerationService(QObject):
             ranges.append((start, end))
         return ranges
 
-    def start_generation(self, indices_to_process=None):
+    def _configure_workers(self, target_gpus: str) -> Tuple[List[str], int]:
+        """Determines devices and max_workers based on settings and hardware."""
+        gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        
+        if "cpu" in target_gpus or gpu_count == 0:
+            return ["cpu"], 1
+            
+        devices = [d.strip() for d in target_gpus.split(',') if d.strip()]
+        return devices, len(devices)
+
+    def _prepare_tasks(self, 
+                      indices: List[int], 
+                      devices: List[str], 
+                      run_seed: int,
+                      outputs_dir: str) -> List[Tuple]:
+        """Creates the list of task tuples for the worker pool."""
+        
+        s = self.state.settings
+        tasks: List[Tuple] = []
+        
+        # Determine sorting
+        if hasattr(self.state, 'generation_order') and self.state.generation_order == "In Order":
+             sorted_indices = sorted(indices, key=lambda i: int(self.state.sentences[i].get('sentence_number', 0)))
+        else:
+             # Default: Fastest First
+             sorted_indices = sorted(indices, key=lambda i: len(self.state.sentences[i]['original_sentence']), reverse=True)
+
+        for i, original_idx in enumerate(sorted_indices):
+            sentence_data = self.state.sentences[original_idx]
+            
+            task = (
+                i, 
+                original_idx, 
+                int(sentence_data.get('sentence_number', i+1)),
+                punc_norm(sentence_data['original_sentence']),
+                devices[i % len(devices)], 
+                run_seed,
+                self.state.ref_audio_path, 
+                s.exaggeration, 
+                s.temperature,
+                s.cfg_weight, 
+                s.disable_watermark,
+                s.num_candidates,
+                s.max_attempts,
+                not s.asr_validation_enabled, 
+                self.state.session_name,
+                0, # run_idx (flattened for now)
+                outputs_dir, 
+                sentence_data['uuid'],
+                s.asr_threshold,
+                s.speed,
+                s.tts_engine,
+                s.pitch_shift,
+                s.timbre_shift,
+                s.gruffness
+            )
+            tasks.append(task)
+            
+        return tasks
+
+    def start_generation(self, indices_to_process: Optional[List[int]] = None) -> None:
         """
         Prepares tasks and starts the GenerationThread.
-        Non-blocking.
+        Main entry point for starting a generation run.
         """
         if self.worker_thread and self.worker_thread.isRunning():
             logging.warning("Generation already running.")
@@ -224,89 +272,41 @@ class GenerationService(QObject):
         self.started.emit()
         s = self.state.settings
         outputs_dir = "Outputs_Pro" 
-        session_name = self.state.session_name
         
-        # Logic to prepare tasks (Fastest First, etc)
-        # We process ALL chapters in one go? Or queue them?
-        # Legacy looped chapters.
-        # To keep it simple inside Thread, we should flatten the chapters into one big list of tasks
-        # OR run thread per chapter?
-        # A single big list is best for packing.
-        
-        # Prepare Tasks
-        tasks = []
-        
-        # Determine Runs (assuming 1 run for now or loop logic inside thread?)
-        # Legacy loop: for run_idx in range(num_runs):
-        # We will support 1 run for now in this Thread refactor, usually fine unless bulk generating.
-        # If num_runs > 1, we should ideally queue them.
-        # For parity, we'll implement logic for Run 0.
-        
-        run_idx = 0
-        current_run_master_seed = (s.master_seed + run_idx) if s.master_seed != 0 else random.randint(1, 2**32 - 1)
-        
-        chapter_ranges = self._get_chapter_ranges()
-        
-        # Devices
-        gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
-        if "cpu" in s.target_gpus or gpu_count == 0:
-                max_workers = 1
-                devices = ["cpu"]
+        # 1. Determine Scope
+        if indices_to_process is not None:
+             # Explicit list (e.g. retry or selected chapters)
+             process_indices = indices_to_process
         else:
-                devices = [d.strip() for d in s.target_gpus.split(',') if d.strip()]
-                max_workers = len(devices)
+             # Full run (filter not-done items)
+             # Logic: Iterate ranges, collect all valid items
+             process_indices = []
+             for start, end in self._get_chapter_ranges():
+                 chunk = list(range(start, end))
+                 # Filter checks
+                 valid = [
+                     i for i in chunk 
+                     if self.state.sentences[i].get('tts_generated') != STATUS_YES 
+                     and not self.state.sentences[i].get('is_pause')
+                 ]
+                 process_indices.extend(valid)
 
-        # Collect tasks across all chapters
-        all_process_indices = []
-        for start, end in chapter_ranges:
-            indices = list(range(start, end))
-            if indices_to_process is not None:
-                filtered = [i for i in indices if i in indices_to_process]
-            else:
-                filtered = [i for i in indices if self.state.sentences[i].get('tts_generated') != 'yes']
-            
-            filtered = [i for i in filtered if not self.state.sentences[i].get('is_pause')]
-            all_process_indices.extend(filtered)
-
-        if not all_process_indices:
+        if not process_indices:
             logging.info("No chunks need generation.")
             self.finished.emit()
             return
-            
-        # Sorting
-        if hasattr(self.state, 'generation_order') and self.state.generation_order == "In Order":
-             chunks_to_process_sorted = sorted(all_process_indices, key=lambda i: int(self.state.sentences[i].get('sentence_number', 0)))
-        else:
-             # Default: Fastest First (Longest text first)
-             chunks_to_process_sorted = sorted(all_process_indices, key=lambda i: len(self.state.sentences[i]['original_sentence']), reverse=True)
+
+        # 2. Configure Resources
+        devices, max_workers = self._configure_workers(s.target_gpus)
         
-        # Create Task Tuples
-        for i, original_idx in enumerate(chunks_to_process_sorted):
-            sentence_data = self.state.sentences[original_idx]
-            task = (
-                i, original_idx, int(sentence_data.get('sentence_number', i+1)),
-                punc_norm(sentence_data['original_sentence']),
-                devices[i % len(devices)], 
-                current_run_master_seed,
-                self.state.ref_audio_path, 
-                s.exaggeration, s.temperature,
-                s.cfg_weight, s.disable_watermark,
-                s.num_candidates,
-                s.max_attempts,
-                not s.asr_validation_enabled, session_name,
-                run_idx, outputs_dir, sentence_data['uuid'],
-                s.asr_threshold,
-                s.speed,
-                s.tts_engine,
-                s.pitch_shift,   # NEW
-                s.timbre_shift,  # NEW
-                s.gruffness      # NEW
-            )
-            tasks.append(task)
+        # 3. Prepare Logic (Seed, etc)
+        run_seed = s.master_seed if s.master_seed != 0 else random.randint(1, 2**32 - 1)
+        
+        # 4. Create Tasks
+        tasks = self._prepare_tasks(process_indices, devices, run_seed, outputs_dir)
             
-        # Create and Start Thread
-        # We assume settings won't change mid-run, so we passed values in tasks.
-        self.worker_thread = GenerationThread({}, tasks, max_workers, outputs_dir)
+        # 5. Start Thread
+        self.worker_thread = GenerationThread(tasks, max_workers, outputs_dir)
         
         self.worker_thread.progress_update.connect(self.progress_update)
         self.worker_thread.chunk_complete.connect(self._on_chunk_complete)
@@ -317,7 +317,7 @@ class GenerationService(QObject):
         self.worker_thread.start()
         
     @Slot(int, dict)
-    def _on_chunk_complete(self, original_idx, result):
+    def _on_chunk_complete(self, original_idx: int, result: Dict[str, Any]) -> None:
         """Called on Main Thread when a chunk finishes."""
         # Update State
         self.state.sentences[original_idx]['generation_seed'] = result.get('seed')
@@ -325,26 +325,25 @@ class GenerationService(QObject):
         
         status = result.get('status')
         if status == 'success':
-            self.state.sentences[original_idx]['tts_generated'] = 'yes'
+            self.state.sentences[original_idx]['tts_generated'] = STATUS_YES
             self.state.sentences[original_idx]['marked'] = False
         else:
-            self.state.sentences[original_idx]['tts_generated'] = 'failed'
+            self.state.sentences[original_idx]['tts_generated'] = STATUS_FAILED
             self.state.sentences[original_idx]['marked'] = True
         
         # Emit update for UI
         self.item_updated.emit(original_idx)
 
     @Slot()
-    def _on_finished(self):
-        # Instead of plain finish, check auto-fix logic
+    def _on_finished(self) -> None:
+        # Check auto-fix logic
         if self.state.auto_regen_main:
-             # Delay slightly to allow UI to update? No, pure logic.
              self._auto_fix_logic()
         else:
              self.finished.emit()
         self.worker_thread = None
 
     @Slot()
-    def _on_stopped(self):
+    def _on_stopped(self) -> None:
         self.stopped.emit()
         self.worker_thread = None

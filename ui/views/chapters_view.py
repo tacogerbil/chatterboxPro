@@ -1,22 +1,29 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListView, 
-                               QPushButton, QLabel, QMessageBox, QCheckBox)
-from PySide6.QtCore import Qt, Signal, Signal
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QListView, 
+    QPushButton, QLabel, QMessageBox, QCheckBox
+)
+from PySide6.QtCore import Qt, Signal, QModelIndex
+from typing import Optional, List
+
 from core.state import AppState
 from core.models.chapter_model import ChapterModel
 from core.services.chapter_service import ChapterService
+from core.services.generation_service import GenerationService
 
 class ChaptersView(QWidget):
     jump_requested = Signal(int)
 
-    def __init__(self, app_state: AppState, parent=None):
+    def __init__(self, app_state: AppState, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.app_state = app_state
         self.logic = ChapterService()
-        
         self.model = ChapterModel(app_state)
+        # Type hint for generation service (injected later)
+        self.gen_service: Optional[GenerationService] = None
+        
         self.setup_ui()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         
         # Header: Title + Refresh
@@ -62,7 +69,9 @@ class ChaptersView(QWidget):
         self.auto_loop_chk = QCheckBox("Auto-loop")
         self.auto_loop_chk.setToolTip("Automatically regenerate until success (Warning: Infinite Loop possible)")
         self.auto_loop_chk.setChecked(self.app_state.auto_regen_main)
-        self.auto_loop_chk.stateChanged.connect(lambda s: setattr(self.app_state, 'auto_regen_main', s == Qt.Checked))
+        self.auto_loop_chk.stateChanged.connect(
+            lambda s: setattr(self.app_state, 'auto_regen_main', s == Qt.Checked or s == 2)
+        )
         footer_layout.addWidget(self.auto_loop_chk)
         
         # Generate Selected button
@@ -73,17 +82,17 @@ class ChaptersView(QWidget):
         
         layout.addLayout(footer_layout)
 
-    def select_all(self):
+    def select_all(self) -> None:
         for i in range(self.model.rowCount()):
             idx = self.model.index(i, 0)
             self.model.setData(idx, Qt.Checked, Qt.CheckStateRole)
 
-    def deselect_all(self):
+    def deselect_all(self) -> None:
         for i in range(self.model.rowCount()):
             idx = self.model.index(i, 0)
             self.model.setData(idx, Qt.Unchecked, Qt.CheckStateRole)
 
-    def check_highlighted(self):
+    def check_highlighted(self) -> None:
         """Checks the checkboxes for all currently highlighted rows in the list."""
         selected_indexes = self.list_view.selectionModel().selectedIndexes()
         if not selected_indexes:
@@ -95,14 +104,11 @@ class ChaptersView(QWidget):
             # Check the box
             self.model.setData(index, Qt.Checked, Qt.CheckStateRole)
             count += 1
-            
-        # Optional: Feedback? No, visual feedback is enough.
 
-
-    def set_generation_service(self, gen_service):
+    def set_generation_service(self, gen_service: GenerationService) -> None:
         self.gen_service = gen_service
 
-    def generate_selected(self):
+    def generate_selected(self) -> None:
         # Merge Checkbox selection + Highlighting selection
         checked_indices = self.model.get_selected_indices() # From checkboxes
         
@@ -122,14 +128,14 @@ class ChaptersView(QWidget):
             final_selection
         )
         
-        if not hasattr(self, 'gen_service') or not self.gen_service:
+        if not self.gen_service:
             QMessageBox.warning(self, "Error", "Generation Service not connected.")
             return
             
         # Trigger generation
         self.gen_service.start_generation(full_indices)
         
-    def on_double_click(self, index):
+    def on_double_click(self, index: QModelIndex) -> None:
         """Handle double click to jump to chapter start."""
         if not index.isValid(): return
         
