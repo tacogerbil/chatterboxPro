@@ -19,24 +19,13 @@ class ChaptersView(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
-        # Header / Controls
+        # Header: Title + Refresh
         header_layout = QHBoxLayout()
         header_layout.addWidget(QLabel("Detected Chapters (Double-click to Jump)"))
         header_layout.addStretch()
         
-        # Generate Selected button
-        self.gen_btn = QPushButton("Generate Selected")
-        self.gen_btn.setStyleSheet("background-color: #D35400; color: white; font-weight: bold;")
-        self.gen_btn.clicked.connect(self.generate_selected)
-        header_layout.addWidget(self.gen_btn)
-        
-        # Auto-loop Checkbox
-        self.auto_loop_chk = QCheckBox("Auto-loop")
-        self.auto_loop_chk.setChecked(self.app_state.auto_regen_main)
-        self.auto_loop_chk.stateChanged.connect(lambda s: setattr(self.app_state, 'auto_regen_main', s == Qt.Checked))
-        header_layout.addWidget(self.auto_loop_chk)
-        
         refresh_btn = QPushButton("↻ Refresh")
+        refresh_btn.setToolTip("Rescan source text for chapters")
         refresh_btn.clicked.connect(self.model.refresh)
         header_layout.addWidget(refresh_btn)
         
@@ -49,7 +38,7 @@ class ChaptersView(QWidget):
         self.list_view.doubleClicked.connect(self.on_double_click)
         layout.addWidget(self.list_view)
         
-        # Footer Selection Controls
+        # Footer: Selection + Actions
         footer_layout = QHBoxLayout()
         
         sel_all = QPushButton("Select All")
@@ -62,9 +51,18 @@ class ChaptersView(QWidget):
         
         footer_layout.addStretch()
         
-        # Generate Button (Removed - duplicate of Header)
-        # self.gen_btn = QPushButton("Generate Selected") ...
-        pass
+        # Auto-loop Checkbox
+        self.auto_loop_chk = QCheckBox("Auto-loop")
+        self.auto_loop_chk.setToolTip("Automatically regenerate until success (Warning: Infinite Loop possible)")
+        self.auto_loop_chk.setChecked(self.app_state.auto_regen_main)
+        self.auto_loop_chk.stateChanged.connect(lambda s: setattr(self.app_state, 'auto_regen_main', s == Qt.Checked))
+        footer_layout.addWidget(self.auto_loop_chk)
+        
+        # Generate Selected button
+        self.gen_btn = QPushButton("Generate Selected")
+        self.gen_btn.setStyleSheet("background-color: #D35400; color: white; font-weight: bold; padding: 5px;")
+        self.gen_btn.clicked.connect(self.generate_selected)
+        footer_layout.addWidget(self.gen_btn)
         
         layout.addLayout(footer_layout)
 
