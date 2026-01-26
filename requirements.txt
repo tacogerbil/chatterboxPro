@@ -32,7 +32,7 @@ pygame==2.6.1
 # --- Qt Migration ---
 PySide6==6.8.1
 pyqtgraph==0.13.7
-pyqtdarktheme==2.1.3
+pyqtdarktheme
 
 # --- Text & File Processing ---
 sentence-splitter==1.4

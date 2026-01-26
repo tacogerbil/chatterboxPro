@@ -104,9 +104,16 @@ def launch_qt_app():
     app = QApplication(sys.argv)
     
     # Apply modern theme (pyqtdarktheme)
+    # Apply modern theme (pyqtdarktheme)
     try:
         import qdarktheme
-        qdarktheme.setup_theme("dark", custom_colors={"primary": "#27AE60"}) # Using our green accent
+        # Try modern API (v2.x)
+        if hasattr(qdarktheme, 'setup_theme'):
+             qdarktheme.setup_theme("dark", custom_colors={"primary": "#27AE60"}) 
+        else:
+             # Fallback for v1.x / 0.1.7
+             app.setStyleSheet(qdarktheme.load_stylesheet(theme="dark"))
+             print("Warning: Using legacy pyqtdarktheme (0.1.7). 'custom_colors' not supported.")
     except Exception as e:
         print(f"Warning: Could not apply qdarktheme: {e}")
 
