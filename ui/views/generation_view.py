@@ -30,17 +30,28 @@ class GenerationView(QWidget):
     def __init__(self, state: AppState, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.state = state
-        self.service = GenerationService(state)
+        self.service: Optional[GenerationService] = None
+        self.audio_service: Optional[Any] = None
         self.template_service = TemplateService()
-        # Thread management
-        self.gen_thread_runner = GenerationWorker(self.service)
         
         self.setup_ui()
-        self.connect_signals()
-        
+        # self.connect_signals() 
+
+    def set_generation_service(self, service: GenerationService) -> None:
+        self.service = service
+        self.service.preview_ready.connect(self.on_preview_ready)
+
+    def set_audio_service(self, service: Any) -> None:
+        self.audio_service = service
+
     def connect_signals(self) -> None:
-        # Service -> UI connections
         pass
+        
+    def on_preview_ready(self, path: str) -> None:
+        if self.audio_service:
+            self.audio_service.play_file(path)
+        else:
+             QMessageBox.warning(self, "Error", "Audio Service not connected.")
         
     def setup_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -322,8 +333,12 @@ class GenerationView(QWidget):
         text = self.sample_text_edit.toPlainText()
         if not text: 
             return
-        QMessageBox.information(self, "Preview", f"Preview generation not yet fully wired. \nText: {text}") 
-        # TODO: Wire to Service.generate_preview(text)
+            
+        if not self.service:
+            QMessageBox.warning(self, "Error", "Generation Service not connected.")
+            return
+
+        self.service.generate_preview(text)
 
     def refresh_values(self) -> None:
         """Updates UI elements to match current AppState settings."""

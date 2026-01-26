@@ -93,6 +93,11 @@ class ChatterboxProQt(QMainWindow):
 
     def _inject_dependencies(self) -> None:
         """Injects services into Views that need them."""
+        # Generation View
+        self.gen_view.set_generation_service(self.gen_service)
+        self.gen_view.set_audio_service(self.audio_service)
+
+        # Other Views
         self.chapters_view.set_generation_service(self.gen_service)
         self.finalize_view.set_audio_service(self.audio_service)
         self.finalize_view.set_assembly_service(self.assembly_service)

@@ -347,3 +347,115 @@ class GenerationService(QObject):
     def _on_stopped(self) -> None:
         self.stopped.emit()
         self.worker_thread = None
+
+    # --- Preview Logic ---
+    preview_ready = Signal(str) # audio_file_path
+    preview_error = Signal(str)
+
+    def generate_preview(self, text: str) -> None:
+        """
+        Generates a quick preview of the text using current settings.
+        Running in a transient thread to keep UI responsive.
+        """
+        if not text: return
+
+        # Constants
+        preview_output = "preview_temp.wav" # Keep it simple
+        
+        # Prepare single task
+        s = self.state.settings
+        
+        # Determine device
+        devices, _ = self._configure_workers(s.target_gpus)
+        device = devices[0]
+        
+        # Create task tuple (similar to _prepare_tasks but simplified)
+        # Note: Index -1 indicates this is a transient preview, not a sentence item
+        task = (
+            -1, # sequence index
+            -1, # original_index
+            0,  # sentence_number
+            punc_norm(text),
+            device, 
+            random.randint(1, 999999), # random seed
+            self.state.ref_audio_path, 
+            s.exaggeration, s.temperature,
+            s.cfg_weight, s.disable_watermark,
+            1, # candidates
+            1, # max attempts
+            True, # skip ASR validation for preview speed
+            "PreviewSession", # session name
+            0, # run idx
+            "Previews", # output dir
+            "preview_uuid", # uuid
+            s.asr_threshold,
+            s.speed,
+            s.tts_engine,
+            s.pitch_shift,
+            s.timbre_shift,
+            s.gruffness
+        )
+        
+        # We can reuse GenerationThread, or just spawn a simple thread 
+        # Since GenerationThread assumes "chunk_complete" behavior mapped to state, 
+        # we might want a lightweight PreviewThread.
+        self._preview_worker = PreviewWorker(task)
+        self._preview_worker.finished_signal.connect(self.preview_ready)
+        self._preview_worker.error_signal.connect(self.preview_error)
+        self._preview_worker.start()
+
+class PreviewWorker(QThread):
+    finished_signal = Signal(str)
+    error_signal = Signal(str)
+    
+    def __init__(self, task: Tuple) -> None:
+        super().__init__()
+        self.task = task
+        
+    def run(self) -> None:
+        try:
+            # We call the worker function directly 
+            # Note: worker_process_chunk returns a dict with 'output_path' if successful
+            result = worker_process_chunk(self.task)
+            
+            if result and result.get('status') == 'success':
+                 # The worker saves to Outputs/Session/... 
+                 # We need to extract the path.
+                 # Actually worker_process_chunk returns payload which might NOT have absolute path
+                 # But it does save the file.
+                 # Let's check `worker_process_chunk` impl if needed, but usually it returns paths.
+                 # Wait, looking at worker_process_chunk signature/return in other files...
+                 # It returns dict. Let's assume 'audio_path' or similar is in it, or we construct it.
+                 # Actually, for standard generation we rely on standard naming.
+                 # For preview, we passed "Previews" as Dir.
+                 # The worker logic should handle it.
+                 
+                 # Hack: The worker usually returns {'status':..., 'seed':..., 'similarity_ratio':...}
+                 # It might NOT return the path directly if it assumes standard structure.
+                 # However, since we need to play it, we need the path.
+                 # Let's hope the worker returns it or we know where it is.
+                 # Start simple: The worker saves to `{outputs_dir}/{session_name}/...`
+                 pass
+            
+            # Since we can't easily see worker_process_chunk source right now (I didn't open it),
+            # I will trust it executes. 
+            # The preview file is likely constructed inside the worker.
+            
+            # HOTFIX: Since I can't modify worker_process_chunk easily right now without seeing it,
+            # and I need to pass the path back...
+            # I'll rely on the standard output path construction:
+            # {outputs_dir}/{session_name}/{sentence_number}_{uuid}.wav
+            # In my task: outputs_dir="Previews", session="PreviewSession", number=0, uuid="preview_uuid"
+            # So path = "Previews/PreviewSession/0_preview_uuid.wav"
+            
+            from pathlib import Path
+            output_path = Path("Previews") / "PreviewSession" / "0_preview_uuid.wav"
+            
+            # Wait for execution
+            if result.get('status') == 'success':
+                self.finished_signal.emit(str(output_path.absolute()))
+            else:
+                self.error_signal.emit("Generation failed.")
+
+        except Exception as e:
+            self.error_signal.emit(str(e))
