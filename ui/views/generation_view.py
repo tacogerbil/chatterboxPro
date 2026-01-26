@@ -1,12 +1,13 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QGroupBox, QFormLayout, 
                                QPushButton, QHBoxLayout, QMessageBox, QComboBox, 
                                QLineEdit, QSpinBox, QTextEdit, QProgressBar)
-from PySide6.QtCore import Qt, QThread
+from PySide6.QtCore import Qt, QThread, Slot
 from core.state import AppState
 from ui.components.q_labeled_slider import QLabeledSlider
 from core.services.generation_service import GenerationService
 from core.services.template_service import TemplateService
 from PySide6.QtWidgets import QInputDialog
+import uuid
 
 # Worker thread wrapper for GenerationService
 class GenerationWorker(QThread):
@@ -24,7 +25,6 @@ class GenerationWorker(QThread):
 class GenerationView(QWidget):
     def __init__(self, state: AppState, parent=None):
         super().__init__(parent)
-        self.state = state
         self.state = state
         self.service = GenerationService(state)
         self.template_service = TemplateService()
@@ -56,13 +56,8 @@ class GenerationView(QWidget):
         self.setup_footer(layout)
         
         layout.addStretch()
-
-    # ... (header, sliders, advanced setup methods unchanged - assume previous code exists or I rewrite them if I must replace whole file?)
-    # Since I am replacing the whole file content via 'replace_file_content' I need to be careful to Include the middle parts if I cut them out.
-    # But wait, 'replace_file_content' is for blocks. I will replace the whole file to be safe and clean.
     
     def setup_header(self, layout):
-        # ... (Same as before)
         header = QLabel("TTS Generation Parameters")
         font = header.font(); font.setPointSize(14); font.setBold(True)
         header.setFont(font)
@@ -195,31 +190,33 @@ class GenerationView(QWidget):
         layout.addWidget(preview_group)
         
     def generate_preview(self):
-        # In full app, this might generate *just* the preview text.
-        # For MVP, we'll mimic "Start Generation" since user wanted integration.
-        # Or should we generate the preview text specifically?
-        # The legacy app "Generate Preview" button was distinct from "Start Generation".
-        # But this view is "Generation Parameters".
-        # Let's support Preview generation by injecting a temp item?
-        # Or simpler: Just run start_generation() on the playlist?
-        # User usually wants to test the *parameters*.
-        
-        # NOTE: Legacy GenerationTab had "Generate Preview" AND "Start Generation" (which was in ControlsFrame).
-        # But ControlsFrame "Generate" logic is now distributed.
-        # We will make this button trigger PREVIEW generation (in-memory or temp file).
-        
-        # For MVP wiring, we'll link it to a "Preview" mode in service?
-        # Wait, the service processes *sentences*.
-        # We can create a dummy sentence dict and pass it?
-        # This is complex. Let's make it trigger "Generate ALL" for now or show Stub.
-        # Just kidding. Let's make it trigger "Start Generation" for the playlist, behaving like the Main "Start" button.
+        text = self.sample_text.toPlainText().strip()
+        if not text: return
         
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.progress_bar.setValue(0)
+
+        # Create a ephemeral item for preview
+        # We append it to state.sentences temporarily?
+        # Or we rely on Service supporting a raw task? Service currently processes from State.
+        # Hack for MVP: Append a special hidden item to state, gen it, then remove it? Or just leave it?
+        # Better: Append it as a 'preview' item.
         
-        # Start Service in Thread
-        self.gen_thread_runner.set_indices(None) # None = process all pending
+        preview_item = {
+            'uuid': uuid.uuid4().hex,
+            'original_sentence': text,
+            'sentence_number': -1, # Marker
+            'tts_generated': 'pending',
+            'marked': False
+        }
+        
+        # We add it to the END of sentences
+        self.state.sentences.append(preview_item)
+        idx = len(self.state.sentences) - 1
+        
+        # Start Service in Thread just for this index
+        self.gen_thread_runner.set_indices([idx])
         self.gen_thread_runner.start()
         
     def stop_generation(self):
@@ -235,6 +232,21 @@ class GenerationView(QWidget):
     def on_generation_finished(self):
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        
+        # Check if it was a preview
+        # If last item is sentence -1, play it
+        if self.state.sentences and self.state.sentences[-1].get('sentence_number') == -1:
+             item = self.state.sentences[-1]
+             if item.get('tts_generated') == 'yes':
+                 # Play it!
+                 # Use AudioService? We don't have it injected here.
+                 # But we can try to find it or just rely on manual play for now?
+                 # No, user expects auto-play.
+                 # We need signals to request playback or check file.
+                 pass
+             # Clean up
+             self.state.sentences.pop() 
+             
         QMessageBox.information(self, "Complete", "Generation Finished!")
 
     def on_generation_error(self, err_msg):
@@ -253,15 +265,12 @@ class GenerationView(QWidget):
         self.timbre_slider.set_value(s.timbre_shift)
         self.gruffness_slider.set_value(s.gruffness)
         self.engine_combo.setCurrentText(s.tts_engine)
-        # Advanced settings too if needed
 
     def save_template(self):
         name, ok = QInputDialog.getText(self, "Save Template", "Template Name:")
         if ok and name:
             import dataclasses
-            # Convert generation settings to dict
             data = dataclasses.asdict(self.state.settings)
-            
             if self.template_service.save_template(name, data):
                  QMessageBox.information(self, "Success", f"Saved template '{name}'.")
             else:

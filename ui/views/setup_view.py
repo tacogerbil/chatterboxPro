@@ -8,6 +8,7 @@ from core.services.template_service import TemplateService
 import os
 import shutil
 import dataclasses
+import torch
 
 class SetupView(QWidget):
     template_loaded = Signal()
@@ -30,7 +31,7 @@ class SetupView(QWidget):
         header = QLabel("Session & Source")
         font = header.font(); font.setPointSize(14); font.setBold(True)
         header.setFont(font)
-        header_layout.addWidget(header)
+        layout.addWidget(header)
         header_layout.addStretch()
         
         # Session Btns
@@ -107,12 +108,34 @@ class SetupView(QWidget):
         self.auto_reg_chk.stateChanged.connect(lambda s: setattr(self.state, 'auto_regen_main', s == Qt.Checked))
         c_layout.addWidget(self.auto_reg_chk)
 
+        # Dual GPU Checkbox (Conditional)
+        try:
+             gpu_count = torch.cuda.device_count()
+        except:
+             gpu_count = 0
+             
+        if gpu_count >= 2:
+            self.dual_gpu_chk = QCheckBox(f"Use Both GPUs ({gpu_count} detected)")
+            # Check if current setting has comma
+            is_dual = "," in self.state.settings.target_gpus
+            self.dual_gpu_chk.setChecked(is_dual)
+            self.dual_gpu_chk.stateChanged.connect(self.toggle_dual_gpu)
+            c_layout.addWidget(self.dual_gpu_chk)
+
         self.start_btn = QPushButton("Start Generation")
         self.start_btn.setStyleSheet("background-color: #27AE60; color: white; font-size: 14px; font-weight: bold; padding: 10px;")
         self.start_btn.clicked.connect(self.toggle_generation)
         c_layout.addWidget(self.start_btn)
         
         layout.addWidget(ctrl_group)
+        
+        # --- Info Display ---
+        info_group = QGroupBox("Legacy Parameters")
+        i_layout = QFormLayout(info_group)
+        self.lbl_ref_path = QLabel(self.state.ref_audio_path or "None")
+        self.lbl_ref_path.setStyleSheet("color: gray")
+        i_layout.addRow("Reference Audio:", self.lbl_ref_path)
+        layout.addWidget(info_group)
         
         # --- System Check ---
         sys_group = QGroupBox("System Check")
@@ -135,6 +158,13 @@ class SetupView(QWidget):
         ae = shutil.which('auto-editor')
         self.lbl_auto.setText("Found" if ae else "Not Found (Optional)")
         self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
+
+    def toggle_dual_gpu(self, state):
+        if state == Qt.Checked:
+            # Set to first two GPUs
+            self.state.settings.target_gpus = "cuda:0,cuda:1"
+        else:
+            self.state.settings.target_gpus = "cuda:0"
 
     def browse_file(self):
         path, _ = QFileDialog.getOpenFileName(self, "Select Text Source", "", 
@@ -179,7 +209,7 @@ class SetupView(QWidget):
             self.project_service.save_session(self.state.session_name, {
                 "source_file_path": self.state.source_file_path,
                 "sentences": self.state.sentences,
-                "generation_settings": {} # ToDo: Serialize settings
+                "generation_settings": dataclasses.asdict(self.state.settings)
             })
             
         except Exception as e:
@@ -190,6 +220,7 @@ class SetupView(QWidget):
         self.session_name_edit.clear()
         self.file_path_edit.clear()
         self.state.sentences = []
+        self.lbl_ref_path.setText("None")
         # Signal a refresh?
         
     def load_session_dialog(self):
@@ -201,6 +232,15 @@ class SetupView(QWidget):
                 self.session_name_edit.setText(self.state.session_name)
                 self.state.sentences = data.get('sentences', [])
                 self.file_path_edit.setText(data.get('source_file_path', ''))
+                
+                # Update settings from loaded session if available
+                # Note: ProjectService.load_session might return just data dict
+                # We should update state.settings
+                if 'generation_settings' in data:
+                     self.state.update_settings(**data['generation_settings'])
+                
+                self.lbl_ref_path.setText(self.state.ref_audio_path or "None")
+                
                 QMessageBox.information(self, "Loaded", f"Session loaded with {len(self.state.sentences)} chunks.")
             else:
                 QMessageBox.warning(self, "Error", "Failed to load session.")

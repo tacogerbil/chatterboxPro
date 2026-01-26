@@ -204,10 +204,14 @@ class ControlsView(QWidget):
         item = self.playlist_service.get_selected_item(idx)
         old_text = item.get('original_sentence', '')
         
-        new_text, ok = QInputDialog.getText(self, "Edit Text", "Edit Sentence:", text=old_text)
-        if ok and new_text != old_text:
-            self.playlist_service.edit_text(idx, new_text)
-            self._refresh()
+        from ui.dialogs.editor_dialog import EditorDialog
+        dlg = EditorDialog(old_text, self)
+        
+        if dlg.exec():
+            new_text = dlg.result_text
+            if new_text != old_text:
+                self.playlist_service.edit_text(idx, new_text)
+                self._refresh()
 
     def _split_chunk(self):
         idx = self._get_selected_index()

@@ -273,8 +273,12 @@ class GenerationService(QObject):
             self.finished.emit()
             return
             
-        # Sorting "Fastest First"
-        chunks_to_process_sorted = sorted(all_process_indices, key=lambda i: len(self.state.sentences[i]['original_sentence']), reverse=True)
+        # Sorting
+        if hasattr(self.state, 'generation_order') and self.state.generation_order == "In Order":
+             chunks_to_process_sorted = sorted(all_process_indices, key=lambda i: int(self.state.sentences[i].get('sentence_number', 0)))
+        else:
+             # Default: Fastest First (Longest text first)
+             chunks_to_process_sorted = sorted(all_process_indices, key=lambda i: len(self.state.sentences[i]['original_sentence']), reverse=True)
         
         # Create Task Tuples
         for i, original_idx in enumerate(chunks_to_process_sorted):
