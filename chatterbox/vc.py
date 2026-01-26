@@ -64,6 +64,38 @@ class ChatterboxVC:
         s3gen_ref_wav = s3gen_ref_wav[:self.DEC_COND_LEN]
         self.ref_dict = self.s3gen.embed_ref(s3gen_ref_wav, S3GEN_SR, device=self.device)
 
+    def load_adapter(self, adapter_path: str, adapter_name: str):
+        """
+        Load a LoRA adapter for the S3Gen flow estimator using PEFT.
+        """
+        from peft import PeftModel
+        
+        estimator = self.s3gen.flow.decoder.estimator
+        if not isinstance(estimator, PeftModel):
+            # First time loading: wrap the estimator
+            # internal_estimator = estimator
+            self.s3gen.flow.decoder.estimator = PeftModel.from_pretrained(
+                estimator,
+                adapter_path,
+                adapter_name=adapter_name
+            )
+            # Ensure it stays on device
+            self.s3gen.flow.decoder.estimator.to(self.device)
+        else:
+            # Already wrapped, just load new adapter
+            estimator.load_adapter(adapter_path, adapter_name=adapter_name)
+
+    def set_adapter(self, adapter_name: str):
+        """
+        Switch the active LoRA adapter.
+        """
+        from peft import PeftModel
+        estimator = self.s3gen.flow.decoder.estimator
+        if isinstance(estimator, PeftModel):
+            estimator.set_adapter(adapter_name)
+        else:
+            print(f"Warning: Model is not using PEFT, cannot set adapter {adapter_name}")
+
     def generate(
         self,
         audio,
