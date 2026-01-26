@@ -134,21 +134,17 @@ class SetupView(QWidget):
         
         layout.addWidget(ctrl_group)
         
-        # --- Info Display ---
-        info_group = QGroupBox("Legacy Parameters")
-        i_layout = QFormLayout(info_group)
-        self.lbl_ref_path = QLabel(self.state.ref_audio_path or "None")
-        self.lbl_ref_path.setStyleSheet("color: gray")
-        i_layout.addRow("Reference Audio:", self.lbl_ref_path)
-        layout.addWidget(info_group)
-        
         # --- System Check ---
         sys_group = QGroupBox("System Check")
         s_layout = QFormLayout(sys_group)
         self.lbl_ffmpeg = QLabel("Checking...")
         self.lbl_auto = QLabel("Checking...")
+        self.lbl_gpu = QLabel("Checking...")
+        
         s_layout.addRow("FFmpeg:", self.lbl_ffmpeg)
         s_layout.addRow("Auto-Editor:", self.lbl_auto)
+        s_layout.addRow("GPU Mode:", self.lbl_gpu)
+        
         layout.addWidget(sys_group)
         
         layout.addStretch()
@@ -163,6 +159,21 @@ class SetupView(QWidget):
         ae = shutil.which('auto-editor')
         self.lbl_auto.setText("Found" if ae else "Not Found (Optional)")
         self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
+
+        # GPU Check
+        try:
+            if torch.cuda.is_available():
+                count = torch.cuda.device_count()
+                name = torch.cuda.get_device_name(0)
+                mode = "Dual GPU" if count > 1 and "cuda:0,cuda:1" in self.state.settings.target_gpus else "Single GPU"
+                self.lbl_gpu.setText(f"{mode} ({count} devices) - {name}")
+                self.lbl_gpu.setStyleSheet("color: green")
+            else:
+                self.lbl_gpu.setText("CPU Mode (No CUDA found)")
+                self.lbl_gpu.setStyleSheet("color: orange")
+        except:
+             self.lbl_gpu.setText("Error Checking GPU")
+             self.lbl_gpu.setStyleSheet("color: red")
 
     def toggle_dual_gpu(self, state):
         if state == Qt.Checked:
