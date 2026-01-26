@@ -83,6 +83,7 @@ class ChatterboxProQt(QMainWindow):
         
         self.chapters_view.set_generation_service(self.gen_service)
         self.finalize_view.set_audio_service(self.audio_service)
+        self.finalize_view.set_assembly_service(self.assembly_service)
         
         # Connect Signals (Global Refresh)
         self.controls_view.playlist = self.playlist_view # Ensure ref matches

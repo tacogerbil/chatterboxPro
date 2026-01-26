@@ -162,7 +162,7 @@ class FinalizeView(QWidget):
         self.btn_export.setEnabled(True)
 
     def assemble(self):
-        if not hasattr(self, 'audio_service'): return
+        if not hasattr(self, 'assembly_service'): return
         
         # Default name
         default_name = f"{self.state.session_name}_audiobook.mp3"
@@ -189,10 +189,10 @@ class FinalizeView(QWidget):
         self.btn_export.setEnabled(False)
         
         # Call Service (Threaded)
-        self.audio_service.assemble_audiobook(path, is_for_acx=False, metadata=metadata)
+        self.assembly_service.assemble_audiobook(path, is_for_acx=False, metadata=metadata)
         
     def export_chapters(self):
-        if not hasattr(self, 'audio_service'): return
+        if not hasattr(self, 'assembly_service'): return
         
         path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if not path: return
@@ -206,4 +206,4 @@ class FinalizeView(QWidget):
         self.btn_assemble.setEnabled(False)
         self.btn_export.setEnabled(False); self.btn_export.setText("Exporting...")
 
-        self.audio_service.export_chapters(path)
+        self.assembly_service.export_chapters(path)
