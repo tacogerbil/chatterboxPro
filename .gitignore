@@ -42,6 +42,8 @@ Thumbs.db
 *.flac
 temp/
 output/
+Outputs_Pro/
+Templates/
 cache/
 *.log
 
