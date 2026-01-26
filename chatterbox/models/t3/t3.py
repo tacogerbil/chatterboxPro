@@ -338,7 +338,14 @@ class T3(nn.Module):
 
         # ---- Generation Loop using kv_cache ----
         for i in tqdm(range(max_new_tokens), desc="Sampling", dynamic_ncols=True):
+            if i % 10 == 0 or i > 100:
+                print(f"[T3 Debug] Loop start step {i}")
+                
             logits = output.logits[:, -1, :]
+            
+            if torch.isnan(logits).any():
+                print(f"[T3 Debug] FATAL: NaNs detected in logits at step {i}!")
+                break
 
             # CFG
             logits_cond = logits[0:1]
@@ -356,6 +363,10 @@ class T3(nn.Module):
 
             # Convert logits to probabilities and sample the next token.
             probs = torch.softmax(logits, dim=-1)
+            
+            if i % 10 == 0 or i > 100:
+                 print(f"[T3 Debug] Sampling step {i}")
+                 
             next_token = torch.multinomial(probs, num_samples=1)  # shape: (B, 1)
 
             predicted.append(next_token)
