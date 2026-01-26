@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QGroupBox, QFormLayout, 
                                QPushButton, QHBoxLayout, QMessageBox, QComboBox, 
-                               QLineEdit, QSpinBox, QTextEdit, QProgressBar)
+                               QLineEdit, QSpinBox, QTextEdit)
 from PySide6.QtCore import Qt, QThread, Slot
 from core.state import AppState
 from ui.components.q_labeled_slider import QLabeledSlider
@@ -36,9 +36,9 @@ class GenerationView(QWidget):
         
     def connect_signals(self):
         # Service -> UI connections
-        self.service.progress_update.connect(self.update_progress)
-        self.service.finished.connect(self.on_generation_finished)
-        self.service.error_occurred.connect(self.on_generation_error)
+        # Service -> UI connections
+        # Methods removed to match legacy parity (no control footer here)
+        pass
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -316,51 +316,5 @@ class GenerationView(QWidget):
         self.seed_spin.setValue(s.master_seed)
         self.cand_spin.setValue(s.num_candidates)
 
-    def start_generation(self):
-        self.gen_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
-        self.progress_bar.setValue(0)
-        self.status_label.setText("Starting generation...")
-        
-        # Ensure thread is clean
-        if self.gen_thread_runner.isRunning():
-             self.gen_thread_runner.wait()
-             
-        self.gen_thread_runner.set_indices(None) # None = All/Remaining logic in service
-        self.gen_thread_runner.start()
 
-    def stop_generation(self):
-        self.status_label.setText("Stopping...")
-        self.service.request_stop()
-        self.stop_btn.setEnabled(False)
-
-    @Slot(int, int)
-    def update_progress(self, completed, total):
-        if total > 0:
-            pct = int((completed / total) * 100)
-            self.progress_bar.setValue(pct)
-            self.progress_bar.setFormat(f"{pct}% ({completed}/{total})")
-        self.status_label.setText(f"Processing: {completed} / {total}")
-
-    @Slot()
-    def on_generation_finished(self):
-        self.gen_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.progress_bar.setValue(100)
-        self.status_label.setText("Generation Complete!")
-        QMessageBox.information(self, "Done", "Generation Task Finished.")
-
-    @Slot(str)
-    def on_generation_error(self, message):
-        self.gen_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.status_label.setText(f"Error: {message}")
-        QMessageBox.critical(self, "Generation Error", message)
-
-    def open_output_folder(self):
-        import os
-        path = os.path.abspath("Outputs_Pro")
-        if not os.path.exists(path):
-            os.makedirs(path)
-        os.startfile(path)
 
