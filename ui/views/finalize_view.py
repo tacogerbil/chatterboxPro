@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QFormLayout, QLineEdit, 
-                               QPushButton, QCheckBox, QGroupBox, QLabel, QHBoxLayout, QMessageBox, QDoubleSpinBox, QFileDialog)
+                               QPushButton, QCheckBox, QGroupBox, QLabel, QHBoxLayout, QMessageBox, QDoubleSpinBox, QFileDialog, QSpinBox)
 from PySide6.QtCore import Qt
 from core.state import AppState
 import shutil
@@ -93,7 +93,7 @@ class FinalizeView(QWidget):
         proc_layout.addRow(self.smart_chunk_chk)
         
         # Fine Tuning
-        from PySide6.QtWidgets import QSpinBox
+
         
         self.max_chars = QSpinBox(); self.max_chars.setRange(100, 5000); self.max_chars.setValue(self.state.settings.max_chunk_chars)
         self.max_chars.valueChanged.connect(lambda v: setattr(self.state.settings, 'max_chunk_chars', v))
