@@ -107,7 +107,7 @@ class ControlsView(QWidget):
         btn_reset.setStyleSheet("background-color: #C0392B; color: white;")
         
         btn_del = QPushButton("❌ Delete"); btn_del.clicked.connect(self._delete_items)
-        btn_del.setStyleSheet("background-color: #E59866;")
+        btn_del.setStyleSheet("background-color: #A93226; color: white; font-weight: bold; text-decoration: underline;")
         
         layout.addWidget(btn_mark, 1, 0)
         layout.addWidget(btn_pass, 1, 1)

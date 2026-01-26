@@ -35,6 +35,7 @@ class ChaptersView(QWidget):
         self.list_view = QListView()
         self.list_view.setModel(self.model)
         self.list_view.setAlternatingRowColors(True)
+        self.list_view.setSelectionMode(QListView.ExtendedSelection)
         self.list_view.doubleClicked.connect(self.on_double_click)
         layout.addWidget(self.list_view)
         
@@ -81,15 +82,23 @@ class ChaptersView(QWidget):
         self.gen_service = gen_service
 
     def generate_selected(self):
-        selected_chapters = self.model.get_selected_indices()
-        if not selected_chapters:
-            QMessageBox.information(self, "Info", "No chapters selected.")
+        # Merge Checkbox selection + Highlighting selection
+        checked_indices = self.model.get_selected_indices() # From checkboxes
+        
+        # Get highlighted rows
+        highlighted_indices = [idx.row() for idx in self.list_view.selectionModel().selectedIndexes()]
+        
+        # Merge unique
+        final_selection = sorted(list(set(checked_indices + highlighted_indices)))
+        
+        if not final_selection:
+            QMessageBox.information(self, "Info", "No chapters selected (checkbox or highlight).")
             return
             
         full_indices = self.logic.get_indices_for_chapters(
             self.app_state.sentences,
             self.model._chapters, # Pass the cached chapter list
-            selected_chapters
+            final_selection
         )
         
         if not hasattr(self, 'gen_service') or not self.gen_service:
