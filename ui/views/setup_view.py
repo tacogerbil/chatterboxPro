@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QFormLayout, QLineEdit, 
-                               QPushButton, QHBoxLayout, QFileDialog, QMessageBox, QLabel, QGroupBox, QGridLayout)
-from PySide6.QtCore import Qt
+                               QPushButton, QHBoxLayout, QFileDialog, QMessageBox, QLabel, QGroupBox, QGridLayout, QComboBox, QCheckBox)
+from PySide6.QtCore import Qt, Signal
 from core.state import AppState
 from utils.text_processor import TextPreprocessor
 from core.services.project_service import ProjectService
