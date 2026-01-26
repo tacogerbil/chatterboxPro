@@ -308,15 +308,22 @@ class T3(nn.Module):
 
         # Instantiate the logits processors.
         top_p_warper = TopPLogitsWarper(top_p=top_p)
-        repetition_penalty_processor = RepetitionPenaltyLogitsProcessor(penalty=repetition_penalty)
-
-            # ---- Initial Forward Pass (no kv_cache yet) ----
+        # ---- Initial Forward Pass (no kv_cache yet) ----
         import transformers
+        # Try to use DynamicCache if available (transformers >= 4.36)
+        try:
+            from transformers import DynamicCache
+            past = DynamicCache()
+            print("[T3 Debug] Using DynamicCache for inference.")
+        except ImportError:
+            print("[T3 Debug] DynamicCache not found, falling back to legacy tuple behavior.")
+            past = None
+
         print(f"[T3 Debug] Transformers version: {transformers.__version__}")
         
         output = self.patched_model(
             inputs_embeds=inputs_embeds,
-            past_key_values=None,
+            past_key_values=past,
             use_cache=True,
             output_attentions=False,
             output_hidden_states=True,
@@ -324,6 +331,7 @@ class T3(nn.Module):
         )
         # Initialize kv_cache with the full context.
         past = output.past_key_values
+        print(f"[T3 Debug] Initial past type: {type(past)}")
         print(f"[T3 Debug] Initial past type: {type(past)}")
 
         # ---- Generation Loop using kv_cache ----
