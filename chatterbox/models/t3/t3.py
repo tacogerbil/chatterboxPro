@@ -308,7 +308,10 @@ class T3(nn.Module):
         top_p_warper = TopPLogitsWarper(top_p=top_p)
         repetition_penalty_processor = RepetitionPenaltyLogitsProcessor(penalty=repetition_penalty)
 
-        # ---- Initial Forward Pass (no kv_cache yet) ----
+            # ---- Initial Forward Pass (no kv_cache yet) ----
+        import transformers
+        print(f"[T3 Debug] Transformers version: {transformers.__version__}")
+        
         output = self.patched_model(
             inputs_embeds=inputs_embeds,
             past_key_values=None,
@@ -319,6 +322,7 @@ class T3(nn.Module):
         )
         # Initialize kv_cache with the full context.
         past = output.past_key_values
+        print(f"[T3 Debug] Initial past type: {type(past)}")
 
         # ---- Generation Loop using kv_cache ----
         for i in tqdm(range(max_new_tokens), desc="Sampling", dynamic_ncols=True):
@@ -357,15 +361,30 @@ class T3(nn.Module):
             next_token_embed = torch.cat([next_token_embed, next_token_embed])
 
             # Forward pass with only the new token and the cached past.
-            output = self.patched_model(
-                inputs_embeds=next_token_embed,
-                past_key_values=past,
-                output_attentions=False,
-                output_hidden_states=True,
-                return_dict=True,
-            )
+            if i % 10 == 0 or i > 65: # Print more frequently around the potential crash point (step 72)
+                 print(f"[T3 Debug] Starting step {i}.")
+            
+            try:
+                output = self.patched_model(
+                    inputs_embeds=next_token_embed,
+                    past_key_values=past,
+                    output_attentions=False,
+                    output_hidden_states=True,
+                    return_dict=True,
+                )
+            except Exception as e:
+                print(f"[T3 Loop Error] Step {i}: {e}")
+                raise e
+            
             # Update the kv_cache.
             past = output.past_key_values
+            
+            if i % 10 == 0 or i > 65:
+                 pass_len = "Unknown"
+                 try:
+                     pass_len = len(past)
+                 except: pass
+                 print(f"[T3 Debug] Step {i} complete. Past type: {type(past)}, Len: {pass_len}")
 
         # Concatenate all predicted tokens along the sequence dimension.
         predicted_tokens = torch.cat(predicted, dim=1)  # shape: (B, num_tokens)
