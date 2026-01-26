@@ -41,3 +41,15 @@ class TemplateService:
         except Exception as e:
             logging.error(f"Failed to save template '{name}': {e}")
             return False
+
+    def delete_template(self, name: str) -> bool:
+        """Deletes a template file."""
+        try:
+            path = self.templates_dir / f"{name}.json"
+            if path.exists():
+                path.unlink()
+                return True
+            return False
+        except Exception as e:
+            logging.error(f"Failed to delete template '{name}': {e}")
+            return False

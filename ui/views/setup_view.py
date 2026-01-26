@@ -66,18 +66,23 @@ class SetupView(QWidget):
         
         layout.addLayout(form_layout)
         
-        # --- Templates ---
-        tpl_group = QGroupBox("Generation Templates")
+        # --- Voices ---
+        tpl_group = QGroupBox("Generation Voices")
         t_layout = QHBoxLayout(tpl_group)
         self.template_combo = QComboBox()
-        self.template_combo.addItems(["No templates found"]) # Placeholder
-        self.load_tpl_btn = QPushButton("Load Template")
-        # Logic to be wired later or inline? We need a service for templates.
+        self.template_combo.addItems(["No voices found"]) # Placeholder
+        
+        self.load_tpl_btn = QPushButton("Load Voice")
         self.load_tpl_btn.clicked.connect(self.load_template)
         
-        t_layout.addWidget(QLabel("Select Template:"))
+        self.del_tpl_btn = QPushButton("Delete Voice")
+        self.del_tpl_btn.setStyleSheet("background-color: #A93226; color: white; font-weight: bold;")
+        self.del_tpl_btn.clicked.connect(self.delete_template)
+        
+        t_layout.addWidget(QLabel("Select Voice:"))
         t_layout.addWidget(self.template_combo, stretch=1)
         t_layout.addWidget(self.load_tpl_btn)
+        t_layout.addWidget(self.del_tpl_btn)
         layout.addWidget(tpl_group)
 
         # Load/Process Button
@@ -270,9 +275,24 @@ class SetupView(QWidget):
                         # Handle potential type mismatches if needed, but assuming JSON types match
                         setattr(self.state.settings, key, value)
                 
-                QMessageBox.information(self, "Success", f"Loaded template '{name}'.")
+                QMessageBox.information(self, "Success", f"Loaded voice '{name}'.")
                 self.template_loaded.emit() # Signal other views to refresh
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to apply template: {e}")
+                QMessageBox.critical(self, "Error", f"Failed to apply voice: {e}")
         else:
-            QMessageBox.warning(self, "Error", "Failed to load template data.")
+            QMessageBox.warning(self, "Error", "Failed to load voice data.")
+
+    def delete_template(self):
+        name = self.template_combo.currentText()
+        if not name or "found" in name: return
+        
+        reply = QMessageBox.question(self, "Confirm Delete", 
+                                   f"Are you sure you want to delete voice '{name}'?",
+                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            if self.template_service.delete_template(name):
+                QMessageBox.information(self, "Deleted", f"Voice '{name}' deleted.")
+                self.populate_templates() # Refresh list
+            else:
+                QMessageBox.critical(self, "Error", f"Failed to delete voice '{name}'.")
