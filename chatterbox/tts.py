@@ -9,6 +9,7 @@ import torch
 import perth
 import torch.nn.functional as F
 from huggingface_hub import hf_hub_download
+from peft import PeftModel
 
 from .models.t3 import T3
 from .models.s3tokenizer import S3_SR, drop_invalid_tokens
@@ -399,3 +400,69 @@ class ChatterboxTTS:
             if apply_watermark:
                 wav_np = self.watermarker.apply_watermark(wav_np, sample_rate=self.sr)
             return torch.from_numpy(wav_np).unsqueeze(0)
+
+    def load_adapter(self, adapter_path: str, adapter_name: str) -> None:
+        """
+        Load a LoRA adapter onto the S3Gen model using PEFT.
+        
+        Args:
+            adapter_path: Path to the adapter weights (local or HF Hub)
+            adapter_name: Name to assign to this adapter for referencing
+        """
+        if not hasattr(self.s3gen, 'active_adapters'):
+            # If not already a PeftModel, wrap it
+            # Note: We wrap self.s3gen because that's where the linear layers are
+            self.s3gen = PeftModel.from_pretrained(
+                self.s3gen, 
+                adapter_path, 
+                adapter_name=adapter_name
+            )
+        else:
+            # Already wrapped, just load another adapter
+            self.s3gen.load_adapter(adapter_path, adapter_name=adapter_name)
+            
+        print(f"[TTS] Loaded adapter '{adapter_name}' from {adapter_path}")
+
+    def set_adapter(self, adapter_names: str | list[str], adapter_weights: list[float] | None = None) -> None:
+        """
+        Activate one or more loaded adapters.
+        
+        Args:
+            adapter_names: Single adapter name or list of names to activate
+            adapter_weights: Optional weights for mixing adapters (if list provided)
+        """
+        if not hasattr(self.s3gen, 'set_adapter'):
+            print("[TTS/WARN] No adapters loaded. Call load_adapter first.")
+            return
+
+        if isinstance(adapter_names, str):
+            self.s3gen.set_adapter(adapter_names)
+            print(f"[TTS] Activated adapter: {adapter_names}")
+        else:
+            # Multi-adapter mixing
+            if adapter_weights:
+                self.s3gen.add_weighted_adapter(
+                    adapters=adapter_names,
+                    weights=adapter_weights,
+                    adapter_name="mixed_adapter",
+                    combination_type="linear"
+                )
+                self.s3gen.set_adapter("mixed_adapter")
+                print(f"[TTS] Activated mixed adapter: {adapter_names} with weights {adapter_weights}")
+            else:
+                # Just string them together? PEFT set_adapter usually expects a single name 
+                # or manages multiple active adapters differently depending on config.
+                # Standard set_adapter takes a string. Mixed adapters must be explicitly created.
+                # If no weights provided but list given, assume equal weighting or error?
+                # For now, let's assume if list given without weights, we just want to enable them?
+                # Actually PEFT's set_adapter can take a list for some models, but usually for mixed.
+                # Let's fallback to creating a mixed adapter with equal weights if no weights given.
+                weights = [1.0 / len(adapter_names)] * len(adapter_names)
+                self.s3gen.add_weighted_adapter(
+                    adapters=adapter_names,
+                    weights=weights,
+                    adapter_name="mixed_adapter",
+                    combination_type="linear"
+                )
+                self.s3gen.set_adapter("mixed_adapter")
+                print(f"[TTS] Activated mixed adapter (equal weights): {adapter_names}")

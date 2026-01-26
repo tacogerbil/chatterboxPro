@@ -237,7 +237,7 @@ class GenerationService(QObject):
                 punc_norm(sentence_data['original_sentence']),
                 devices[i % len(devices)], 
                 run_seed,
-                self.state.ref_audio_path, 
+                self.state.ref_audio_path if self.state.ref_audio_path and self.state.ref_audio_path.strip() else None, 
                 s.exaggeration, 
                 s.temperature,
                 s.cfg_weight, 
@@ -378,7 +378,7 @@ class GenerationService(QObject):
             punc_norm(text),
             device, 
             random.randint(1, 999999), # random seed
-            self.state.ref_audio_path, 
+            self.state.ref_audio_path if self.state.ref_audio_path and self.state.ref_audio_path.strip() else None, 
             s.exaggeration, s.temperature,
             s.cfg_weight, s.disable_watermark,
             1, # candidates

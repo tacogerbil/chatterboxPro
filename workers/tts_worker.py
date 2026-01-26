@@ -321,7 +321,8 @@ def worker_process_chunk(task_bundle):
     base_candidate_path_prefix = run_temp_dir.resolve() / f"c_{uuid}_cand"
 
     try:
-        tts_engine.prepare_reference(ref_audio_path, exaggeration=min(exaggeration, 1.0))
+        if ref_audio_path and str(ref_audio_path).strip():
+            tts_engine.prepare_reference(ref_audio_path, exaggeration=min(exaggeration, 1.0))
     except Exception as e:
         logging.error(f"[Worker-{pid}] Failed to prepare reference for chunk {sentence_number}: {e}", exc_info=True)
         return {"original_index": original_index, "status": "error", "error_message": f"Reference Prep Fail: {e}"}
