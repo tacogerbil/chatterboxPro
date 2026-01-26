@@ -66,6 +66,18 @@ class SetupView(QWidget):
         
         layout.addLayout(form_layout)
         
+        # Load/Process Button
+        self.load_btn = QPushButton("Edit Source Text")
+        self.load_btn.setStyleSheet("background-color: #2E86C1; color: white; padding: 10px; font-weight: bold;")
+        self.load_btn.clicked.connect(self.process_text)
+        layout.addWidget(self.load_btn)
+        
+        # Aggro Clean Switch
+        self.aggro_chk = QCheckBox("Remove all special characters on processing")
+        self.aggro_chk.setChecked(self.state.aggro_clean_on_parse)
+        self.aggro_chk.stateChanged.connect(lambda s: setattr(self.state, 'aggro_clean_on_parse', s == Qt.Checked))
+        layout.addWidget(self.aggro_chk)
+
         # --- Voices ---
         tpl_group = QGroupBox("Generation Voices")
         t_layout = QHBoxLayout(tpl_group)
@@ -84,18 +96,6 @@ class SetupView(QWidget):
         t_layout.addWidget(self.load_tpl_btn)
         t_layout.addWidget(self.del_tpl_btn)
         layout.addWidget(tpl_group)
-
-        # Load/Process Button
-        self.load_btn = QPushButton("Process Text & Create Session")
-        self.load_btn.setStyleSheet("background-color: #2E86C1; color: white; padding: 10px; font-weight: bold;")
-        self.load_btn.clicked.connect(self.process_text)
-        layout.addWidget(self.load_btn)
-        
-        # Aggro Clean Switch
-        self.aggro_chk = QCheckBox("Remove all special characters on processing")
-        self.aggro_chk.setChecked(self.state.aggro_clean_on_parse)
-        self.aggro_chk.stateChanged.connect(lambda s: setattr(self.state, 'aggro_clean_on_parse', s == Qt.Checked))
-        layout.addWidget(self.aggro_chk)
         
         # --- Main Controls ---
         ctrl_group = QGroupBox("Main Controls")
