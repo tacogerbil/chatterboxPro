@@ -63,10 +63,28 @@ class SetupView(QWidget):
         self.load_btn.clicked.connect(self.process_text)
         layout.addWidget(self.load_btn)
         
+        # Aggro Clean Switch
+        self.aggro_chk = QCheckBox("Remove all special characters on processing")
+        self.aggro_chk.setChecked(self.state.aggro_clean_on_parse)
+        self.aggro_chk.stateChanged.connect(lambda s: setattr(self.state, 'aggro_clean_on_parse', s == Qt.Checked))
+        layout.addWidget(self.aggro_chk)
+        
         # --- Main Controls ---
         ctrl_group = QGroupBox("Main Controls")
         c_layout = QVBoxLayout(ctrl_group)
         
+        # Auto Assemble
+        self.auto_asm_chk = QCheckBox("Re-Assemble After Full Run")
+        self.auto_asm_chk.setChecked(self.state.auto_assemble_after_run)
+        self.auto_asm_chk.stateChanged.connect(lambda s: setattr(self.state, 'auto_assemble_after_run', s == Qt.Checked))
+        c_layout.addWidget(self.auto_asm_chk)
+
+        # Auto Regen
+        self.auto_reg_chk = QCheckBox("Continue to Regenerate until all files pass")
+        self.auto_reg_chk.setChecked(self.state.auto_regen_main)
+        self.auto_reg_chk.stateChanged.connect(lambda s: setattr(self.state, 'auto_regen_main', s == Qt.Checked))
+        c_layout.addWidget(self.auto_reg_chk)
+
         self.start_btn = QPushButton("Start Generation")
         self.start_btn.setStyleSheet("background-color: #27AE60; color: white; font-size: 14px; font-weight: bold; padding: 10px;")
         self.start_btn.clicked.connect(self.toggle_generation)

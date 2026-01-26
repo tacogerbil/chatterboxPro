@@ -234,3 +234,19 @@ class PlaylistService:
                     item['marked'] = True
                     count += 1
         return count
+
+    def filter_non_english_in_selected(self, indices: List[int]) -> int:
+        """Filters non-english words from selected items."""
+        count = 0
+        for idx in indices:
+            if 0 <= idx < len(self.state.sentences):
+                item = self.state.sentences[idx]
+                text = item.get('original_sentence', '')
+                filtered = self.processor.filter_non_english_words(text)
+                
+                if filtered != text:
+                    item['original_sentence'] = filtered
+                    item['tts_generated'] = 'no'
+                    item['marked'] = True
+                    count += 1
+        return count

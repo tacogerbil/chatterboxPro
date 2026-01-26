@@ -103,6 +103,10 @@ class GenerationView(QWidget):
         self.temp_slider = QLabeledSlider("Temperature:", 0.1, 1.5, self.state.settings.temperature)
         self.temp_slider.value_changed.connect(lambda v: setattr(self.state.settings, 'temperature', v))
         v_layout.addWidget(self.temp_slider)
+
+        self.cfg_slider = QLabeledSlider("CFG Scale:", 0.1, 1.0, self.state.settings.cfg_weight)
+        self.cfg_slider.value_changed.connect(lambda v: setattr(self.state.settings, 'cfg_weight', v))
+        v_layout.addWidget(self.cfg_slider)
         
         layout.addWidget(voice_group)
         
@@ -116,6 +120,10 @@ class GenerationView(QWidget):
         self.timbre_slider = QLabeledSlider("Timbre Shift:", -3.0, 3.0, self.state.settings.timbre_shift, step=0.1)
         self.timbre_slider.value_changed.connect(lambda v: setattr(self.state.settings, 'timbre_shift', v))
         f_layout.addWidget(self.timbre_slider)
+
+        self.gruffness_slider = QLabeledSlider("Gruffness:", 0.0, 1.0, self.state.settings.gruffness, step=0.1)
+        self.gruffness_slider.value_changed.connect(lambda v: setattr(self.state.settings, 'gruffness', v))
+        f_layout.addWidget(self.gruffness_slider)
         
         layout.addWidget(fx_group)
 

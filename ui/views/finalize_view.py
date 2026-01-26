@@ -58,10 +58,41 @@ class FinalizeView(QWidget):
         self.silence_chk.setToolTip("Requires auto-editor installed")
         proc_layout.addRow(self.silence_chk)
         
+        # Silence Params (Legacy restoration)
+        sil_params_layout = QHBoxLayout()
+        
+        self.thresh_spin = QDoubleSpinBox(); self.thresh_spin.setRange(0.01, 1.0); self.thresh_spin.setSingleStep(0.01); self.thresh_spin.setValue(self.state.settings.silence_threshold)
+        self.thresh_spin.valueChanged.connect(lambda v: setattr(self.state.settings, 'silence_threshold', v))
+        sil_params_layout.addWidget(QLabel("Thresh:"))
+        sil_params_layout.addWidget(self.thresh_spin)
+        
+        self.speed_spin = QDoubleSpinBox(); self.speed_spin.setRange(1.0, 99999.0); self.speed_spin.setValue(self.state.settings.silent_speed)
+        self.speed_spin.valueChanged.connect(lambda v: setattr(self.state.settings, 'silent_speed', v))
+        sil_params_layout.addWidget(QLabel("Speed:"))
+        sil_params_layout.addWidget(self.speed_spin)
+        
+        self.margin_spin = QSpinBox(); self.margin_spin.setRange(0, 100); self.margin_spin.setValue(self.state.settings.frame_margin)
+        self.margin_spin.valueChanged.connect(lambda v: setattr(self.state.settings, 'frame_margin', v))
+        sil_params_layout.addWidget(QLabel("Margin:"))
+        sil_params_layout.addWidget(self.margin_spin)
+        
+        proc_layout.addRow(sil_params_layout)
+        
         # Formatting
         self.smart_chunk_chk = QCheckBox("Smart Chunking (Merge small files)")
         self.smart_chunk_chk.setChecked(True)
         proc_layout.addRow(self.smart_chunk_chk)
+        
+        # Fine Tuning
+        from PySide6.QtWidgets import QSpinBox
+        
+        self.max_chars = QSpinBox(); self.max_chars.setRange(100, 5000); self.max_chars.setValue(self.state.settings.max_chunk_chars)
+        self.max_chars.valueChanged.connect(lambda v: setattr(self.state.settings, 'max_chunk_chars', v))
+        proc_layout.addRow("Max Chars per Chunk:", self.max_chars)
+        
+        self.sil_dur = QSpinBox(); self.sil_dur.setRange(0, 5000); self.sil_dur.setValue(self.state.settings.silence_duration)
+        self.sil_dur.valueChanged.connect(lambda v: setattr(self.state.settings, 'silence_duration', v))
+        proc_layout.addRow("Silence Duration (ms):", self.sil_dur)
         
         layout.addWidget(proc_group)
         

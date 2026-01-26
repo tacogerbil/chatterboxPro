@@ -28,7 +28,9 @@ class GenerationSettings:
     silence_removal_enabled: bool = False
     norm_level: float = -23.0
     silence_threshold: float = 0.04
+    silence_threshold: float = 0.04
     silent_speed: float = 9999
+    frame_margin: int = 6
     
     # TTS Engine
     tts_engine: str = "chatterbox"
@@ -62,6 +64,9 @@ class AppState:
     
     # UI State Persisted
     auto_regen_main: bool = False # For Chapters Tab "Auto-loop" logic
+    auto_regen_sub: bool = False # For Batch Fix Logic
+    auto_assemble_after_run: bool = False
+    aggro_clean_on_parse: bool = False
     
     def update_settings(self, **kwargs):
         """Update settings from a dictionary."""

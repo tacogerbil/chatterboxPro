@@ -1,353 +1,313 @@
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-    QLineEdit, QToolBox, QMessageBox, QGridLayout, QInputDialog
-)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QGridLayout, 
+                               QLineEdit, QLabel, QMessageBox, QInputDialog, QCheckBox)
 from PySide6.QtCore import Qt, Signal
-from core.state import AppState
+from ui.components.collapsible_frame import CollapsibleFrame
 from core.services.playlist_service import PlaylistService
+from core.services.generation_service import GenerationService
 
 class ControlsView(QWidget):
     """
-    The Editing Suite: Playback, Search, Editing, and Batch operations.
-    Replaces legacy ControlsFrame.
-    
-    This view acts as a Controller for the PlaylistService, triggering
-    state mutations based on user input (buttons/dialogs).
+    The "Editing Panel" comprising Playback, Editing, and Batch operations.
+    Ported from legacy `ui/controls_frame.py`.
     """
-    # Signals to request App actions
-    refresh_requested = Signal() # Request playlist view refresh
-    playback_requested = Signal(str) # cmd: "play", "stop", "play_from"
-    
-    def __init__(self, app_state: AppState, parent=None):
+    def __init__(self, services, playlist_view, parent=None):
         super().__init__(parent)
-        self.state = app_state
-        self.service = PlaylistService(app_state)
-        self.search_matches = []
-        self.curr_search_idx = -1
-        self.playlist_view = None
+        self.services = services # Dict {playlist: PlaylistService, generation: GenerationService}
+        self.playlist = playlist_view # Reference to list view for selection
+        self.generation_service = services.get('generation')
+        self.playlist_service = services.get('playlist')
+        
         self.setup_ui()
         
     def setup_ui(self):
-        """Initializes the layout with collapsible groups (QToolBox)."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0,0,0,0) # Tight fit
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # We use QToolBox to simulate the Collapsible Groups
-        self.toolbox = QToolBox()
-        
-        # --- Page 1: Playback & Navigation ---
-        page1 = QWidget()
-        p1_layout = QVBoxLayout(page1)
-        
-        # Row 1: Playback
-        pb_layout = QHBoxLayout()
-        self.btn_play = QPushButton("▶ Play"); self.btn_play.clicked.connect(lambda: self.playback_requested.emit("play"))
-        self.btn_stop = QPushButton("■ Stop"); self.btn_stop.clicked.connect(lambda: self.playback_requested.emit("stop"))
-        self.btn_play_from = QPushButton("▶ From Selec."); self.btn_play_from.clicked.connect(lambda: self.playback_requested.emit("play_from"))
-        pb_layout.addWidget(self.btn_play); pb_layout.addWidget(self.btn_stop); pb_layout.addWidget(self.btn_play_from)
-        p1_layout.addLayout(pb_layout)
-        
-        # Row 2: Move / Errors
-        mv_layout = QHBoxLayout()
-        self.btn_up = QPushButton("▲ Up"); self.btn_up.clicked.connect(lambda: self.move_item(-1))
-        self.btn_down = QPushButton("▼ Down"); self.btn_down.clicked.connect(lambda: self.move_item(1))
-        self.btn_prev_err = QPushButton("◄ Prev Err"); self.btn_prev_err.clicked.connect(lambda: self.find_error(-1))
-        self.btn_next_err = QPushButton("Next Err ►"); self.btn_next_err.clicked.connect(lambda: self.find_error(1))
-        mv_layout.addWidget(self.btn_up); mv_layout.addWidget(self.btn_down)
-        mv_layout.addWidget(self.btn_prev_err); mv_layout.addWidget(self.btn_next_err)
-        p1_layout.addLayout(mv_layout)
-        
-        # Row 3: Search
-        search_layout = QHBoxLayout()
-        search_layout.addWidget(QLabel("🔍"))
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search text...")
-        self.search_input.returnPressed.connect(self.perform_search)
-        search_layout.addWidget(self.search_input)
-        
-        self.btn_s_prev = QPushButton("◄"); self.btn_s_prev.clicked.connect(self.search_prev)
-        self.btn_s_prev.setEnabled(False) # Default disabled
-        self.btn_s_next = QPushButton("►"); self.btn_s_next.clicked.connect(self.search_next)
-        self.btn_s_next.setEnabled(False) # Default disabled
-        
-        search_layout.addWidget(self.btn_s_prev); search_layout.addWidget(self.btn_s_next)
-        p1_layout.addLayout(search_layout)
-        
-        p1_layout.addStretch()
-        self.toolbox.addItem(page1, "Playback & Navigation")
-        
-        # --- Page 2: Chunk Editing ---
-        page2 = QWidget()
-        p2_layout = QGridLayout(page2)
-        
-        # Tools: Edit / Split / Mark / Delete
-        btn_edit = QPushButton("✎ Edit"); btn_edit.clicked.connect(self.edit_current)
-        btn_split = QPushButton("➗ Split"); btn_split.clicked.connect(self.split_current)
-        btn_mark = QPushButton("M Mark"); btn_mark.clicked.connect(self.mark_current)
-        btn_del = QPushButton("❌ Delete"); btn_del.clicked.connect(self.delete_current)
-        
-        p2_layout.addWidget(btn_edit, 0, 0)
-        p2_layout.addWidget(btn_split, 0, 1)
-        p2_layout.addWidget(btn_mark, 1, 0)
-        p2_layout.addWidget(btn_del, 1, 1)
-        
-        # Advanced Inserts
-        btn_ins_txt = QPushButton("➕ Text"); btn_ins_txt.clicked.connect(self.insert_text)
-        btn_ins_pause = QPushButton("⏸ Pause"); btn_ins_pause.clicked.connect(self.insert_pause)
-        btn_ins_chap = QPushButton("📑 Chapter"); btn_ins_chap.clicked.connect(self.insert_chapter)
-        
-        p2_layout.addWidget(btn_ins_txt, 2, 0)
-        p2_layout.addWidget(btn_ins_pause, 2, 1)
-        p2_layout.addWidget(btn_ins_chap, 3, 0, 1, 2)
-        
-        self.toolbox.addItem(page2, "Chunk Editing")
-        
-        # --- Page 3: Batch Operations ---
-        page3 = QWidget()
-        p3_layout = QVBoxLayout(page3)
-        
-        # Failed Chunk Fixes
-        btn_merge = QPushButton("Merge Failed Down")
-        btn_merge.clicked.connect(self.merge_failed_down)
-        
-        btn_split_failed = QPushButton("Split All Failed")
-        btn_split_failed.clicked.connect(self.split_all_failed)
-        
-        p3_layout.addWidget(btn_merge)
-        p3_layout.addWidget(btn_split_failed)
-        p3_layout.addWidget(QLabel("---"))
-        
-        # Cleaning Tools
-        clean_layout = QHBoxLayout()
-        btn_clean = QPushButton("Clean Special Chars")
-        btn_clean.clicked.connect(self.clean_selected)
-        # Filter Non-English (logic pending in Service but button ready)
-        # btn_filter = QPushButton("Filter Non-English")
-        
-        clean_layout.addWidget(btn_clean)
-        p3_layout.addLayout(clean_layout)
-        p3_layout.addWidget(QLabel("---"))
-        
-        btn_regen = QPushButton("↻ Regenerate Marked")
-        btn_regen.setStyleSheet("background-color: #D35400; color: white; font-weight: bold;")
-        btn_regen.clicked.connect(self.regenerate_marked)
-        
-        p3_layout.addWidget(btn_regen)
-        p3_layout.addStretch()
-        
-        self.toolbox.addItem(page3, "Batch Operations")
-        
-        layout.addWidget(self.toolbox)
+        # --- Group 1: Playback & Navigation ---
+        self.playback_group = CollapsibleFrame("Playback & Navigation", start_open=True)
+        main_layout.addWidget(self.playback_group)
+        self._setup_playback(self.playback_group)
 
-    def set_playlist_reference(self, playlist_view):
-        """Stores reference to playlist for selection fetching."""
-        self.playlist_view = playlist_view
+        # --- Group 2: Chunk Editing & Status ---
+        self.edit_group = CollapsibleFrame("Chunk Editing & Status", start_open=True)
+        main_layout.addWidget(self.edit_group)
+        self._setup_editing(self.edit_group)
 
-    def set_audio_service(self, audio_service):
-        """Stores reference to audio service for playback."""
-        self.audio_service = audio_service
-        # Verify connection
-        self.playback_requested.connect(self._handle_playback_request)
-
-    def _handle_playback_request(self, cmd):
-        """Internal handler to route signals to AudioService."""
-        if not hasattr(self, 'audio_service'): return
+        # --- Group 3: Batch Fix & Regeneration ---
+        self.batch_group = CollapsibleFrame("Batch Fix & Regeneration", start_open=False)
+        main_layout.addWidget(self.batch_group)
+        self._setup_batch(self.batch_group)
         
-        if cmd == "play":
-            # Play selected or first
-            indices = self.get_selected_indices()
-            if indices:
-                uuid_str = self.state.sentences[indices[0]].get('uuid')
-                self.audio_service.play_audio(uuid_str)
-            else:
-                 QMessageBox.information(self, "Info", "Select an item to play.")
-        elif cmd == "stop":
-            self.audio_service.stop_playback()
-        elif cmd == "play_from":
-             # Logic for play from...
-             pass
+        main_layout.addStretch()
 
-    def get_selected_indices(self):
-        """Retrieves selected indices from the PlaylistView."""
-        if hasattr(self, 'playlist_view') and self.playlist_view:
-            return self.playlist_view.get_selected_indices()
-        return []
+    def _setup_playback(self, group):
+        layout = QGridLayout()
+        
+        # Row 0: Play Controls
+        btn_play = QPushButton("▶ Play"); btn_play.clicked.connect(self._play_selected)
+        btn_stop = QPushButton("■ Stop"); btn_stop.clicked.connect(self._stop_playback)
+        btn_play_from = QPushButton("▶ Play From"); btn_play_from.clicked.connect(self._play_from)
+        
+        layout.addWidget(btn_play, 0, 0)
+        layout.addWidget(btn_stop, 0, 1)
+        layout.addWidget(btn_play_from, 0, 2, 1, 2)
+        
+        # Row 1: Nav
+        btn_up = QPushButton("▲ Move Up"); btn_up.clicked.connect(lambda: self._move_items(-1))
+        btn_down = QPushButton("▼ Move Down"); btn_down.clicked.connect(lambda: self._move_items(1))
+        btn_prev_err = QPushButton("◄ Prev Error"); btn_prev_err.clicked.connect(lambda: self._nav_error(-1))
+        btn_next_err = QPushButton("Next Error ►"); btn_next_err.clicked.connect(lambda: self._nav_error(1))
+        
+        layout.addWidget(btn_up, 1, 0)
+        layout.addWidget(btn_down, 1, 1)
+        layout.addWidget(btn_prev_err, 1, 2)
+        layout.addWidget(btn_next_err, 1, 3)
+        
+        # Row 2: Search
+        search_widget = QWidget()
+        s_layout = QHBoxLayout(search_widget); s_layout.setContentsMargins(0,0,0,0)
+        s_layout.addWidget(QLabel("🔍"))
+        self.search_edit = QLineEdit(); self.search_edit.setPlaceholderText("Search text...")
+        self.search_edit.returnPressed.connect(self._search)
+        s_layout.addWidget(self.search_edit)
+        
+        btn_s_prev = QPushButton("◄"); btn_s_prev.setFixedWidth(30); btn_s_prev.clicked.connect(self._search_prev)
+        btn_s_next = QPushButton("►"); btn_s_next.setFixedWidth(30); btn_s_next.clicked.connect(self._search_next)
+        s_layout.addWidget(btn_s_prev)
+        s_layout.addWidget(btn_s_next)
+        
+        layout.addWidget(search_widget, 2, 0, 1, 4)
+        
+        group.add_layout(layout)
 
-    # --- Batch Actions ---
-    def merge_failed_down(self):
-        """Attempts to merge all failed chunks with their successors."""
-        count = self.service.merge_failed_down()
-        if count > 0:
-            QMessageBox.information(self, "Success", f"Merged {count} failed chunks.")
-            self.refresh_requested.emit()
+    def _setup_editing(self, group):
+        layout = QGridLayout()
+        
+        # Row 0
+        btn_edit = QPushButton("✎ Edit"); btn_edit.clicked.connect(self._edit_text)
+        btn_split = QPushButton("➗ Split"); btn_split.clicked.connect(self._split_chunk)
+        btn_ins_txt = QPushButton("➕ Insert Text"); btn_ins_txt.clicked.connect(self._insert_text)
+        btn_ins_pause = QPushButton("⏸ Insert Pause"); btn_ins_pause.clicked.connect(self._insert_pause)
+        btn_ins_chap = QPushButton("📑 Insert Chapter"); btn_ins_chap.clicked.connect(self._insert_chapter)
+        
+        layout.addWidget(btn_edit, 0, 0)
+        layout.addWidget(btn_split, 0, 1)
+        layout.addWidget(btn_ins_txt, 0, 2)
+        layout.addWidget(btn_ins_pause, 0, 3)
+        layout.addWidget(btn_ins_chap, 0, 4)
+        
+        # Row 1
+        btn_mark = QPushButton("M Mark"); btn_mark.clicked.connect(self._mark_current)
+        btn_pass = QPushButton("✓ Mark Passed"); btn_pass.clicked.connect(self._mark_passed)
+        btn_pass.setStyleSheet("background-color: #2ECC71; color: white;")
+        
+        btn_reset = QPushButton("🔄 Reset Gen"); btn_reset.clicked.connect(self._reset_gen)
+        btn_reset.setStyleSheet("background-color: #C0392B; color: white;")
+        
+        btn_del = QPushButton("❌ Delete"); btn_del.clicked.connect(self._delete_items)
+        btn_del.setStyleSheet("background-color: #E59866;")
+        
+        layout.addWidget(btn_mark, 1, 0)
+        layout.addWidget(btn_pass, 1, 1)
+        layout.addWidget(btn_reset, 1, 2, 1, 2)
+        layout.addWidget(btn_del, 1, 4)
+        
+        group.add_layout(layout)
+
+    def _setup_batch(self, group):
+        layout = QGridLayout()
+        
+        # Row 0
+        self.chk_fix_all = QCheckBox("Apply Batch Fix to ALL Failed Chunks")
+        layout.addWidget(self.chk_fix_all, 0, 0, 1, 3)
+        
+        # Row 1
+        btn_merge = QPushButton("Merge Failed Down"); btn_merge.clicked.connect(self._merge_failed)
+        btn_clean = QPushButton("Clean Special Chars"); btn_clean.clicked.connect(self._clean_chars)
+        btn_filter = QPushButton("Filter Non-English"); btn_filter.clicked.connect(self._filter_english)
+        
+        layout.addWidget(btn_merge, 1, 0)
+        layout.addWidget(btn_clean, 1, 1)
+        layout.addWidget(btn_filter, 1, 2)
+        
+        # Row 2
+        btn_split_all = QPushButton("Split All Failed"); btn_split_all.clicked.connect(self._split_all_failed)
+        layout.addWidget(btn_split_all, 2, 0, 1, 3)
+        
+        # Row 3
+        btn_regen = QPushButton("↻ Regenerate Marked"); btn_regen.clicked.connect(self._regen_marked)
+        btn_regen.setStyleSheet("background-color: #A40000; color: white;")
+        
+        self.chk_auto_loop = QCheckBox("Auto-loop")
+        self.chk_reassemble = QCheckBox("Re-Assemble after")
+        
+        layout.addWidget(btn_regen, 3, 0, 1, 2)
+        layout.addWidget(self.chk_auto_loop, 3, 2)
+        layout.addWidget(self.chk_reassemble, 4, 0, 1, 3)
+        
+        group.add_layout(layout)
+        
+    # --- Actions ---
+    
+    def _play_selected(self):
+        # Delegate to playlist or app? 
+        # For simplicity, if playlist view has method, call it.
+        # PlaylistView usually relies on AudioService.
+        # We need access to AudioService. Not passed explicitly?
+        # We can emit? Or use parent.
+        pass # To be wired
+
+    def _stop_playback(self):
+        pass # To be wired
+
+    def _play_from(self):
+        pass # To be wired
+
+    def _get_selected_index(self):
+        indices = self.playlist.get_selected_indices()
+        return indices[0] if indices else -1
+
+    def _get_selected_indices(self):
+        return self.playlist.get_selected_indices()
+
+    def _refresh(self):
+        self.playlist.refresh()
+
+    def _edit_text(self):
+        idx = self._get_selected_index()
+        if idx == -1: return
+        
+        item = self.playlist_service.get_selected_item(idx)
+        old_text = item.get('original_sentence', '')
+        
+        new_text, ok = QInputDialog.getText(self, "Edit Text", "Edit Sentence:", text=old_text)
+        if ok and new_text != old_text:
+            self.playlist_service.edit_text(idx, new_text)
+            self._refresh()
+
+    def _split_chunk(self):
+        idx = self._get_selected_index()
+        if idx == -1: return
+        if self.playlist_service.split_chunk(idx):
+             self._refresh()
         else:
-            QMessageBox.information(self, "Info", "No failed chunks found to merge.")
-            
-    def split_all_failed(self):
-        """Attempts to split all failed chunks using the text splitter."""
-        count = self.service.split_all_failed()
-        if count > 0:
-            QMessageBox.information(self, "Success", f"Split {count} failed chunks.")
-            self.refresh_requested.emit()
-        else:
-            QMessageBox.information(self, "Info", "No valid splittable failed chunks found.")
+            QMessageBox.warning(self, "Split Failed", "Could not split chunk (maybe too short?)")
 
-    def clean_selected(self):
-        """Cleans special characters from selected items."""
-        indices = self.get_selected_indices()
-        if not indices:
-             QMessageBox.information(self, "Info", "Please select items to clean.")
-             return
-             
-        count = self.service.clean_special_chars_selected(indices)
-        if count > 0:
-            self.refresh_requested.emit()
-            QMessageBox.information(self, "Success", f"Cleaned {count} items.")
-        else:
-            QMessageBox.information(self, "Info", "No special characters found in selection.")
-        
-    def regenerate_marked(self):
-        """Trigger generation for marked items."""
-        # Signal main window to start? Or just emit signal?
-        QMessageBox.information(self, "Regenerate", "Batch regen logic pending Phase 5 wiring.")
-
-    # --- Navigation Actions ---
-    def move_item(self, direction):
-        """Moves selected items up or down."""
-        indices = self.get_selected_indices()
-        if not indices:
-            QMessageBox.information(self, "Info", "Select items in playlist first.")
-            return
-            
-        new_indices = self.service.move_items(indices, direction)
-        if new_indices != indices:
-            self.refresh_requested.emit()
-            # Restore selection (requires PlaylistView method to set selection)
-            # self.playlist_view.set_selection(new_indices) # TODO: Implement set_selection
-
-    def find_error(self, direction):
-        """Finds next/prev failed item."""
-        # Currently defaults to searching from 0.
-        # Ideally should search from current selection.
-        indices = self.get_selected_indices()
-        start = indices[0] if indices else -1
-        
-        idx = self.service.find_next_status(start, direction, 'failed')
-        if idx >= 0:
-            QMessageBox.information(self, "Found", f"Found error at index {idx}. (Selection jump pending)")
-        else:
-             QMessageBox.information(self, "Info", "No errors found.")
-
-    # --- Search ---
-    def perform_search(self):
-        """Executes search and updates navigation buttons."""
-        query = self.search_input.text()
-        self.search_matches = self.service.search(query)
-        if self.search_matches:
-            self.curr_search_idx = 0
-            self.btn_s_prev.setEnabled(True) # Enable
-            self.btn_s_next.setEnabled(True) # Enable
-            self.search_next()
-        else:
-            self.btn_s_prev.setEnabled(False) # Disable
-            self.btn_s_next.setEnabled(False) # Disable
-            QMessageBox.information(self, "Search", "No matches found.")
-            
-    def search_next(self):
-        """Jumps to next search match."""
-        if not self.search_matches: return
-        idx = self.search_matches[self.curr_search_idx]
-        self.curr_search_idx = (self.curr_search_idx + 1) % len(self.search_matches)
-        QMessageBox.information(self, "Search", f"Found at {idx}. (Jump not wired)")
-
-    def search_prev(self):
-        """Jumps to previous search match."""
-        if not self.search_matches: return
-        self.curr_search_idx = (self.curr_search_idx - 1) % len(self.search_matches)
-        idx = self.search_matches[self.curr_search_idx]
-        QMessageBox.information(self, "Search", f"Found at {idx}. (Jump not wired)")
-
-    # --- Editing ---
-    def edit_current(self):
-        """Opens dialog to edit the text of the single selected item."""
-        indices = self.get_selected_indices()
-        if len(indices) != 1:
-            QMessageBox.information(self, "Info", "Please select exactly one item to edit.")
-            return
-            
-        idx = indices[0]
-        item = self.service.get_selected_item(idx)
-        if not item: return
-        
-        current_text = item.get('original_sentence', '')
-        
-        new_text, ok = QInputDialog.getMultiLineText(self, "Edit Text", "Content:", current_text)
-        
-        if ok and new_text != current_text:
-            if self.service.edit_text(idx, new_text):
-                self.refresh_requested.emit()
-        
-    def split_current(self):
-        """Splits the selected chunk using the text splitter."""
-        indices = self.get_selected_indices()
-        if len(indices) != 1:
-            QMessageBox.information(self, "Info", "Please select exactly one item to split.")
-            return
-            
-        idx = indices[0]
-        if self.service.split_chunk(idx):
-            self.refresh_requested.emit()
-        else:
-            QMessageBox.information(self, "Info", "Could not split this chunk (too specific? or 1 sentence).")
-        
-    def mark_current(self):
-        """Marks selected items for regeneration."""
-        indices = self.get_selected_indices()
-        for idx in indices:
-            item = self.state.sentences[idx]
-            item['marked'] = True
-            item['tts_generated'] = 'no'
-        if indices:
-            self.refresh_requested.emit()
-
-    def delete_current(self):
-        """Deletes selected items after confirmation."""
-        indices = self.get_selected_indices()
-        if not indices: return
-        
-        if QMessageBox.question(self, "Confirm", f"Delete {len(indices)} items?") == QMessageBox.Yes:
-            self.service.delete_items(indices)
-            self.refresh_requested.emit()
-        
-    def insert_text(self):
-        """Inserts a new text block at the selected position."""
-        idx = 0
-        indices = self.get_selected_indices()
-        if indices: idx = indices[0]
-        
-        text, ok = QInputDialog.getText(self, "Insert Text", "New Text:")
+    def _insert_text(self):
+        idx = self._get_selected_index()
+        text, ok = QInputDialog.getText(self, "Insert Text", "Enter text:")
         if ok and text:
-            self.service.insert_item(idx, text)
-            self.refresh_requested.emit()
-        
-    def insert_pause(self):
-        """Inserts a pause block at the selected position."""
-        idx = 0
-        indices = self.get_selected_indices()
-        if indices: idx = indices[0]
-        
-        dur, ok = QInputDialog.getInt(self, "Insert Pause", "Duration (ms):", 500, 100, 10000)
+            self.playlist_service.insert_item(idx, text)
+            self._refresh()
+
+    def _insert_pause(self):
+        idx = self._get_selected_index()
+        dur, ok = QInputDialog.getInt(self, "Insert Pause", "Duration (ms):", value=500)
         if ok:
-            self.service.insert_item(idx, "--- PAUSE ---", is_pause=True, duration=dur)
-            self.refresh_requested.emit()
+             self.playlist_service.insert_item(idx, "[PAUSE]", is_pause=True, duration=dur)
+             self._refresh()
+
+    def _insert_chapter(self):
+        idx = self._get_selected_index()
+        title, ok = QInputDialog.getText(self, "Insert Chapter", "Chapter Title:", text="Chapter X")
+        if ok and title:
+             self.playlist_service.insert_item(idx, title, is_chapter=True)
+             self._refresh()
+
+    def _mark_current(self):
+        indices = self._get_selected_indices()
+        if not indices: return
+        for i in indices:
+            item = self.playlist_service.get_selected_item(i)
+            item['marked'] = True
+        self._refresh()
+
+    def _mark_passed(self):
+        indices = self._get_selected_indices()
+        if not indices: return
+        for i in indices:
+            item = self.playlist_service.get_selected_item(i)
+            item['tts_generated'] = 'yes' # Force pass
+            item['marked'] = False
+        self._refresh()
+
+    def _reset_gen(self):
+        # Reset current?
+        indices = self._get_selected_indices()
+        for i in indices:
+            item = self.playlist_service.get_selected_item(i)
+            item['tts_generated'] = None
+            item['marked'] = False
+        self._refresh()
+
+    def _delete_items(self):
+        indices = self._get_selected_indices()
+        if not indices: return
+        if QMessageBox.question(self, "Confirm", f"Delete {len(indices)} items?") == QMessageBox.Yes:
+            self.playlist_service.delete_items(indices)
+            self._refresh()
+
+    def _move_items(self, direction):
+        indices = self._get_selected_indices()
+        if self.playlist_service.move_items(indices, direction):
+            self._refresh()
+            # Restore selection (tricky due to re-indexing, but service returns new indices)
+            # Todo: update selection
+
+    def _nav_error(self, direction):
+        idx = self._get_selected_index()
+        next_idx = self.playlist_service.find_next_status(idx, direction, 'failed')
+        if next_idx != -1:
+            # Select it (need mapping to View)
+            # PlaylistView logic to select row
+            # self.playlist.select_row(next_idx) ?
+            pass
+
+    def _search(self):
+        q = self.search_edit.text()
+        self.matches = self.playlist_service.search(q)
+        self.match_idx = 0
+        self._show_search_match()
         
-    def insert_chapter(self):
-        """Inserts a chapter marker at the selected position."""
-        idx = 0
-        indices = self.get_selected_indices()
-        if indices: idx = indices[0]
+    def _search_prev(self):
+        if not hasattr(self, 'matches') or not self.matches: return
+        self.match_idx = (self.match_idx - 1) % len(self.matches)
+        self._show_search_match()
         
-        name, ok = QInputDialog.getText(self, "Insert Chapter", "Chapter Name:")
-        if ok and name:
-            self.service.insert_item(idx, name, is_chapter=True)
-            self.refresh_requested.emit()
+    def _search_next(self):
+        if not hasattr(self, 'matches') or not self.matches: return
+        self.match_idx = (self.match_idx + 1) % len(self.matches)
+        self._show_search_match()
+        
+    def _show_search_match(self):
+        if not self.matches: return
+        target = self.matches[self.match_idx]
+        # self.playlist.jump_to_row(target) 
+        pass
+
+    def _merge_failed(self):
+        count = self.playlist_service.merge_failed_down()
+        if count: self._refresh(); QMessageBox.information(self, "Merged", f"Merged {count} chunks.")
+        
+    def _split_all_failed(self):
+        count = self.playlist_service.split_all_failed()
+        if count: self._refresh(); QMessageBox.information(self, "Split", f"Split {count} chunks.")
+        
+    def _clean_chars(self):
+        indices = self._get_selected_indices()
+        c = self.playlist_service.clean_special_chars_selected(indices)
+        if c: self._refresh()
+
+    def _filter_english(self):
+        indices = self._get_selected_indices()
+        c = self.playlist_service.filter_non_english_in_selected(indices)
+        if c: self._refresh()
+
+    def _regen_marked(self):
+        # Call generation service for marked items
+        # Logic: find ALL marked items
+        indices = [i for i, item in enumerate(self.playlist_service.state.sentences) if item.get('marked')]
+        if not indices: QMessageBox.information(self, "Info", "No marked items."); return
+        
+        if self.generation_service:
+            self.generation_service.start_generation(indices)

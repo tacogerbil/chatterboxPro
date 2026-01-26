@@ -49,10 +49,16 @@ class PlaylistView(QWidget):
         self.setup_ui()
         
     def setup_ui(self):
-        # Stats Panel needs horizontal layout with main list
-        main_layout = QHBoxLayout(self)
+        # Main Layout: Vertical (Split: List/Stats on Top, Controls on Bottom)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Left Side: List + Controls
+        # Top Section: List + Stats (Horizontal)
+        top_widget = QWidget()
+        top_layout = QHBoxLayout(top_widget)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Left Side: List (No controls here, moved to ControlsView)
         left_container = QWidget()
         left_layout = QVBoxLayout(left_container)
         left_layout.setContentsMargins(0,0,0,0)
@@ -61,34 +67,16 @@ class PlaylistView(QWidget):
         
         self.list_view = QListView()
         self.list_view.setModel(self.model)
-        self.list_view.setItemDelegate(PlaylistDelegate()) # Use Custom Delegate
-        self.list_view.setSelectionMode(QListView.ExtendedSelection) # Enable Ctrl/Shift Click
+        self.list_view.setItemDelegate(PlaylistDelegate()) 
+        self.list_view.setSelectionMode(QListView.ExtendedSelection)
         self.list_view.selectionModel().selectionChanged.connect(self.update_stats)
         left_layout.addWidget(self.list_view)
         
-        # Playback Controls
-        ctrl_layout = QHBoxLayout()
-        icon_prev = self.style().standardIcon(QStyle.SP_MediaSkipBackward)
-        icon_play = self.style().standardIcon(QStyle.SP_MediaPlay)
-        icon_stop = self.style().standardIcon(QStyle.SP_MediaStop)
-        icon_next = self.style().standardIcon(QStyle.SP_MediaSkipForward)
-        
-        btn_prev = QPushButton(); btn_prev.setIcon(icon_prev)
-        btn_play = QPushButton(); btn_play.setIcon(icon_play)
-        btn_stop = QPushButton(); btn_stop.setIcon(icon_stop)
-        btn_next = QPushButton(); btn_next.setIcon(icon_next)
-        
-        ctrl_layout.addWidget(btn_prev)
-        ctrl_layout.addWidget(btn_play)
-        ctrl_layout.addWidget(btn_stop)
-        ctrl_layout.addWidget(btn_next)
-        left_layout.addLayout(ctrl_layout)
-        
-        main_layout.addWidget(left_container, stretch=2)
+        top_layout.addWidget(left_container, stretch=3)
         
         # Right Side: Stats Panel
         stats_group = QGroupBox("Chunk Stats")
-        stats_group.setMaximumWidth(200)
+        stats_group.setMaximumWidth(220)
         stats_layout = QFormLayout(stats_group)
         
         self.lbl_status = QLabel("--")
@@ -99,7 +87,16 @@ class PlaylistView(QWidget):
         stats_layout.addRow("Seed:", self.lbl_seed)
         stats_layout.addRow("ASR Match:", self.lbl_asr)
         
-        main_layout.addWidget(stats_group, stretch=1)
+        top_layout.addWidget(stats_group, stretch=1)
+        
+        main_layout.addWidget(top_widget, stretch=1)
+        
+        # Bottom Slot for ControlsView (Will be added by set_controls_view or public method)
+        # We leave it open or add if passed in init?
+        # Better: provide method `add_controls_widget(widget)`
+
+    def add_controls_view(self, controls_widget):
+        self.layout().addWidget(controls_widget)
         
     def refresh(self):
         self.model.refresh()
