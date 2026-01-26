@@ -85,6 +85,15 @@ class ChatterboxProQt(QMainWindow):
         # Connect Signals (Global Refresh)
         self.controls_view.playlist = self.playlist_view # Ensure ref matches
         
+        # --- INJECT DEPENDENCIES FOR AUTO-FIX LOOP ---
+        self.gen_service.set_playlist_service(self.playlist_service)
+        
+        # Connect Auto-Fix Status to Status Bar
+        self.gen_service.auto_fix_status.connect(self.statusBar().showMessage)
+        
+        # Wire Template Loading
+        self.setup_view.template_loaded.connect(self.generation_view.refresh_values)
+        
         # Optional: Status Bar
         self.statusBar().showMessage("Ready")
 

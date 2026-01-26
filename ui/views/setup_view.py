@@ -4,16 +4,22 @@ from PySide6.QtCore import Qt
 from core.state import AppState
 from utils.text_processor import TextPreprocessor
 from core.services.project_service import ProjectService
+from core.services.template_service import TemplateService
 import os
 import shutil
+import dataclasses
 
 class SetupView(QWidget):
+    template_loaded = Signal()
+
     def __init__(self, app_state: AppState, parent=None):
         super().__init__(parent)
         self.state = app_state
         self.processor = TextPreprocessor()
         self.project_service = ProjectService()
+        self.template_service = TemplateService()
         self.setup_ui()
+        self.populate_templates() # Load templates on init
         self.check_system() # Run system check on init
         
     def setup_ui(self):
@@ -57,6 +63,22 @@ class SetupView(QWidget):
         
         layout.addLayout(form_layout)
         
+        layout.addLayout(form_layout)
+        
+        # --- Templates ---
+        tpl_group = QGroupBox("Generation Templates")
+        t_layout = QHBoxLayout(tpl_group)
+        self.template_combo = QComboBox()
+        self.template_combo.addItems(["No templates found"]) # Placeholder
+        self.load_tpl_btn = QPushButton("Load Template")
+        # Logic to be wired later or inline? We need a service for templates.
+        self.load_tpl_btn.clicked.connect(self.load_template)
+        
+        t_layout.addWidget(QLabel("Select Template:"))
+        t_layout.addWidget(self.template_combo, stretch=1)
+        t_layout.addWidget(self.load_tpl_btn)
+        layout.addWidget(tpl_group)
+
         # Load/Process Button
         self.load_btn = QPushButton("Process Text & Create Session")
         self.load_btn.setStyleSheet("background-color: #2E86C1; color: white; padding: 10px; font-weight: bold;")
@@ -136,6 +158,14 @@ class SetupView(QWidget):
             if raw_text.startswith("Error"):
                 QMessageBox.critical(self, "Error", raw_text)
                 return
+            
+            # --- REVIEW DIALOG ---
+            from ui.dialogs.review_text_dialog import ReviewTextDialog
+            dlg = ReviewTextDialog(raw_text, self)
+            if dlg.exec():
+                raw_text = dlg.result_text
+            else:
+                return # User cancelled
                 
             sentences = self.processor.preprocess_text(
                 raw_text, 
@@ -177,3 +207,32 @@ class SetupView(QWidget):
 
     def toggle_generation(self):
         QMessageBox.information(self, "Start", "Generation started! (Wiring pending in Phase 5)")
+
+    def populate_templates(self):
+        templates = self.template_service.list_templates()
+        self.template_combo.clear()
+        if templates:
+            self.template_combo.addItems(templates)
+        else:
+            self.template_combo.addItem("No templates found")
+
+    def load_template(self):
+        name = self.template_combo.currentText()
+        if not name or "found" in name: return
+        
+        data = self.template_service.load_template(name)
+        if data:
+            # Update state settings
+            try:
+                # We iterate keys to ensure safety
+                for key, value in data.items():
+                    if hasattr(self.state.settings, key):
+                        # Handle potential type mismatches if needed, but assuming JSON types match
+                        setattr(self.state.settings, key, value)
+                
+                QMessageBox.information(self, "Success", f"Loaded template '{name}'.")
+                self.template_loaded.emit() # Signal other views to refresh
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to apply template: {e}")
+        else:
+            QMessageBox.warning(self, "Error", "Failed to load template data.")

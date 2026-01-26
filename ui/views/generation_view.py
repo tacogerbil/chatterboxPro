@@ -5,6 +5,8 @@ from PySide6.QtCore import Qt, QThread
 from core.state import AppState
 from ui.components.q_labeled_slider import QLabeledSlider
 from core.services.generation_service import GenerationService
+from core.services.template_service import TemplateService
+from PySide6.QtWidgets import QInputDialog
 
 # Worker thread wrapper for GenerationService
 class GenerationWorker(QThread):
@@ -23,7 +25,9 @@ class GenerationView(QWidget):
     def __init__(self, state: AppState, parent=None):
         super().__init__(parent)
         self.state = state
+        self.state = state
         self.service = GenerationService(state)
+        self.template_service = TemplateService()
         # Thread management
         self.gen_thread_runner = GenerationWorker(self.service)
         
@@ -238,5 +242,27 @@ class GenerationView(QWidget):
         self.stop_btn.setEnabled(False)
         QMessageBox.critical(self, "Error", f"Generation Error: {err_msg}")
 
+    def refresh_values(self):
+        """Refreshes all sliders from AppState settings."""
+        s = self.state.settings
+        self.exag_slider.set_value(s.exaggeration)
+        self.speed_slider.set_value(s.speed)
+        self.temp_slider.set_value(s.temperature)
+        self.cfg_slider.set_value(s.cfg_weight)
+        self.pitch_slider.set_value(s.pitch_shift)
+        self.timbre_slider.set_value(s.timbre_shift)
+        self.gruffness_slider.set_value(s.gruffness)
+        self.engine_combo.setCurrentText(s.tts_engine)
+        # Advanced settings too if needed
+
     def save_template(self):
-        QMessageBox.information(self, "Save Template", "Template saving will be implemented in the polishing phase.")
+        name, ok = QInputDialog.getText(self, "Save Template", "Template Name:")
+        if ok and name:
+            import dataclasses
+            # Convert generation settings to dict
+            data = dataclasses.asdict(self.state.settings)
+            
+            if self.template_service.save_template(name, data):
+                 QMessageBox.information(self, "Success", f"Saved template '{name}'.")
+            else:
+                 QMessageBox.critical(self, "Error", "Failed to save template.")

@@ -109,18 +109,94 @@ class GenerationService(QObject):
     stopped = Signal()
     error_occurred = Signal(str)
     
+    # Auto-Fix Signals
+    auto_fix_status = Signal(str) # "Splitting failed chunks...", "Retrying...", etc.
+    
     def __init__(self, app_state: AppState):
         super().__init__()
         self.state = app_state
         self.worker_thread = None
-        
+        self.playlist_service = None # Injected dependency for splitting
+        self.auto_fix_stage = "NONE" # NONE, MAIN_INITIAL, MAIN_RETRY_1, MAIN_SPLIT, MAIN_LOOP
+        self._loop_iteration = 0
+
+    def set_playlist_service(self, service):
+        self.playlist_service = service
+
     def request_stop(self):
         """Sets the stop flag to terminate generation."""
+        self.auto_fix_stage = "NONE" # Hard stop breaks loop
         if self.worker_thread and self.worker_thread.isRunning():
             logging.info("Generation stop requested...")
             self.worker_thread.request_stop()
         else:
             self.stopped.emit()
+
+    def _auto_fix_logic(self):
+        """
+        State machine for auto-regeneration loops.
+        Ported from Legacy main_window.py _auto_fix_logic.
+        """
+        # 1. Identify Failures
+        failed_indices = [i for i, s in enumerate(self.state.sentences) if s.get('tts_generated') == 'failed']
+        
+        if not failed_indices:
+            self.auto_fix_stage = "NONE"
+            logging.info("Auto-Fix: All clear.")
+            self.finished.emit() # Real finish
+            
+            # Check Auto-Assemble
+            if self.state.auto_assemble_after_run:
+                pass # TODO: Emit signal to trigger assembly? Or handle elsewhere.
+            return
+
+        # 2. State Transition
+        if self.auto_fix_stage == "MAIN_INITIAL":
+            # Initial run had failures. Trigger Retry 1.
+            self.auto_fix_stage = "MAIN_RETRY_1"
+            self.auto_fix_status.emit(f"Auto-Fix: Retry 1 ({len(failed_indices)} items)...")
+            
+            # Mark failed for regeneration
+            for idx in failed_indices: 
+                self.state.sentences[idx]['marked'] = True
+                
+            self.start_generation(failed_indices)
+
+        elif self.auto_fix_stage == "MAIN_RETRY_1":
+            # Retry 1 had failures. Split them.
+            self.auto_fix_stage = "MAIN_SPLIT"
+            self.auto_fix_status.emit(f"Auto-Fix: Splitting {len(failed_indices)} failed items...")
+            
+            # Call Splitting Logic
+            if self.playlist_service:
+                # We split ALL failed chunks.
+                # Note: This modifies indices, so we must be careful with recursive calls.
+                count = self.playlist_service.split_all_failed(confirm=False)
+                if count == 0:
+                     # Could not split (maybe too short). Force loop or stop?
+                     # Legacy behavior: Move to Loop anyway.
+                     pass
+            
+            # After splitting, identify new marked items (the pieces)
+            new_marked = [i for i, s in enumerate(self.state.sentences) if s.get('marked')]
+            self.start_generation(new_marked)
+
+        elif self.auto_fix_stage == "MAIN_SPLIT":
+            # Post-Split run finished. If failures remain, enter infinite loop.
+            self.auto_fix_stage = "MAIN_LOOP"
+            self._loop_iteration = 0
+            self.auto_fix_status.emit(f"Auto-Fix: Entering Loop for {len(failed_indices)} items...")
+            self.start_generation(failed_indices)
+
+        elif self.auto_fix_stage == "MAIN_LOOP":
+            # Infinite loop untill success or stop
+            self._loop_iteration += 1
+            self.auto_fix_status.emit(f"Auto-Fix: Loop Iteration {self._loop_iteration} ({len(failed_indices)} items)...")
+            self.start_generation(failed_indices)
+            
+        else:
+            # Should not happen if logic is correct, or stage was NONE
+            self.finished.emit()
 
     def _get_chapter_ranges(self):
         """Returns list of (start_idx, end_idx) for each chapter."""
@@ -256,7 +332,12 @@ class GenerationService(QObject):
 
     @Slot()
     def _on_finished(self):
-        self.finished.emit()
+        # Instead of plain finish, check auto-fix logic
+        if self.state.auto_regen_main:
+             # Delay slightly to allow UI to update? No, pure logic.
+             self._auto_fix_logic()
+        else:
+             self.finished.emit()
         self.worker_thread = None
 
     @Slot()
