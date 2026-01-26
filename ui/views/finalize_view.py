@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QFormLayout, QLineEdit, 
-                               QPushButton, QCheckBox, QGroupBox, QLabel, QHBoxLayout, QMessageBox, QDoubleSpinBox)
+                               QPushButton, QCheckBox, QGroupBox, QLabel, QHBoxLayout, QMessageBox, QDoubleSpinBox, QFileDialog)
 from PySide6.QtCore import Qt
 from core.state import AppState
 import shutil
@@ -32,9 +32,6 @@ class FinalizeView(QWidget):
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("Defaults to session name")
         
-        # Bindings (Mocked or Real State)
-        # Assuming State has these fields or we just use them on click
-        
         meta_layout.addRow("Artist:", self.artist_edit)
         meta_layout.addRow("Album:", self.album_edit)
         meta_layout.addRow("Book Title:", self.title_edit)
@@ -53,7 +50,6 @@ class FinalizeView(QWidget):
         norm_row.addWidget(self.norm_chk)
         norm_row.addWidget(QLabel("Target LUFS:"))
         norm_row.addWidget(self.norm_val)
-        layout.addWidget(proc_group) # Add group first then layout? No.
         
         proc_layout.addRow(norm_row)
         
@@ -89,8 +85,8 @@ class FinalizeView(QWidget):
         self.check_deps()
 
     def check_deps(self):
-        ffmpeg = shutil.which('ffmpeg')
-        if not ffmpeg:
+        ffmpeg_loc = shutil.which('ffmpeg')
+        if not ffmpeg_loc:
             self.norm_chk.setEnabled(False)
             self.norm_chk.setText("Normalization (FFmpeg Missing)")
             
@@ -102,49 +98,72 @@ class FinalizeView(QWidget):
 
     def set_audio_service(self, audio_service):
         self.audio_service = audio_service
-        # Connect signals? Currently service signals are general, not View-specific.
-        # Ideally we listen to 'assembly_finished' etc to show msgbox here?
-        # For MVP we might rely on global notification or sync calls if threaded.
-        # The service uses Signals, so we should connect them to slots here to show UI feedback.
+        # Connect signals for UI feedback
+        self.audio_service.assembly_progress.connect(self._on_progress)
+        self.audio_service.assembly_finished.connect(self._on_finished)
+        self.audio_service.assembly_error.connect(self._on_error)
+        
+    def _on_progress(self, msg):
+        # We could show a STATUS BAR message or a Toast.
+        # For now, print to console or update header?
+        # A status bar in Main Window would be best.
+        print(f"[Assembly] {msg}")
+
+    def _on_finished(self, msg):
+        QMessageBox.information(self, "Success", msg)
+        self.btn_assemble.setEnabled(True)
+        self.btn_assemble.setText("Assemble Single File")
+        self.btn_export.setEnabled(True)
+
+    def _on_error(self, msg):
+        QMessageBox.critical(self, "Error", msg)
+        self.btn_assemble.setEnabled(True)
+        self.btn_assemble.setText("Assemble Single File")
+        self.btn_export.setEnabled(True)
 
     def assemble(self):
         if not hasattr(self, 'audio_service'): return
         
-        # Open file dialog here to get path OR let service do it?
-        # Service logic had filedialog. But services shouldn't have UI.
-        # We must open FileDialog HERE.
+        # Default name
+        default_name = f"{self.state.session_name}_audiobook.mp3"
         
-        # We need imports for QFileDialog
-        from PySide6.QtWidgets import QFileDialog
-        
-        # Get path
         path, _ = QFileDialog.getSaveFileName(self, "Assemble Audiobook", 
-                                              f"{self.state.session_name}_audiobook.mp3", 
+                                              default_name, 
                                               "MP3 Files (*.mp3);;WAV Files (*.wav)")
         if not path: return
         
-        # Call Service
-        # Note: assembly might be slow. Should be threaded. 
-        # For parity, legacy ran on main thread (blocking). We'll keep it blocking or implement thread later.
-        # Wait, the porting plan said "Service is backend". 
-        # AudioService.assemble_audiobook IS implemented as blocking logic in the port.
-        # In a real app we'd thread this. For MVP parity, we block.
+        # Gather Metadata
+        metadata = {
+            "artist": self.artist_edit.text() or "Chatterbox Pro",
+            "album": self.album_edit.text() or self.state.session_name,
+            "title": self.title_edit.text() or self.state.session_name
+        }
         
-        self.audio_service.assemble_audiobook(path, is_for_acx=False)
-
+        # Sync Settings
+        self.state.settings.norm_enabled = self.norm_chk.isChecked()
+        self.state.settings.norm_level = self.norm_val.value()
+        self.state.settings.silence_removal_enabled = self.silence_chk.isChecked()
+        
+        # Lock buttons
+        self.btn_assemble.setEnabled(False); self.btn_assemble.setText("Assembling...")
+        self.btn_export.setEnabled(False)
+        
+        # Call Service (Threaded)
+        self.audio_service.assemble_audiobook(path, is_for_acx=False, metadata=metadata)
+        
     def export_chapters(self):
         if not hasattr(self, 'audio_service'): return
-        
-        from PySide6.QtWidgets import QFileDialog
         
         path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if not path: return
         
-        # Note: AudioService logic for export_by_chapter was NOT ported in step 1751?
-        # Let me check AudioService... NO, I missed 'export_by_chapter' in step 1751?
-        # I only see 'assemble_audiobook'.
-        # I need to add 'export_by_chapter' to AudioService!
-        
-        # Blocked: AudioService missing method.
-        # I will leave this placeholder and Fix AudioService next.
-        QMessageBox.information(self, "Export", "Export by Chapter requires service update (pending).")
+        # Sync Settings
+        self.state.settings.norm_enabled = self.norm_chk.isChecked()
+        self.state.settings.norm_level = self.norm_val.value()
+        self.state.settings.silence_removal_enabled = self.silence_chk.isChecked()
+
+        # Lock buttons
+        self.btn_assemble.setEnabled(False)
+        self.btn_export.setEnabled(False); self.btn_export.setText("Exporting...")
+
+        self.audio_service.export_chapters(path)
