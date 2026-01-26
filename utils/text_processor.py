@@ -9,9 +9,55 @@ try:
 except ImportError:
     SentenceSplitter = None
 
-# Optional imports ... (unchanged)
+# Optional imports for file extraction (match legacy behavior)
+try:
+    from pdftextract import XPdf
+except ImportError:
+    XPdf = None
+try:
+    import ebooklib
+    from ebooklib import epub
+except ImportError:
+    ebooklib = None
+    epub = None
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+try:
+    import pypandoc
+except ImportError:
+    pypandoc = None
 
-# ... (punc_norm unchanged)
+
+def punc_norm(text: str) -> str:
+    """Quick cleanup func for punctuation from LLMs or containing chars not seen often in the dataset."""
+    if not text:
+        return "You need to add some text for me to talk."
+
+    # Capitalise first letter
+    if text and text[0].islower():
+        text = text[0].upper() + text[1:]
+
+    # Remove multiple space chars
+    text = " ".join(text.split())
+
+    # Replace uncommon/llm punc
+    punc_to_replace = [
+        ("...", ", "), ("…", ", "), (":", ","), (" - ", ", "), (";", ", "),
+        ("—", "-"), ("–", "-"), (" ,", ","), ("“", "\""), ("”", "\""),
+        ("‘", "'"), ("’", "'"),
+    ]
+    for old_char_sequence, new_char in punc_to_replace:
+        text = text.replace(old_char_sequence, new_char)
+
+    # Add full stop if no ending punc
+    text = text.rstrip()
+    sentence_enders = {".", "!", "?", "-", ","}
+    if text and not any(text.endswith(p) for p in sentence_enders):
+        text += "."
+
+    return text
 
 class TextPreprocessor:
     """Handles all text extraction and splitting logic."""
@@ -206,7 +252,13 @@ class TextPreprocessor:
             text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
             text = text.replace('[[PARAGRAPH]]', '\n')
 
-        sentences = self.splitter.split(text)
+        # Fallback split logic
+        if self.splitter:
+            sentences = self.splitter.split(text)
+        else:
+             # Very basic fallback split
+             sentences = self.simple_split_re.split(text)
+
         processed_sentences = []
         char_offset = 0
         
