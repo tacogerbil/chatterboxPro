@@ -265,7 +265,6 @@ class T3(nn.Module):
             self.patched_model = patched_model
             self.compiled = True
 
-
         device = embeds.device
 
         bos_token = torch.tensor([[self.hp.start_speech_token]], dtype=torch.long, device=device)
