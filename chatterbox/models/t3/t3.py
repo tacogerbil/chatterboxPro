@@ -256,39 +256,15 @@ class T3(nn.Module):
         # TODO? synchronize the expensive compile function
         # with self.compile_lock:
         if not self.compiled:
-            # alignment_stream_analyzer = AlignmentStreamAnalyzer(
-            #     self.tfmr,
-            #     None,
-            #     text_tokens_slice=(len_cond, len_cond + text_tokens.size(-1)),
-            #     alignment_layer_idx=9, # TODO: hparam or something?
-            #     eos_idx=self.hp.stop_speech_token,
-            # )
             patched_model = T3HuggingfaceBackend(
                 config=self.cfg,
                 llama=self.tfmr,
                 speech_enc=self.speech_emb,
                 speech_head=self.speech_head,
-                # alignment_stream_analyzer=alignment_stream_analyzer,
             )
             self.patched_model = patched_model
             self.compiled = True
 
-        # # Run normal generate method, which calls our custom extended methods
-        # return self.patched_model.generate(
-        #     inputs=initial_speech_tokens,
-        #     decoder_cond=embeds,
-        #     bos_token_id=self.hp.start_speech_token,
-        #     eos_token_id=(self.hp.stop_speech_token if stop_on_eos else -1),
-        #     pad_token_id=self.hp.stop_speech_token,
-        #     max_new_tokens=max_new_tokens or self.hp.max_speech_tokens,
-        #     num_return_sequences=num_return_sequences,
-        #     temperature=temperature,
-        #     top_p=top_p,
-        #     length_penalty=length_penalty,
-        #     repetition_penalty=repetition_penalty,
-        #     do_sample=do_sample,
-        #     # cache_implementation=None if not self.compiled else "static",
-        # )
 
         device = embeds.device
 
@@ -366,7 +342,12 @@ class T3(nn.Module):
             
             if i % 10 == 0 or i > 100:
                  print(f"[T3 Debug] Sampling step {i}")
-                 
+            
+            # Ensure probability tensor is contiguous and synchronized to prevent kernel hangs
+            probs = probs.contiguous()
+            if self.device.type == "cuda":
+                torch.cuda.synchronize()
+
             next_token = torch.multinomial(probs, num_samples=1)  # shape: (B, 1)
 
             predicted.append(next_token)
@@ -384,8 +365,8 @@ class T3(nn.Module):
             next_token_embed = torch.cat([next_token_embed, next_token_embed])
 
             # Forward pass with only the new token and the cached past.
-            if i % 10 == 0 or i > 65: # Print more frequently around the potential crash point (step 72)
-                 print(f"[T3 Debug] Starting step {i}.")
+            if i % 10 == 0 or i > 65: # Print more frequently around the potential crash point
+                 print(f"[T3 Debug] Starting forward pass step {i}.")
             
             try:
                 output = self.patched_model(
