@@ -213,10 +213,18 @@ class SetupView(QWidget):
             else:
                 return # User cancelled
                 
+            # Step 1: Preprocess (Split sentences + clean)
             sentences = self.processor.preprocess_text(
                 raw_text, 
-                max_chars=self.state.settings.max_chunk_chars
+                aggressive_clean=self.state.aggro_clean_on_parse
             )
+            
+            # Step 2: Chunking (if enabled)
+            if self.state.settings.chunking_enabled:
+                sentences = self.processor.group_sentences_into_chunks(
+                    sentences, 
+                    max_chars=self.state.settings.max_chunk_chars
+                )
             
             self.state.sentences = sentences
             QMessageBox.information(self, "Success", f"Loaded {len(sentences)} chunks.")
