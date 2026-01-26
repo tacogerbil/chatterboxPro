@@ -308,6 +308,8 @@ class T3(nn.Module):
 
         # Instantiate the logits processors.
         top_p_warper = TopPLogitsWarper(top_p=top_p)
+        repetition_penalty_processor = RepetitionPenaltyLogitsProcessor(penalty=repetition_penalty)
+
         # ---- Initial Forward Pass (no kv_cache yet) ----
         import transformers
         # Try to use DynamicCache if available (transformers >= 4.36)
