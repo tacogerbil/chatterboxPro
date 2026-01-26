@@ -52,7 +52,7 @@ class ChapterModel(QAbstractListModel):
             
         if role == Qt.CheckStateRole:
             row = index.row()
-            if value == Qt.Checked:
+            if value == Qt.Checked or value == 2:
                 self._checked_state.add(row)
             else:
                 self._checked_state.discard(row)
