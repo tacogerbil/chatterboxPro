@@ -52,3 +52,9 @@ class QLabeledSlider(QWidget):
         self.slider.setValue(int_val)
         self.slider.blockSignals(False)
         self.value_changed.emit(val)
+
+    def set_value(self, val):
+        self.spinbox.setValue(val)
+        
+    def get_value(self):
+        return self.spinbox.value()
