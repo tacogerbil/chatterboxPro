@@ -96,7 +96,7 @@ class T3HuggingfaceBackend(LlamaPreTrainedModel, GenerationMixin):
             inputs_embeds=inputs_embeds,
             past_key_values=past_key_values,
             use_cache=use_cache,
-            output_attentions=False,
+            output_attentions=False, # Force False to use optimized SdpaAttention
             output_hidden_states=output_hidden_states,
             return_dict=True,
         )
