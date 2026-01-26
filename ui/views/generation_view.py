@@ -53,7 +53,7 @@ class GenerationView(QWidget):
         self.setup_advanced(layout)
         
         # 4. Preview / Progress
-        self.setup_footer(layout)
+        self.setup_preview(layout)
         
         layout.addStretch()
     
@@ -185,7 +185,7 @@ class GenerationView(QWidget):
         
         # --- Voice Save Section (New) ---
         save_group = QGroupBox("Voice Save")
-        save_group.setStyleSheet("QGroupBox { border: 1px solid #A93226; margin-top: 10px; } QGroupBox::title { color: white; }")
+        # Removed red styling as per user request
         s_layout = QHBoxLayout(save_group)
         
         self.voice_save_combo = QComboBox()
@@ -260,42 +260,31 @@ class GenerationView(QWidget):
         else:
              QMessageBox.critical(self, "Error", "Failed to save voice.")
 
-    def setup_footer(self, layout):
-        footer_group = QGroupBox("Control & Status")
-        f_layout = QVBoxLayout(footer_group)
+    def setup_preview(self, layout):
+        preview_group = QGroupBox("Test Voice Settings")
+        p_layout = QVBoxLayout(preview_group)
         
-        # Stats / Status
-        self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: gray; font-style: italic;")
-        f_layout.addWidget(self.status_label)
+        # Sample Text
+        p_layout.addWidget(QLabel("Sample Text:"))
+        self.sample_text_edit = QTextEdit()
+        self.sample_text_edit.setPlaceholderText("Enter text to preview voice...")
+        self.sample_text_edit.setText("Hello! This is a test of the voice settings. How does it sound?")
+        self.sample_text_edit.setMaximumHeight(60)
+        p_layout.addWidget(self.sample_text_edit)
         
-        # Progress
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        f_layout.addWidget(self.progress_bar)
+        # Preview Button
+        self.preview_btn = QPushButton("▶ Generate Preview")
+        self.preview_btn.setStyleSheet("background-color: #27AE60; color: white; font-weight: bold; padding: 10px;")
+        self.preview_btn.clicked.connect(self.generate_preview)
+        p_layout.addWidget(self.preview_btn)
         
-        # Buttons
-        btn_layout = QHBoxLayout()
-        
-        self.gen_btn = QPushButton("Generate All / Remaining")
-        self.gen_btn.setStyleSheet("background-color: #27AE60; color: white; font-weight: bold; padding: 8px;")
-        self.gen_btn.clicked.connect(self.start_generation)
-        btn_layout.addWidget(self.gen_btn)
-        
-        self.stop_btn = QPushButton("Stop")
-        self.stop_btn.setStyleSheet("background-color: #A93226; color: white; font-weight: bold; padding: 8px;")
-        self.stop_btn.setEnabled(False)
-        self.stop_btn.clicked.connect(self.stop_generation)
-        btn_layout.addWidget(self.stop_btn)
-        
-        self.open_dir_btn = QPushButton("📂 Output")
-        self.open_dir_btn.clicked.connect(self.open_output_folder)
-        btn_layout.addWidget(self.open_dir_btn)
-        
-        f_layout.addLayout(btn_layout)
-        layout.addWidget(footer_group)
+        layout.addWidget(preview_group)
+
+    def generate_preview(self):
+        text = self.sample_text_edit.toPlainText()
+        if not text: return
+        QMessageBox.information(self, "Preview", f"Preview generation not yet fully wired. \nText: {text}") 
+        # TODO: Wire to Service.generate_preview(text)
 
     def refresh_values(self):
         """Updates UI elements to match current AppState settings."""
