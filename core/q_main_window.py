@@ -24,7 +24,8 @@ class ChatterboxProQt(QMainWindow):
         
         # Instantiate Backend Services
         self.gen_service = GenerationService(self.app_state)
-        self.audio_service = AudioService(self.app_state)
+        self.audio_service = AudioService()
+        self.assembly_service = AssemblyService(self.app_state)
         self.playlist_service = PlaylistService(self.app_state)
         
         # Setup UI

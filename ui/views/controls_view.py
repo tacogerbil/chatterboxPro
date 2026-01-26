@@ -15,7 +15,9 @@ class ControlsView(QWidget):
         self.services = services # Dict {playlist: PlaylistService, generation: GenerationService}
         self.playlist = playlist_view # Reference to list view for selection
         self.generation_service = services.get('generation')
+        self.generation_service = services.get('generation')
         self.playlist_service = services.get('playlist')
+        self.audio_service = services.get('audio') # Injected by MainWindow
         
         self.setup_ui()
         
@@ -150,15 +152,37 @@ class ControlsView(QWidget):
     # --- Actions ---
     
     def _play_selected(self):
-        # Delegate to playlist or app? 
-        # For simplicity, if playlist view has method, call it.
-        # PlaylistView usually relies on AudioService.
-        # We need access to AudioService. Not passed explicitly?
-        # We can emit? Or use parent.
-        pass # To be wired
+        if not self.audio_service: return
+        
+        idx = self._get_selected_index()
+        if idx == -1: return
+        
+        item = self.playlist_service.get_selected_item(idx)
+        if not item or item.get("tts_generated") != "yes":
+            QMessageBox.warning(self, "No Audio", "Selected item has no generated audio.")
+            return
+
+        # Resolve path
+        # Using ProjectService helper would be best, but we can construct it or use path in item if stored.
+        # Item has 'uuid'.
+        # We need session name.
+        session_name = self.playlist_service.state.session_name
+        uuid_str = item.get('uuid')
+        
+        # Construct path manually or via service method if we had one accessible?
+        # Let's assume standard path: Outputs_Pro/{session}/Sentence_wavs/audio_{uuid}.wav
+        # We can use ProjectService if accessible. 
+        # But for now, construct path.
+        if not session_name: return
+        
+        from pathlib import Path
+        path = Path("Outputs_Pro") / session_name / "Sentence_wavs" / f"audio_{uuid_str}.wav"
+        
+        self.audio_service.play_file(str(path))
 
     def _stop_playback(self):
-        pass # To be wired
+        if self.audio_service:
+            self.audio_service.stop()
 
     def _play_from(self):
         pass # To be wired

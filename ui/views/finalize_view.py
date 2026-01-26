@@ -11,7 +11,16 @@ class FinalizeView(QWidget):
     def __init__(self, app_state: AppState, parent=None):
         super().__init__(parent)
         self.state = app_state
+        self.audio_service = None
+        self.assembly_service = None
         self.setup_ui()
+
+    def set_assembly_service(self, service):
+        self.assembly_service = service
+        # Connect signals
+        self.assembly_service.assembly_finished.connect(self._on_assembly_finished)
+        self.assembly_service.assembly_error.connect(self._on_assembly_error)
+        self.assembly_service.assembly_started.connect(self._on_assembly_started)
         
     def setup_ui(self):
         layout = QVBoxLayout(self)

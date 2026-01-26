@@ -13,22 +13,13 @@ project_root = Path(__file__).parent.resolve()
 sys.path.insert(0, str(project_root))
 
 # --- Project-Specific Imports ---
-from ui.main_window import ChatterboxProGUI
+# from ui.main_window import ChatterboxProGUI # LEGACY
+from core.q_main_window import QChatterboxPro
+from PySide6.QtWidgets import QApplication
 from utils.dependency_checker import DependencyManager
 
-# --- FIX: Monkeypatch CTkToolTip for compatibility with new CustomTkinter ---
-# The ScalingTracker in CTk 5.2.2 expects tracked windows to have 'block_update_dimensions_event'.
-try:
-    from CTkToolTip import CTkToolTip
-    if not hasattr(CTkToolTip, 'block_update_dimensions_event'):
-        def block_update_dimensions_event(self):
-            pass
-        CTkToolTip.block_update_dimensions_event = block_update_dimensions_event
-except ImportError:
-    pass # If CTkToolTip isn't installed, we don't need the patch (app might degrade gracefully)
-
 # --- Header ---
-CODE_VERSION = "2024-08-05-Final-Refactor"
+CODE_VERSION = "2026-01-25-PySide6-Migration"
 print(f"--- Running Chatterbox Pro ---\n--- Code Version: {CODE_VERSION} ---")
 
 if __name__ == "__main__":
@@ -37,8 +28,18 @@ if __name__ == "__main__":
             multiprocessing.set_start_method('spawn', force=True)
             logging.info("Multiprocessing start method set to 'spawn'.")
         except RuntimeError:
-            logging.warning(f"Could not set 'spawn' method, already set to: {multiprocessing.get_start_method(allow_none=True)}.")
+            logging.warning(f"Could not set 'spawn' method.")
 
+    # Initialize Dependency Manager
     deps = DependencyManager()
-    app = ChatterboxProGUI(dependency_manager=deps)
-    app.mainloop()
+    
+    # Initialize Qt Application
+    qt_app = QApplication(sys.argv)
+    qt_app.setApplicationName("Chatterbox Pro")
+    
+    # Initialize Main Window (New Codebase)
+    window = QChatterboxPro(dependency_manager=deps)
+    window.show()
+    
+    # Run Event Loop
+    sys.exit(qt_app.exec())

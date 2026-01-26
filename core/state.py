@@ -28,9 +28,13 @@ class GenerationSettings:
     silence_removal_enabled: bool = False
     norm_level: float = -23.0
     silence_threshold: float = 0.04
-    silence_threshold: float = 0.04
     silent_speed: float = 9999
     frame_margin: int = 6
+    
+    # Metadata (For Export)
+    metadata_title: str = ""
+    metadata_artist: str = ""
+    metadata_album: str = ""
     
     # TTS Engine
     tts_engine: str = "chatterbox"
