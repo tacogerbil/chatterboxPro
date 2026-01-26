@@ -244,7 +244,7 @@ class SetupView(QWidget):
         self.session_name_edit.clear()
         self.file_path_edit.clear()
         self.state.sentences = []
-        self.lbl_ref_path.setText("None")
+
         # Signal a refresh?
         
     def load_session_dialog(self):
@@ -263,7 +263,6 @@ class SetupView(QWidget):
                 if 'generation_settings' in data:
                      self.state.update_settings(**data['generation_settings'])
                 
-                self.lbl_ref_path.setText(self.state.ref_audio_path or "None")
                 
                 QMessageBox.information(self, "Loaded", f"Session loaded with {len(self.state.sentences)} chunks.")
             else:
