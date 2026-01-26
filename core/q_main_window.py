@@ -13,6 +13,7 @@ from ui.views.finalize_view import FinalizeView
 from core.services.generation_service import GenerationService
 from core.services.audio_service import AudioService
 from core.services.playlist_service import PlaylistService
+from core.services.assembly_service import AssemblyService
 
 class ChatterboxProQt(QMainWindow):
     def __init__(self):
