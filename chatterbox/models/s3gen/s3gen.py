@@ -207,12 +207,14 @@ class S3Token2Mel(torch.nn.Module):
         # assert speech_tokens.shape[0] == 1, "only batch size of one allowed for now"
         speech_token_lens = torch.LongTensor([speech_tokens.size(1)]).to(self.device)
 
+        print(f"[S3Token2Mel Debug] Calling flow.inference on device {self.device}", flush=True)
         output_mels, _ = self.flow.inference(
             token=speech_tokens,
             token_len=speech_token_lens,
             finalize=finalize,
             **ref_dict,
         )
+        print(f"[S3Token2Mel Debug] flow.inference returned. Shape: {output_mels.shape}", flush=True)
         return output_mels
 
 
@@ -296,10 +298,19 @@ class S3Token2Wav(S3Token2Mel):
         cache_source: torch.Tensor = None, # NOTE: this arg is for streaming, it can probably be removed here
         finalize: bool = True,
     ):
-        output_mels = self.flow_inference(speech_tokens, ref_wav=ref_wav, ref_sr=ref_sr, ref_dict=ref_dict, finalize=finalize)
-        output_wavs, output_sources = self.hift_inference(output_mels, cache_source)
+        print(f"[S3Gen Debug] Inside inference. speech_tokens shape: {speech_tokens.shape}", flush=True)
+        try:
+            output_mels = self.flow_inference(speech_tokens, ref_wav=ref_wav, ref_sr=ref_sr, ref_dict=ref_dict, finalize=finalize)
+            print(f"[S3Gen Debug] flow_inference success. mels shape: {output_mels.shape}", flush=True)
+            output_wavs, output_sources = self.hift_inference(output_mels, cache_source)
+            print(f"[S3Gen Debug] hift_inference success. wavs shape: {output_wavs.shape}", flush=True)
 
-        # NOTE: ad-hoc method to reduce "spillover" from the reference clip.
-        output_wavs[:, :len(self.trim_fade)] *= self.trim_fade
+            # NOTE: ad-hoc method to reduce "spillover" from the reference clip.
+            output_wavs[:, :len(self.trim_fade)] *= self.trim_fade
 
-        return output_wavs, output_sources
+            return output_wavs, output_sources
+        except Exception as e:
+            print(f"[S3Gen Debug] CRITICAL ERROR IN S3GEN INFERENCE: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            raise
