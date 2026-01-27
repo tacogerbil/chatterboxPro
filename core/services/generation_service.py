@@ -29,7 +29,8 @@ class GenerationThread(QThread):
     error_occurred = Signal(str)
     stopped = Signal()
 
-    def __init__(self, tasks: List[Tuple], max_workers: int, outputs_dir: str) -> None:
+    # task type can be explicit but passing class via generic in legacy thread is messy, simple Any/struct reference is fine
+    def __init__(self, tasks: List[Any], max_workers: int, outputs_dir: str) -> None:
         super().__init__()
         self.tasks = tasks
         self.max_workers = max_workers
@@ -229,38 +230,41 @@ class GenerationService(QObject):
              # Default: Fastest First
              sorted_indices = sorted(indices, key=lambda i: len(self.state.sentences[i]['original_sentence']), reverse=True)
 
+        from core.structs import WorkerTask
+        
         for i, original_idx in enumerate(sorted_indices):
             sentence_data = self.state.sentences[original_idx]
             
-            task = (
-                i, 
-                original_idx, 
-                int(sentence_data.get('sentence_number', i+1)),
-                punc_norm(sentence_data['original_sentence']),
-                devices[i % len(devices)], 
-                run_seed,
-                self.state.ref_audio_path if self.state.ref_audio_path and self.state.ref_audio_path.strip() else None, 
-                s.exaggeration, 
-                s.temperature,
-                s.cfg_weight, 
-                s.disable_watermark,
-                s.num_candidates,
-                s.max_attempts,
-                not s.asr_validation_enabled, 
-                self.state.session_name,
-                0, # run_idx (flattened for now)
-                outputs_dir, 
-                sentence_data['uuid'],
-                s.asr_threshold,
-                self.state.settings.speed,
-                self.state.settings.tts_engine,
-                self.state.settings.pitch_shift,
-                self.state.settings.timbre_shift,
-                self.state.settings.gruffness,
-                self.state.settings.bass_boost,
-                self.state.settings.treble_boost,
-                self.state.settings.model_path 
+            task = WorkerTask(
+                task_index=i,
+                original_index=original_idx,
+                sentence_number=int(sentence_data.get('sentence_number', i+1)),
+                uuid=sentence_data['uuid'],
+                session_name=self.state.session_name,
+                run_idx=0, # flattened
+                output_dir_str=outputs_dir,
+                text_chunk=punc_norm(sentence_data['original_sentence']),
+                ref_audio_path=self.state.ref_audio_path if self.state.ref_audio_path and self.state.ref_audio_path.strip() else None,
+                device_str=devices[i % len(devices)],
+                master_seed=run_seed,
+                exaggeration=s.exaggeration,
+                temperature=s.temperature,
+                cfg_weight=s.cfg_weight,
+                disable_watermark=s.disable_watermark,
+                num_candidates=s.num_candidates,
+                max_attempts=s.max_attempts,
+                bypass_asr=not s.asr_validation_enabled,
+                asr_threshold=s.asr_threshold,
+                speed=s.speed,
+                tts_engine=s.tts_engine,
+                pitch_shift=s.pitch_shift,
+                timbre_shift=s.timbre_shift,
+                gruffness=s.gruffness,
+                bass_boost=s.bass_boost,
+                treble_boost=s.treble_boost,
+                model_path=s.model_path 
             )
+            
             tasks.append(task)
             
         return tasks

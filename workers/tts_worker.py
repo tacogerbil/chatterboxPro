@@ -246,12 +246,39 @@ def get_similarity_ratio(text1, text2):
 
 # apply_voice_effects removed. Logic moved to utils/pedalboard_processor.py (MCCC: Separation of Concerns)
 
-def worker_process_chunk(task_bundle):
+from core.structs import WorkerTask
+
+def worker_process_chunk(task: WorkerTask):
     """The main function executed by each worker process to generate a single audio chunk."""
-    (task_index, original_index, sentence_number, text_chunk, device_str, master_seed, ref_audio_path,
-     exaggeration, temperature, cfg_weight, disable_watermark, num_candidates, max_attempts,
-     bypass_asr, session_name, run_idx, output_dir_str, uuid, asr_threshold, speed, engine_name,
-     pitch_shift, timbre_shift, gruffness, bass_boost, treble_boost, model_path) = task_bundle
+    # Unpack from explicit dataclass for local usage
+    # MCCC: Explicit Interface
+    task_index = task.task_index
+    original_index = task.original_index
+    sentence_number = task.sentence_number
+    text_chunk = task.text_chunk
+    device_str = task.device_str
+    master_seed = task.master_seed
+    ref_audio_path = task.ref_audio_path
+    exaggeration = task.exaggeration
+    temperature = task.temperature
+    cfg_weight = task.cfg_weight
+    disable_watermark = task.disable_watermark
+    num_candidates = task.num_candidates
+    max_attempts = task.max_attempts
+    bypass_asr = task.bypass_asr
+    session_name = task.session_name
+    run_idx = task.run_idx
+    output_dir_str = task.output_dir_str
+    uuid = task.uuid
+    asr_threshold = task.asr_threshold
+    speed = task.speed
+    engine_name = task.tts_engine # Mapped field name
+    pitch_shift = task.pitch_shift
+    timbre_shift = task.timbre_shift
+    gruffness = task.gruffness
+    bass_boost = task.bass_boost
+    treble_boost = task.treble_boost
+    model_path = task.model_path
 
     pid = os.getpid()
     logging.info(f"[Worker-{pid}] Starting chunk (Idx: {original_index}, #: {sentence_number}, UUID: {uuid[:8]}) on device {device_str}")
