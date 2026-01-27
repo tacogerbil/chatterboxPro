@@ -379,7 +379,7 @@ def worker_process_chunk(task_bundle):
             
             try:
                 sf.write(temp_path_str, audio_data, tts_engine.sr)
-                print(f"[Worker Debug] File saved.", flush=True)
+                print(f"[Worker Debug] File saved to disk.", flush=True)
             except Exception as e_sf:
                 print(f"[Worker Debug] sf.write failed: {e_sf}", flush=True)
                 raise
@@ -387,17 +387,21 @@ def worker_process_chunk(task_bundle):
             duration = wav_tensor.shape[-1] / tts_engine.sr
             
             # --- Signal Processing Check (Pre-Whisper) ---
-            # Reject obvious garbage before wasting time saving to disk or running Whisper
+            print(f"[Worker Debug] Validating audio signal...", flush=True)
             is_valid_signal, signal_error = validate_audio_signal(wav_tensor.cpu(), tts_engine.sr)
+            print(f"[Worker Debug] Validation result: {is_valid_signal}", flush=True)
+            
             if not is_valid_signal:
                 logging.warning(f"Signal Rejected inside worker chunk #{sentence_number}, attempt {attempt_num+1}: {signal_error}")
                 if Path(temp_path_str).exists(): os.remove(temp_path_str) # Cleanup if we wrote it (logic above wrote sf.write first)
                 continue
             
             # GPU Memory Cleanup: Free tensor immediately after use
+            print(f"[Worker Debug] Cleaning up GPU memory...", flush=True)
             del wav_tensor
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            print(f"[Worker Debug] GPU memory cleaned.", flush=True)
 
         except Exception as e:
             logging.error(f"Generation crashed for chunk #{sentence_number}, attempt {attempt_num+1}: {e}", exc_info=True)

@@ -40,6 +40,11 @@ class GenerationView(QWidget):
     def set_generation_service(self, service: GenerationService) -> None:
         self.service = service
         self.service.preview_ready.connect(self.on_preview_ready)
+        self.service.preview_error.connect(self.on_preview_error)
+
+    def on_preview_error(self, error_msg: str) -> None:
+        print(f"[UI Debug] Preview Error signal received: {error_msg}", flush=True)
+        QMessageBox.critical(self, "Preview Failed", f"Error generating preview:\n{error_msg}")
 
     def set_audio_service(self, service: Any) -> None:
         self.audio_service = service
