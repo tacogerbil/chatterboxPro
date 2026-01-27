@@ -21,7 +21,7 @@ class ChatterboxProQt(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Chatterbox Pro (Qt Edition)")
-        self.resize(1600, 900)
+        self.resize(1200, 800)
         
         self.app_state = AppState()
         

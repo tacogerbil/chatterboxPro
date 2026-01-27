@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QGroupBox, QFormLayout, 
     QPushButton, QHBoxLayout, QMessageBox, QComboBox, 
-    QLineEdit, QSpinBox, QTextEdit
+    QLineEdit, QSpinBox, QPlainTextEdit, QScrollArea
 )
 from PySide6.QtCore import Qt, QThread, Slot
 from typing import Optional, List, Dict, Any
@@ -62,7 +62,21 @@ class GenerationView(QWidget):
              QMessageBox.warning(self, "Error", "Audio Service not connected.")
         
     def setup_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        # Wrap everything in a ScrollArea to handle small screens
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setSpacing(10)
+        
+        scroll.setWidget(container)
+        main_layout.addWidget(scroll)
+
         self.setup_header(layout)
         self.setup_sliders(layout)
         self.setup_advanced(layout)
@@ -357,13 +371,10 @@ class GenerationView(QWidget):
         
         # Sample Text
         p_layout.addWidget(QLabel("Sample Text:"))
-        self.sample_text_edit = QTextEdit()
+        self.sample_text_edit = QPlainTextEdit()
         self.sample_text_edit.setPlaceholderText("Enter text to preview voice...")
-        self.sample_text_edit.setText("Hello! This is a test of the voice settings. How does it sound?")
-        self.sample_text_edit.setMaximumHeight(60)
-        self.sample_text_edit.setPlaceholderText("Enter text to preview voice...")
-        self.sample_text_edit.setText("Hello! This is a test of the voice settings. How does it sound?")
-        self.sample_text_edit.setMaximumHeight(60)
+        self.sample_text_edit.setPlainText("Hello! This is a test of the voice settings. How does it sound?")
+        self.sample_text_edit.setMaximumHeight(80)
         # Theme handled globally by qt-material
         p_layout.addWidget(self.sample_text_edit)
         
