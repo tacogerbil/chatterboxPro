@@ -10,6 +10,7 @@ import perth
 import torch.nn.functional as F
 from huggingface_hub import hf_hub_download
 from peft import PeftModel
+from ..utils.file_utils import get_audio_hash
 
 from .models.t3 import T3
 from .models.s3tokenizer import S3_SR, drop_invalid_tokens
@@ -198,125 +199,123 @@ class ChatterboxTTS:
         ckpt_dir = Path(downloaded_files["ve.pt"]).parent
         return cls.from_local(ckpt_dir, device)
 
-    def _get_audio_hash(self, wav_fpath_or_bytes):
-        hasher = hashlib.md5()
-        if isinstance(wav_fpath_or_bytes, (str, Path)):
-            with open(wav_fpath_or_bytes, "rb") as f:
-                buf = f.read(65536)
-                while len(buf) > 0:
-                    hasher.update(buf)
-                    buf = f.read(65536)
-        elif isinstance(wav_fpath_or_bytes, bytes):
-            hasher.update(wav_fpath_or_bytes)
-        else:
-            raise TypeError("Input must be a file path or bytes object for hashing.")
-        return hasher.hexdigest()
-
-    def prepare_conditionals(self, wav_fpath, exaggeration=0.5, use_cache=True):
-        audio_hash = None
-        cache_file = None
-
-        if not wav_fpath or not Path(wav_fpath).exists():
-            print(f"[TTS.prepare_conditionals/WARN] Invalid reference audio path: {wav_fpath}. Skipping conditional preparation.")
-            # Potentially load default or raise error if reference is mandatory for current state
-            if self.conds is None: # If no built-in voice, this is an issue
-                raise ValueError("Reference audio path is invalid and no default conditionals are loaded.")
-            # If self.conds exists (e.g. built-in), we can proceed using those, but log a warning.
-            print("[TTS.prepare_conditionals/WARN] Proceeding with existing/default conditionals.")
-            return
 
 
-        if use_cache:
-            try:
-                stat = os.stat(wav_fpath)
-                unique_key = f"{wav_fpath}-{stat.st_mtime}-{stat.st_size}-{exaggeration}"
-                audio_hash = hashlib.md5(unique_key.encode()).hexdigest()
-            except OSError:
-                try:
-                    with open(wav_fpath, "rb") as f: audio_bytes = f.read()
-                    content_hash_key = f"{self._get_audio_hash(audio_bytes)}-{exaggeration}"
-                    audio_hash = hashlib.md5(content_hash_key.encode()).hexdigest()
-                except Exception as e_hash:
-                    print(f"[TTS.prepare_conditionals/WARN] Could not hash audio file {wav_fpath}: {e_hash}. Disabling cache for this call.")
-                    use_cache = False # Disable cache if hashing fails
+    def _try_load_cached_conds(self, cache_file: Path, exaggeration: float) -> Conditionals | None:
+        if not cache_file.exists():
+            return None
+            
+        print(f"Loading cached conditionals from {cache_file}")
+        try:
+            loaded_conds = Conditionals.load(cache_file, map_location=self.device)
+            # Validate exaggeration match
+            if not hasattr(loaded_conds.t3, 'emotion_adv') or \
+               not torch.is_tensor(loaded_conds.t3.emotion_adv) or \
+               not np.isclose(loaded_conds.t3.emotion_adv.item(), exaggeration):
+                
+                print("Exaggeration changed or emotion_adv invalid, patching.")
+                new_emotion_adv = exaggeration * torch.ones(
+                    1, 1, 1, device=self.device, dtype=loaded_conds.t3.speaker_emb.dtype
+                )
+                
+                # Reconstruct T3Cond
+                new_t3 = T3Cond(
+                    speaker_emb=loaded_conds.t3.speaker_emb,
+                    clap_emb=getattr(loaded_conds.t3, 'clap_emb', None),
+                    cond_prompt_speech_tokens=getattr(loaded_conds.t3, 'cond_prompt_speech_tokens', None),
+                    cond_prompt_speech_emb=getattr(loaded_conds.t3, 'cond_prompt_speech_emb', None),
+                    emotion_adv=new_emotion_adv
+                ).to(device=self.device)
+                
+                loaded_conds.t3 = new_t3
+                loaded_conds.to(self.device).save(cache_file)
+                
+            return loaded_conds.to(self.device)
+            
+        except Exception as e:
+            print(f"Failed to load/validate cache: {e}. Recomputing.")
+            return None
 
-            if audio_hash: # Only proceed if hashing was successful
-                cache_file = COND_CACHE_DIR / f"{audio_hash}.pt"
-                if cache_file.exists():
-                    print(f"Loading cached conditionals from {cache_file}")
-                    try:
-                        loaded_conds = Conditionals.load(cache_file, map_location=self.device)
-                        # Ensure the loaded conditionals are valid and update exaggeration if necessary
-                        if not hasattr(loaded_conds.t3, 'emotion_adv') or \
-                           not torch.is_tensor(loaded_conds.t3.emotion_adv) or \
-                           not np.isclose(loaded_conds.t3.emotion_adv.item(), exaggeration):
-
-                            print("Exaggeration changed or emotion_adv missing/invalid in cache, re-creating emotion_adv tensor.")
-                            new_emotion_adv = exaggeration * torch.ones(1, 1, 1, device=self.device, dtype=loaded_conds.t3.speaker_emb.dtype)
-
-                            # Reconstruct T3Cond safely
-                            self.conds = Conditionals(
-                                t3=T3Cond(
-                                    speaker_emb=loaded_conds.t3.speaker_emb,
-                                    clap_emb=getattr(loaded_conds.t3, 'clap_emb', None), # Handle missing attrs
-                                    cond_prompt_speech_tokens=getattr(loaded_conds.t3, 'cond_prompt_speech_tokens', None),
-                                    cond_prompt_speech_emb=getattr(loaded_conds.t3, 'cond_prompt_speech_emb', None),
-                                    emotion_adv=new_emotion_adv
-                                ).to(device=self.device),
-                                gen=loaded_conds.gen
-                            ).to(device=self.device)
-                            self.conds.save(cache_file) # Re-save cache
-                        else:
-                            self.conds = loaded_conds.to(device=self.device)
-                        return
-                    except Exception as e:
-                        print(f"Failed to load or validate cached conditionals: {e}. Recomputing.")
-
-        s3gen_ref_wav_np, _sr_s3gen = librosa.load(wav_fpath, sr=S3GEN_SR)
-        ref_16k_wav_np, _sr_16k = librosa.load(wav_fpath, sr=S3_SR)
-
-        # Ensure they are numpy arrays for functions expecting them
+    def _compute_new_conds(self, wav_fpath: str | Path, exaggeration: float) -> Conditionals:
+        # 1. Load Audio
+        s3gen_ref_wav_np, _ = librosa.load(wav_fpath, sr=S3GEN_SR)
+        ref_16k_wav_np, _ = librosa.load(wav_fpath, sr=S3_SR)
+        
+        # Ensure numpy
         if not isinstance(s3gen_ref_wav_np, np.ndarray): s3gen_ref_wav_np = np.array(s3gen_ref_wav_np)
         if not isinstance(ref_16k_wav_np, np.ndarray): ref_16k_wav_np = np.array(ref_16k_wav_np)
 
+        # 2. S3Gen Reference (Decoder)
         s3gen_ref_wav_trimmed = s3gen_ref_wav_np[:self.DEC_COND_LEN]
-        # s3gen.embed_ref expects a numpy array or tensor, and its length
-        s3gen_ref_dict = self.s3gen.embed_ref(torch.from_numpy(s3gen_ref_wav_trimmed).float(), S3GEN_SR, device=self.device)
+        s3gen_ref_dict = self.s3gen.embed_ref(
+            torch.from_numpy(s3gen_ref_wav_trimmed).float(), 
+            S3GEN_SR, 
+            device=self.device
+        )
 
-
+        # 3. T3 Conditionals (Encoder)
         t3_cond_prompt_tokens = None
-        if (plen := getattr(self.t3.hp, 'speech_cond_prompt_len', 0)) and plen > 0 :
-            s3_tokzr = self.s3gen.tokenizer
-            ref_16k_for_tokenizer = [ref_16k_wav_np[:self.ENC_COND_LEN]] # list of numpy arrays
+        if (plen := getattr(self.t3.hp, 'speech_cond_prompt_len', 0)) and plen > 0:
+            ref_16k_input = [ref_16k_wav_np[:self.ENC_COND_LEN]]
+            batch_tokens, _ = self.s3gen.tokenizer.forward(ref_16k_input, max_len=plen)
+            t3_cond_prompt_tokens = torch.atleast_2d(batch_tokens[0]).to(self.device)
 
-            # S3Tokenizer.forward expects a list of tensors or list of numpy arrays
-            # It returns a tuple: (tokens_tensor_batch, token_lengths_tensor_batch)
-            t3_cond_prompt_tokens_batch, _ = s3_tokzr.forward(ref_16k_for_tokenizer, max_len=plen)
-            t3_cond_prompt_tokens = torch.atleast_2d(t3_cond_prompt_tokens_batch[0]).to(self.device)
-
-        ve_embed_numpy = self.ve.embeds_from_wavs([ref_16k_wav_np], sample_rate=S3_SR) # Expects list of numpy
+        # Voice Encoder
+        ve_embed_numpy = self.ve.embeds_from_wavs([ref_16k_wav_np], sample_rate=S3_SR)
         ve_embed = torch.from_numpy(ve_embed_numpy).to(self.device)
-        if ve_embed.ndim > 1 and ve_embed.shape[0] > 1: ve_embed = ve_embed.mean(axis=0, keepdim=True)
-        elif ve_embed.ndim == 1: ve_embed = ve_embed.unsqueeze(0)
+        if ve_embed.ndim > 1 and ve_embed.shape[0] > 1: 
+            ve_embed = ve_embed.mean(axis=0, keepdim=True)
+        elif ve_embed.ndim == 1: 
+            ve_embed = ve_embed.unsqueeze(0)
 
-        # Determine dtype for emotion_adv from a model parameter to ensure consistency
         target_dtype = self.t3.text_emb.weight.dtype if hasattr(self.t3, 'text_emb') else torch.float32
 
         t3_cond_obj = T3Cond(
             speaker_emb=ve_embed.to(dtype=target_dtype),
-            cond_prompt_speech_tokens=t3_cond_prompt_tokens, # Can be None
-            # clap_emb and cond_prompt_speech_emb will be None by default in T3Cond if not provided
+            cond_prompt_speech_tokens=t3_cond_prompt_tokens,
             emotion_adv=exaggeration * torch.ones(1, 1, 1, device=self.device, dtype=target_dtype),
         ).to(device=self.device)
 
-        self.conds = Conditionals(t3_cond_obj, s3gen_ref_dict)
+        return Conditionals(t3_cond_obj, s3gen_ref_dict)
 
+    def prepare_conditionals(self, wav_fpath: str | Path, exaggeration: float = 0.5, use_cache: bool = True) -> None:
+        """
+        Prepare conditionals for T3 and S3Gen from a reference audio file.
+        Handles caching and embedding generation.
+        """
+        if not wav_fpath or not Path(wav_fpath).exists():
+            print(f"[TTS.prepare_conditionals/WARN] Invalid reference audio path: {wav_fpath}.")
+            if self.conds is None:
+                raise ValueError("Reference audio path is invalid and no default conditionals are loaded.")
+            return
+
+        cache_file = None
+        if use_cache:
+            try:
+                # Calculate Hash
+                stat = os.stat(wav_fpath)
+                unique_key = f"{wav_fpath}-{stat.st_mtime}-{stat.st_size}-{exaggeration}"
+                audio_hash = hashlib.md5(unique_key.encode()).hexdigest()
+                
+                cache_file = COND_CACHE_DIR / f"{audio_hash}.pt"
+                
+                # Try Load
+                if cached := self._try_load_cached_conds(cache_file, exaggeration):
+                    self.conds = cached
+                    return
+            except Exception as e:
+                print(f"[TTS/WARN] Caching setup failed: {e}. Proceeding without cache.")
+
+        # Compute New
+        self.conds = self._compute_new_conds(wav_fpath, exaggeration)
+
+        # Save Cache
         if use_cache and cache_file:
             try:
                 self.conds.save(cache_file)
                 print(f"Saved new conditionals to cache: {cache_file}")
             except Exception as e:
-                print(f"Failed to save conditionals to cache: {e}")
+                print(f"Failed to save to cache: {e}")
 
     def generate(
         self,
@@ -387,7 +386,15 @@ class ChatterboxTTS:
             # S3Gen inference
             # s3gen.inference returns (wav, flow_cache), we only need wav here.
             # flow_cache is None for CausalMaskedDiffWithXvec in s3gen.flow
-            s3gen_output = self.s3gen.inference(
+            
+            # PEFT Fix: accessing inference method on wrapped model
+            inference_model = self.s3gen
+            if isinstance(inference_model, PeftModel):
+                # Unwrap to access custom 'inference' method not exposed by PeftModel wrapper
+                # PeftModel -> BasePeftModel -> model (the underlying S3Gen/S3Token2Wav)
+                inference_model = inference_model.base_model.model
+            
+            s3gen_output = inference_model.inference(
                 speech_tokens=speech_tokens,
                 ref_dict=self.conds.gen,
             )
@@ -410,8 +417,7 @@ class ChatterboxTTS:
             adapter_path: Path to the adapter weights (local or HF Hub)
             adapter_name: Name to assign to this adapter for referencing
         """
-        # Lazy import to avoid global transformers monkey-patching issues
-        from peft import PeftModel
+
 
         if not hasattr(self.s3gen, 'active_adapters'):
             # If not already a PeftModel, wrap it
@@ -435,8 +441,7 @@ class ChatterboxTTS:
             adapter_names: Single adapter name or list of names to activate
             adapter_weights: Optional weights for mixing adapters (if list provided)
         """
-        # Lazy import to avoid global transformers monkey-patching issues
-        from peft import PeftModel
+
 
         if not hasattr(self.s3gen, 'set_adapter'):
             print("[TTS/WARN] No adapters loaded. Call load_adapter first.")
