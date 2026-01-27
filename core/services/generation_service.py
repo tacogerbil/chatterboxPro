@@ -1,5 +1,6 @@
 import logging
 import random
+import uuid
 import multiprocessing
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -388,7 +389,7 @@ class GenerationService(QObject):
             "PreviewSession", # session name
             0, # run idx
             "Previews", # output dir
-            "preview_uuid", # uuid
+            f"preview_{str(uuid.uuid4())[:8]}", # uuid - unique per preview for locking safety
             s.asr_threshold,
             s.speed,
             s.tts_engine,

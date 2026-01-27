@@ -55,8 +55,7 @@ class GenerationView(QWidget):
     def on_preview_ready(self, path: str) -> None:
         print(f"[UI Debug] Preview Ready signal received. Path: {path}", flush=True)
         if self.audio_service:
-            # Show popup first (so user sees success even if audio fails)
-            QMessageBox.information(self, "Preview Ready", f"Preview generated successfully!\nPlaying: {path}")
+            # Auto-play without popup
             self.audio_service.play_file(path)
         else:
              print("[UI Debug] Audio Service not connected!", flush=True)
