@@ -365,15 +365,24 @@ def worker_process_chunk(task_bundle):
                 cfg_weight=cfg_weight,
                 apply_watermark=not disable_watermark
             )
+            print(f"[Worker Debug] generate returned. Tensor type: {type(wav_tensor)}", flush=True)
+            
             if not (torch.is_tensor(wav_tensor) and wav_tensor.numel() > tts_engine.sr * 0.1):
                 logging.warning(f"Generation failed (empty audio) for chunk #{sentence_number}, attempt {attempt_num+1}.")
                 continue
             
+            print(f"[Worker Debug] Saving to {temp_path_str}...", flush=True)
 #            torchaudio.save(temp_path_str, wav_tensor.cpu(), tts_engine.sr, backend="soundfile")
             audio_data = wav_tensor.cpu().numpy()
             if len(audio_data.shape) > 1:
                 audio_data = audio_data.T
-            sf.write(temp_path_str, audio_data, tts_engine.sr)
+            
+            try:
+                sf.write(temp_path_str, audio_data, tts_engine.sr)
+                print(f"[Worker Debug] File saved.", flush=True)
+            except Exception as e_sf:
+                print(f"[Worker Debug] sf.write failed: {e_sf}", flush=True)
+                raise
 
             duration = wav_tensor.shape[-1] / tts_engine.sr
             
