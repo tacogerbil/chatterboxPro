@@ -409,6 +409,9 @@ class ChatterboxTTS:
             adapter_path: Path to the adapter weights (local or HF Hub)
             adapter_name: Name to assign to this adapter for referencing
         """
+        # Lazy import to avoid global transformers monkey-patching issues
+        from peft import PeftModel
+
         if not hasattr(self.s3gen, 'active_adapters'):
             # If not already a PeftModel, wrap it
             # Note: We wrap self.s3gen because that's where the linear layers are
@@ -431,6 +434,9 @@ class ChatterboxTTS:
             adapter_names: Single adapter name or list of names to activate
             adapter_weights: Optional weights for mixing adapters (if list provided)
         """
+        # Lazy import to avoid global transformers monkey-patching issues
+        from peft import PeftModel
+
         if not hasattr(self.s3gen, 'set_adapter'):
             print("[TTS/WARN] No adapters loaded. Call load_adapter first.")
             return
