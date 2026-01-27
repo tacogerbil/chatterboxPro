@@ -256,7 +256,9 @@ class GenerationService(QObject):
                 s.tts_engine,
                 s.pitch_shift,
                 s.timbre_shift,
-                s.gruffness
+                s.gruffness,
+                s.bass_boost,
+                s.treble_boost
             )
             tasks.append(task)
             
@@ -405,7 +407,9 @@ class GenerationService(QObject):
             s.tts_engine,
             s.pitch_shift,
             s.timbre_shift,
-            s.gruffness
+            s.gruffness,
+            s.bass_boost,
+            s.treble_boost
         )
         
         # We can reuse GenerationThread, or just spawn a simple thread 

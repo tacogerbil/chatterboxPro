@@ -240,7 +240,7 @@ def worker_process_chunk(task_bundle):
     (task_index, original_index, sentence_number, text_chunk, device_str, master_seed, ref_audio_path,
      exaggeration, temperature, cfg_weight, disable_watermark, num_candidates, max_attempts,
      bypass_asr, session_name, run_idx, output_dir_str, uuid, asr_threshold, speed, engine_name,
-     pitch_shift, timbre_shift, gruffness) = task_bundle
+     pitch_shift, timbre_shift, gruffness, bass_boost, treble_boost) = task_bundle
 
     pid = os.getpid()
     logging.info(f"[Worker-{pid}] Starting chunk (Idx: {original_index}, #: {sentence_number}, UUID: {uuid[:8]}) on device {device_str}")
@@ -450,7 +450,7 @@ def worker_process_chunk(task_bundle):
             
             # Apply speed adjustment if needed (FFmpeg post-processing)
             # Apply voice effects if needed (Pedalboard post-processing)
-            if any([speed != 1.0, pitch_shift != 0.0, timbre_shift != 0.0, gruffness > 0.0]):
+            if any([speed != 1.0, pitch_shift != 0.0, timbre_shift != 0.0, gruffness > 0.0, bass_boost != 0.0, treble_boost != 0.0]):
                 try:
                     # MCCC: Delegated to utils/pedalboard_processor.py
                     apply_pedalboard_effects(
@@ -458,7 +458,9 @@ def worker_process_chunk(task_bundle):
                         pitch_semitones=pitch_shift,
                         timbre_shift=timbre_shift,
                         gruffness=gruffness,
-                        speed=speed
+                        speed=speed,
+                        bass_boost=bass_boost,
+                        treble_boost=treble_boost
                     )
                 except Exception as e:
                     logging.warning(f"Voice effects failed for chunk #{sentence_number}: {e}")

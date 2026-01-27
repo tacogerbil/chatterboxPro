@@ -205,11 +205,31 @@ class GenerationView(QWidget):
             "Gruffness:", 0.0, 1.0, self.state.settings.gruffness, step=0.05,
             left_label="Clean", right_label="Gravelly"
         )
-        self.gruffness_slider.setToolTip("Add vocal texture/rasp (Batman style). Uses saturation + compression + resonance.")
         self.gruffness_slider.value_changed.connect(
             lambda v: setattr(self.state.settings, 'gruffness', v)
         )
         f_layout.addWidget(self.gruffness_slider)
+        
+        # New: Bass / Treble
+        self.bass_slider = QLabeledSlider(
+            "Bass Boost:", -12.0, 12.0, self.state.settings.bass_boost, step=0.5,
+            left_label="Cut", right_label="Boost"
+        )
+        self.bass_slider.setToolTip("EQ: Adjust low frequencies (100Hz Shelf).")
+        self.bass_slider.value_changed.connect(
+            lambda v: setattr(self.state.settings, 'bass_boost', v)
+        )
+        f_layout.addWidget(self.bass_slider)
+
+        self.treble_slider = QLabeledSlider(
+            "Treble Boost:", -12.0, 12.0, self.state.settings.treble_boost, step=0.5,
+            left_label="Cut", right_label="Boost"
+        )
+        self.treble_slider.setToolTip("EQ: Adjust high frequencies (8kHz Shelf).")
+        self.treble_slider.value_changed.connect(
+            lambda v: setattr(self.state.settings, 'treble_boost', v)
+        )
+        f_layout.addWidget(self.treble_slider)
         
         layout.addWidget(fx_group)
 
@@ -383,6 +403,8 @@ class GenerationView(QWidget):
         if hasattr(self, 'pitch_slider'): self.pitch_slider.set_value(s.pitch_shift)
         if hasattr(self, 'timbre_slider'): self.timbre_slider.set_value(s.timbre_shift)
         if hasattr(self, 'gruffness_slider'): self.gruffness_slider.set_value(s.gruffness)
+        if hasattr(self, 'bass_slider'): self.bass_slider.set_value(s.bass_boost)
+        if hasattr(self, 'treble_slider'): self.treble_slider.set_value(s.treble_boost)
         
         self.gpu_edit.setText(s.target_gpus)
         self.seed_spin.setValue(s.master_seed)

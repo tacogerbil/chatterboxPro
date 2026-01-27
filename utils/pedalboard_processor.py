@@ -14,7 +14,7 @@ from pathlib import Path
 print(f"[DEBUG] Attempting to import pedalboard...", flush=True)
 try:
     from pedalboard import (
-        Pedalboard, HighpassFilter, LowpassFilter, PeakFilter,
+        Pedalboard, HighpassFilter, LowpassFilter, PeakFilter, LowShelfFilter, HighShelfFilter,
         Compressor, Distortion, PitchShift, Reverb, Gain, Limiter
     )
     from pedalboard.io import AudioFile
@@ -143,20 +143,33 @@ def _build_grit_chain(
 def _build_master_chain(
     sample_rate: int,
     reverb_room: float, 
-    reverb_wet: float
+    reverb_wet: float,
+    bass_boost: float = 0.0,
+    treble_boost: float = 0.0
 ) -> Pedalboard:
     board_effects = []
     
-    # 1. Glue Compression
+    # 1. EQ Stage (Shelves) - Pre-Compression
+    if bass_boost != 0:
+        # Low Shelf at 100Hz (Standard Bass)
+        board_effects.append(LowShelfFilter(cutoff_frequency_hz=100.0, gain_db=bass_boost, q=0.5))
+        
+    if treble_boost != 0:
+        # High Shelf at 8kHz (Air/Detail)
+        # Verify Nyquist safety for 8kHz (Safe for 24kHz+)
+        safe_treble_hz = get_safe_nyquist_clamp(8000.0, sample_rate)
+        board_effects.append(HighShelfFilter(cutoff_frequency_hz=safe_treble_hz, gain_db=treble_boost, q=0.5))
+    
+    # 2. Glue Compression
     board_effects.append(Compressor(threshold_db=-10.0, ratio=2.0, attack_ms=15.0, release_ms=100.0))
 
-    # 2. Reverb (Subtle)
+    # 3. Reverb (Subtle)
     if reverb_wet > 0:
         r_size = max(0.0, min(reverb_room, 1.0))
         r_wet = max(0.0, min(reverb_wet, 1.0))
         board_effects.append(Reverb(room_size=r_size, wet_level=r_wet))
         
-    # 3. Final Limiter (Safety against clipping from adding signal paths)
+    # 4. Final Limiter (Safety against clipping from EQ boosts)
     board_effects.append(Limiter(threshold_db=-1.0))
     
     return Pedalboard(board_effects)
@@ -168,7 +181,9 @@ def apply_pedalboard_effects(
     pitch_semitones: float = 0.0,
     timbre_shift: float = 0.0,
     gruffness: float = 0.0,
-    speed: float = 1.0
+    speed: float = 1.0,
+    bass_boost: float = 0.0,
+    treble_boost: float = 0.0
 ) -> bool:
     """
     Applies Parallel DSP Effects to an audio file.
@@ -236,7 +251,7 @@ def apply_pedalboard_effects(
         if gruffness > 0.2:
              r_wet = 0.04 # Dried out for clarity
              
-        master_board = _build_master_chain(sr, reverb_room=0.15, reverb_wet=r_wet)
+        master_board = _build_master_chain(sr, reverb_room=0.15, reverb_wet=r_wet, bass_boost=bass_boost, treble_boost=treble_boost)
         final_audio = master_board(audio_mixed, sr)
 
         # --- PARALLEL PROCESSING END ---

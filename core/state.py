@@ -43,6 +43,8 @@ class GenerationSettings:
     pitch_shift: float = 0.0
     timbre_shift: float = 0.0
     gruffness: float = 0.0
+    bass_boost: float = 0.0
+    treble_boost: float = 0.0
 
 @dataclass
 class AppState:
