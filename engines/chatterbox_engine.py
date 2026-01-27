@@ -53,19 +53,19 @@ class ChatterboxEngine(BaseTTSEngine):
         # Prepare conditionals (this caches embeddings)
         self.model.prepare_conditionals(
             ref_audio_path, 
-            exaggeration=exaggeration,
-            use_cache=True
+            exaggeration=exaggeration
         )
         
         # Generate audio
+        # Upstream ChatterboxTTS.generate signature:
+        # text, repetition_penalty, min_p, top_p, audio_prompt_path, exaggeration, cfg_weight, temperature
         wav_tensor = self.model.generate(
             text,
-            audio_prompt_path=None,  # Already prepared
+            audio_prompt_path=None,  # Already prepared via prepare_conditionals
             exaggeration=exaggeration,
             cfg_weight=cfg_weight,
-            temperature=temperature,
-            apply_watermark=apply_watermark,
-            use_cond_cache=True
+            temperature=temperature
+            # apply_watermark and use_cond_cache are NOT supported in official upstream
         )
         
         return wav_tensor
@@ -73,7 +73,7 @@ class ChatterboxEngine(BaseTTSEngine):
     def prepare_reference(self, audio_path: str, exaggeration: float = 0.5, **kwargs) -> None:
         """Prepare reference audio embeddings."""
         self._ensure_model_loaded()
-        self.model.prepare_conditionals(audio_path, exaggeration=exaggeration, use_cache=True)
+        self.model.prepare_conditionals(audio_path, exaggeration=exaggeration)
     
     def get_supported_params(self) -> Dict[str, Dict[str, Any]]:
         """Return Chatterbox-specific parameters."""
