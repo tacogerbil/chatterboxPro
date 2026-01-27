@@ -19,7 +19,70 @@ from .inference.t3_hf_backend import T3HuggingfaceBackend
 from .inference.alignment_stream_analyzer import AlignmentStreamAnalyzer
 
 
+
 logger = logging.getLogger(__name__)
+
+
+def safe_multinomial(probs: torch.Tensor, num_samples: int = 1, *, eps: float = 1e-12) -> torch.LongTensor:
+    """
+    Sample indices from batched probability distributions using cumsum+searchsorted.
+    probs: Tensor shape (B, V) or (V,) containing non-negative scores or probabilities.
+    Returns: LongTensor shape (B, num_samples) or (num_samples,) if input was 1-D.
+    """
+    # Normalize/guard
+    original_ndim = probs.ndim
+    if original_ndim == 1:
+        probs = probs.unsqueeze(0)  # (1, V)
+
+    # Ensure float32 math for numeric stability (avoid float16 accumulation)
+    device = probs.device
+    probs_f = probs.detach().to(dtype=torch.float32, device=device).clamp(min=0.0)
+
+    # If the incoming tensor is logits (not normalized), normalize to sum=1 per row
+    row_sum = probs_f.sum(dim=-1, keepdim=True)
+    zero_sum_mask = (row_sum <= eps).squeeze(-1)
+    if zero_sum_mask.any():
+        # If any row sums to zero, replace with uniform distribution for that row
+        probs_f[zero_sum_mask, :] = 1.0 / probs_f.size(-1)
+        row_sum = probs_f.sum(dim=-1, keepdim=True)
+
+    probs_f = probs_f / row_sum
+
+    # cumulative sums along last dim
+    cum = torch.cumsum(probs_f, dim=-1)  # (B, V)
+
+    B, V = cum.shape
+    # generate uniform samples in [0,1)
+    # shape (B, num_samples)
+    u = torch.rand((B, num_samples), device=device, dtype=torch.float32)
+
+    # torch.searchsorted expects the sorted sequence, we can use batched searchsorted in modern PyTorch
+    # For older PyTorch, fallback to CPU numpy searchsorted per-batch (slower).
+    try:
+        # torch.searchsorted supports broadcasting: searchsorted(cum, u[..., None]) -> (...)
+        # We want indices of where u would be inserted along dim=-1 of cum
+        # But torch.searchsorted expects the searched values to have an extra trailing dim
+        # So we flatten appropriately:
+        # cum: (B, V)
+        # u: (B, num_samples) -> reshape to (B, num_samples, 1) for searchsorted
+        idx = torch.searchsorted(cum, u.unsqueeze(-1), right=False).squeeze(-1)  # (B, num_samples)
+    except Exception:
+        # Fallback: run per batch on CPU with numpy
+        idx_list = []
+        cum_cpu = cum.cpu().numpy()
+        u_cpu = u.cpu().numpy()
+        import numpy as _np
+        for i in range(B):
+            inds = _np.searchsorted(cum_cpu[i], u_cpu[i], side='left')
+            idx_list.append(torch.from_numpy(inds).to(dtype=torch.long))
+        idx = torch.stack(idx_list, dim=0).to(device)
+
+    # If input was 1-D, return 1-D indices when num_samples==1
+    if original_ndim == 1:
+        if num_samples == 1:
+            return idx[0, 0].unsqueeze(0)  # return shape (1,) for compatibility with multinomial single-sample
+        return idx[0]
+    return idx  # (B, num_samples)
 
 
 class AttrDict(dict):
