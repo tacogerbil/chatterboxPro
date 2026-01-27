@@ -86,7 +86,9 @@ def build_pedalboard_chain(
     if gruffness > 0:
         # Throat resonance gain
         gain = min(gruffness * 4.0, 12.0) # Clamp gain max 12dB
-        board_effects.append(PeakFilter(cutoff_frequency_hz=220.0, gain_db=gain, q=0.9))
+        # Fix: 220Hz rings like an echo. Move to 800Hz for "fry" presence or 
+        # keep low but lower Q. Let's try boosting "chest" at 150Hz broadly.
+        board_effects.append(PeakFilter(cutoff_frequency_hz=150.0, gain_db=gain, q=0.6))
         
     if timbre_shift != 0:
         if timbre_shift < 0: # Warmer (Darker)
@@ -107,15 +109,16 @@ def build_pedalboard_chain(
 
     # 4. Compression
     if gruffness > 0:
-        # Aggressive for gravel
-        board_effects.append(Compressor(threshold_db=-24.0, ratio=4.5, attack_ms=3.0, release_ms=120.0))
+        # Aggressive but tighter release to prevent "pumping" the reverb tail
+        board_effects.append(Compressor(threshold_db=-24.0, ratio=5.0, attack_ms=2.0, release_ms=40.0))
     else:
         # Standard polish
         board_effects.append(Compressor(threshold_db=-18.0, ratio=2.5, attack_ms=5.0, release_ms=150.0))
     
     # 5. Distortion
     if gruffness > 0:
-        drive = min(gruffness * 5.0, 24.0) # Cap drive to safeguard ears
+        # Boost drive significantly for grit
+        drive = min(gruffness * 35.0, 48.0) # Up to 35dB drive (max clamped at 48 just in case)
         board_effects.append(Distortion(drive_db=drive))
         
     # 6. Global Polish
@@ -126,10 +129,18 @@ def build_pedalboard_chain(
     board_effects.append(LowpassFilter(cutoff_frequency_hz=polish_cutoff))
     
     # 7. Reverb
-    if reverb_wet_level > 0:
+    # FIX: "Subtle Echo" complaint. High gruffness/compression brings up reverb tail.
+    # If gruffness is high, DUCK the reverb.
+    final_reverb_wet = reverb_wet_level
+    if gruffness > 0.2:
+        # Scale down reverb as gruffness increases (at 1.0 gruffness, reverb -> 0.15 * original)
+        duck_factor = 1.0 - (gruffness * 0.85) 
+        final_reverb_wet = reverb_wet_level * duck_factor
+        
+    if final_reverb_wet > 0.001:
         # Clamp Reverb params to 0.0-1.0
         r_size = max(0.0, min(reverb_room_size, 1.0))
-        r_wet = max(0.0, min(reverb_wet_level, 1.0))
+        r_wet = max(0.0, min(final_reverb_wet, 1.0))
         board_effects.append(Reverb(room_size=r_size, wet_level=r_wet))
 
     return Pedalboard(board_effects)
