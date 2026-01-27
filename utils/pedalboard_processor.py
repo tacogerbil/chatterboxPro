@@ -130,21 +130,21 @@ def apply_pedalboard_effects(
         if gruffness > 0:
             # "PeakFilter(220, gain_db=4.0, q=0.9)" - User recipe for throat resonance
             gain = gruffness * 4.0 # Up to +4dB
-            board_effects.append(PeakFilter(center_frequency_hz=220.0, gain_db=gain, q=0.9))
+            board_effects.append(PeakFilter(cutoff_frequency_hz=220.0, gain_db=gain, q=0.9))
             
         # User Timbre Slider (Global EQ color)
         if timbre_shift != 0:
             # Apply tilt-like EQ
             if timbre_shift < 0: # Warmer
                 # Boost body (warmth)
-                board_effects.append(PeakFilter(center_frequency_hz=350.0, gain_db=abs(timbre_shift)*2.0, q=1.0))
+                board_effects.append(PeakFilter(cutoff_frequency_hz=350.0, gain_db=abs(timbre_shift)*2.0, q=1.0))
                 # Cut harshness
-                board_effects.append(PeakFilter(center_frequency_hz=3000.0, gain_db=timbre_shift*1.0, q=1.0)) # shift is neg, so this cuts
+                board_effects.append(PeakFilter(cutoff_frequency_hz=3000.0, gain_db=timbre_shift*1.0, q=1.0)) # shift is neg, so this cuts
             else: # Brighter
                 # Cut mud
-                board_effects.append(PeakFilter(center_frequency_hz=300.0, gain_db=-abs(timbre_shift)*1.5, q=1.0))
+                board_effects.append(PeakFilter(cutoff_frequency_hz=300.0, gain_db=-abs(timbre_shift)*1.5, q=1.0))
                 # Boost air/presence
-                board_effects.append(PeakFilter(center_frequency_hz=4000.0, gain_db=abs(timbre_shift)*2.0, q=0.8))
+                board_effects.append(PeakFilter(cutoff_frequency_hz=4000.0, gain_db=abs(timbre_shift)*2.0, q=0.8))
 
         # 4. Compression
         # "Batman" element: "Compressor(threshold_db=-24, ratio=4.5)"
