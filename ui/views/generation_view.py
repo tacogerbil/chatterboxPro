@@ -349,9 +349,17 @@ class GenerationView(QWidget):
     def load_voice_by_name(self, name: str) -> None:
          data = self.template_service.load_template(name)
          if data:
+             # 1. Load Settings
              for key, value in data.items():
                  if hasattr(self.state.settings, key):
                      setattr(self.state.settings, key, value)
+             
+             # 2. Load Ref Audio (if present)
+             if 'ref_audio_path' in data and data['ref_audio_path']:
+                 path = data['ref_audio_path']
+                 self.state.ref_audio_path = path
+                 self.ref_audio_edit.setText(path)
+                 
              self.refresh_values()
              QMessageBox.information(self, "Loaded", f"Voice '{name}' loaded.")
          else:
@@ -372,6 +380,10 @@ class GenerationView(QWidget):
 
         import dataclasses
         data = dataclasses.asdict(self.state.settings)
+        
+        # Inject global state items that belong to a "Voice Profile"
+        data['ref_audio_path'] = self.state.ref_audio_path
+        
         if self.template_service.save_template(name, data):
              QMessageBox.information(self, "Saved", f"Voice '{name}' saved.")
              self.populate_voices() 
