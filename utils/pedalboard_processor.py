@@ -47,6 +47,63 @@ def _apply_speed_ffmpeg(input_path: str, output_path: str, speed: float) -> bool
 
 
 
+def build_pedalboard_chain(
+    pitch_semitones: float = 0.0,
+    timbre_shift: float = 0.0,
+    gruffness: float = 0.0,
+    reverb_room_size: float = 0.1,
+    reverb_wet_level: float = 0.08
+) -> Pedalboard:
+    """
+    Constructs the Pedalboard effect chain.
+    Pure Function (MCCC: Logic Isolation).
+    """
+    board_effects = []
+    
+    # 1. Cleanup (Always active)
+    board_effects.append(HighpassFilter(cutoff_frequency_hz=60.0))
+    
+    # 2. Pitch Shift
+    if pitch_semitones != 0:
+        board_effects.append(PitchShift(semitones=pitch_semitones))
+        
+    # 3. Timbre / Formant Illusion
+    if gruffness > 0:
+        # Throat resonance gain
+        gain = gruffness * 4.0 
+        board_effects.append(PeakFilter(cutoff_frequency_hz=220.0, gain_db=gain, q=0.9))
+        
+    if timbre_shift != 0:
+        if timbre_shift < 0: # Warmer
+            board_effects.append(PeakFilter(cutoff_frequency_hz=350.0, gain_db=abs(timbre_shift)*2.0, q=1.0))
+            board_effects.append(PeakFilter(cutoff_frequency_hz=3000.0, gain_db=timbre_shift*1.0, q=1.0))
+        else: # Brighter
+            board_effects.append(PeakFilter(cutoff_frequency_hz=300.0, gain_db=-abs(timbre_shift)*1.5, q=1.0))
+            board_effects.append(PeakFilter(cutoff_frequency_hz=4000.0, gain_db=abs(timbre_shift)*2.0, q=0.8))
+
+    # 4. Compression
+    if gruffness > 0:
+        # Aggressive for gravel
+        board_effects.append(Compressor(threshold_db=-24.0, ratio=4.5, attack_ms=3.0, release_ms=120.0))
+    else:
+        # Standard polish
+        board_effects.append(Compressor(threshold_db=-18.0, ratio=2.5, attack_ms=5.0, release_ms=150.0))
+
+    # 5. Distortion
+    if gruffness > 0:
+        drive = gruffness * 5.0 
+        board_effects.append(Distortion(drive_db=drive))
+        
+    # 6. Global Polish
+    board_effects.append(LowpassFilter(cutoff_frequency_hz=14000.0))
+    
+    # 7. Reverb
+    if reverb_wet_level > 0:
+        board_effects.append(Reverb(room_size=reverb_room_size, wet_level=reverb_wet_level))
+
+    return Pedalboard(board_effects)
+
+
 def apply_pedalboard_effects(
     input_path: str,
     output_path: str,
@@ -56,45 +113,29 @@ def apply_pedalboard_effects(
     speed: float = 1.0
 ) -> bool:
     """
-    Apply "Narrator Polish" and "Batman Gravel" effects using Pedalboard.
-    Handles Speed via FFmpeg (pre-process) if needed.
-    
-    Chain Logic:
-    1. Speed (FFmpeg - if != 1.0)
-    2. Pedalboard Chain:
-       - HPF -> PitchShift -> EQ (Timbre/Resonance) -> Compressor -> Distortion -> Reverb
-    
-    Args:
-        input_path: Input WAV path.
-        output_path: Output WAV path.
-        pitch_semitones: -12 to +12.
-        timbre_shift: -3 to +3.
-        gruffness: 0.0 to 1.0.
-        speed: 0.5 to 2.0 (handled via ffmpeg atempo).
-        
-    Returns:
-        True if successful, False otherwise.
+    Applies effects to an audio file.
+    Wrapper for I/O + Speed + Chain Execution.
     """
+    # ... I/O Logic ... (unchanged parts handled below)
+    
+    # ... (Start of I/O Block) ...
     if not _PEDALBOARD_AVAILABLE:
-        # Fallback copy if pedalboard is missing
         if input_path != output_path:
             import shutil
             shutil.copy2(input_path, output_path)
         return False
         
-    # Optimization: If no effects active, just copy
+    # Optimization check
     if pitch_semitones == 0 and timbre_shift == 0 and gruffness == 0 and speed == 1.0:
         import shutil
         shutil.copy2(input_path, output_path)
         return True
 
-    # Temporary path for speed processing intermediate
-    # MCCC: Ensure temp files are cleaned up
     temp_speed_path = None
     processing_input = input_path
     
     try:
-        # 1. Apply Speed (if needed)
+        # 1. Apply Speed (FFmpeg)
         if speed != 1.0:
             temp_speed_path = str(input_path).replace('.wav', '_speed.wav')
             if _apply_speed_ffmpeg(input_path, temp_speed_path, speed):
@@ -102,77 +143,18 @@ def apply_pedalboard_effects(
             else:
                 logging.warning("Speed change failed, proceeding with original audio.")
 
-        # 2. Read Audio (from original or speed-altered temp)
+        # 2. Read Audio
         with AudioFile(processing_input) as f:
             audio = f.read(f.frames)
             sr = f.samplerate
 
-        board_effects = []
-        
-        # --- Chain Construction ---
-        
-        # 1. Cleanup
-        # Always good to cut rumble below 60Hz for clean speech
-        board_effects.append(HighpassFilter(cutoff_frequency_hz=60.0))
-        
-        # 2. Pitch Shift
-        # "Batman" element: Lower pitch slightly (-1.0 to -2.0)
-        if pitch_semitones != 0:
-            board_effects.append(PitchShift(semitones=pitch_semitones))
-            
-        # 3. Timbre / Formant Illusion / Throat Resonance
-        # "Batman" element: Boost 150-400Hz for "throat rumble"
-        # Timbre Shift (-3 to +3):
-        # - Negative (Warmth): Boost low-mids (200-500Hz), Cut highs
-        # - Positive (Bright): Cut low-mids, Boost highs (3-8kHz)
-        
-        # Base throat resonance (activated by Gruffness)
-        if gruffness > 0:
-            # "PeakFilter(220, gain_db=4.0, q=0.9)" - User recipe for throat resonance
-            gain = gruffness * 4.0 # Up to +4dB
-            board_effects.append(PeakFilter(cutoff_frequency_hz=220.0, gain_db=gain, q=0.9))
-            
-        # User Timbre Slider (Global EQ color)
-        if timbre_shift != 0:
-            # Apply tilt-like EQ
-            if timbre_shift < 0: # Warmer
-                # Boost body (warmth)
-                board_effects.append(PeakFilter(cutoff_frequency_hz=350.0, gain_db=abs(timbre_shift)*2.0, q=1.0))
-                # Cut harshness
-                board_effects.append(PeakFilter(cutoff_frequency_hz=3000.0, gain_db=timbre_shift*1.0, q=1.0)) # shift is neg, so this cuts
-            else: # Brighter
-                # Cut mud
-                board_effects.append(PeakFilter(cutoff_frequency_hz=300.0, gain_db=-abs(timbre_shift)*1.5, q=1.0))
-                # Boost air/presence
-                board_effects.append(PeakFilter(cutoff_frequency_hz=4000.0, gain_db=abs(timbre_shift)*2.0, q=0.8))
-
-        # 4. Compression
-        # "Batman" element: "Compressor(threshold_db=-24, ratio=4.5)"
-        # Bring forward the vocal fry
-        if gruffness > 0:
-            # Stronger compression for gravel
-            board_effects.append(Compressor(threshold_db=-24.0, ratio=4.5, attack_ms=3.0, release_ms=120.0))
-        else:
-            # Standard narrator polish compression
-            board_effects.append(Compressor(threshold_db=-18.0, ratio=2.5, attack_ms=5.0, release_ms=150.0))
-
-        # 5. Saturation / Distortion
-        # "Batman" element: "Distortion(drive_db=2.5)" - subtle saturation
-        if gruffness > 0:
-            # Scale 0.0-1.0 to 0.0-5.0 dB drive
-            drive = gruffness * 5.0 
-            board_effects.append(Distortion(drive_db=drive))
-            
-        # 6. Global Polish
-        # Standard de-harshing Lowpass
-        board_effects.append(LowpassFilter(cutoff_frequency_hz=14000.0))
-        
-        # 7. Reverb (Light Room)
-        # Keeps it natural, avoids "dry booth" feeling
-        board_effects.append(Reverb(room_size=0.1, wet_level=0.08))
-
-        # --- Processing ---
-        board = Pedalboard(board_effects)
+        # 3. Build & Run Chain
+        # Calls the Pure Function
+        board = build_pedalboard_chain(
+            pitch_semitones=pitch_semitones,
+            timbre_shift=timbre_shift,
+            gruffness=gruffness
+        )
         processed = board(audio, sr)
 
         # 8. Write Output
