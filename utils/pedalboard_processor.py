@@ -147,6 +147,12 @@ def apply_pedalboard_effects(
         with AudioFile(processing_input) as f:
             audio = f.read(f.frames)
             sr = f.samplerate
+            
+        # DIAGNOSTIC: Check Input Signal
+        input_peak = np.max(np.abs(audio))
+        print(f"[PEDALBOARD DEBUG] Input Audio Peak: {input_peak:.4f}", flush=True)
+        if input_peak == 0:
+            logging.warning("Pedalboard received SILENT input audio.")
 
         # 3. Build & Run Chain
         # Calls the Pure Function
@@ -164,6 +170,8 @@ def apply_pedalboard_effects(
         
         # Ensure output is clipped/limited
         peak = np.max(np.abs(processed))
+        print(f"[PEDALBOARD DEBUG] Processed Output Peak: {peak:.4f}", flush=True)
+
         if peak > 1.0:
             processed = processed / peak * 0.99 
 
