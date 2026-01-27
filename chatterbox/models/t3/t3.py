@@ -414,7 +414,7 @@ class T3(nn.Module):
                 torch.cuda.synchronize()
 
             # Robust safe sampling replacement for correct PEFT/CUDA interop
-            next_token = safe_multinomial(probs, num_samples=1).squeeze(-1)
+            next_token = safe_multinomial(probs, num_samples=1)
 
             predicted.append(next_token)
             generated_ids = torch.cat([generated_ids, next_token], dim=1)
