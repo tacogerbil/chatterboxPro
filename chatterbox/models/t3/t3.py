@@ -312,7 +312,9 @@ class T3(nn.Module):
         print(f"[T3 Debug] Initial past type: {type(past)}")
 
         # ---- Generation Loop using kv_cache ----
-        for i in tqdm(range(max_new_tokens), desc="Sampling", dynamic_ncols=True):
+        # Removed tqdm to avoid potential TTY lockups
+        range_iter = range(max_new_tokens)
+        for i in range_iter:
             # Log every step to catch the exact freeze point
             if self.device.type == "cuda":
                 torch.cuda.synchronize()
@@ -343,12 +345,17 @@ class T3(nn.Module):
             
             print(f"[T3 Debug] Sampling step {i}")
             
-            # Ensure probability tensor is contiguous and synchronized to prevent kernel hangs
+            # Ensure probability tensor is contiguous and synchronized
             probs = probs.contiguous()
             if self.device.type == "cuda":
                 torch.cuda.synchronize()
 
-            next_token = torch.multinomial(probs, num_samples=1)  # shape: (B, 1)
+            # Custom sampling to avoid torch.multinomial freeze on Windows/CUDA
+            # Using cumsum + searchsorted is deterministic and stable
+            cdf = probs.cumsum(dim=-1)
+            rand_vals = torch.rand((probs.shape[0], 1), device=self.device)
+            # searchsorted returns the index where rand_vals would be inserted to maintain order
+            next_token = torch.searchsorted(cdf, rand_vals).clamp(max=probs.size(-1) - 1)
 
             predicted.append(next_token)
             generated_ids = torch.cat([generated_ids, next_token], dim=1)
