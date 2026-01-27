@@ -411,16 +411,20 @@ class T3(nn.Module):
             # Ensure probability tensor is contiguous and synchronized
             probs = probs.contiguous()
             if self.device.type == "cuda":
+                print(f"[T3 Debug] Pre-Sync step {i}")
                 torch.cuda.synchronize()
+                print(f"[T3 Debug] Post-Sync step {i}")
 
             # Robust safe sampling replacement for correct PEFT/CUDA interop
             next_token = safe_multinomial(probs, num_samples=1)
-
+            print(f"[T3 Debug] Raw safe_multinomial output shape: {next_token.shape}")
+            
             predicted.append(next_token)
             generated_ids = torch.cat([generated_ids, next_token], dim=1)
 
             # Check for EOS token.
             if next_token.view(-1) == self.hp.stop_speech_token:
+                print(f"[T3 Debug] Step {i}: EOS token detected ({self.hp.stop_speech_token}). Breaking.")
                 break
 
             # Get embedding for the new token.
@@ -457,5 +461,6 @@ class T3(nn.Module):
             print(f"[T3 Debug] Step {i} complete. Past type: {type(past)}, Len: {pass_len}")
 
         # Concatenate all predicted tokens along the sequence dimension.
+        print("[T3 Debug] Loop finished. Concatenating tokens.")
         predicted_tokens = torch.cat(predicted, dim=1)  # shape: (B, num_tokens)
         return predicted_tokens

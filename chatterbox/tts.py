@@ -362,13 +362,10 @@ class ChatterboxTTS:
         text_tokens_cfg_batch = F.pad(text_tokens_cfg_batch, (0, 1), value=eot)
 
         with torch.inference_mode():
-            speech_tokens_result_batch = self.t3.inference(
-                t3_cond=self.conds.t3, # T3.inference will expand this to batch size 2 if needed
-                text_tokens=text_tokens_cfg_batch,
-                max_new_tokens=1000,
                 temperature=temperature,
                 cfg_weight=cfg_weight,
             )
+            print("[TTS Debug] T3 Inference returned. Validating tokens...")
 
             # Result from t3.inference (with CFG > 0) is the conditional part, already selected.
             # It should be [1, S_speech]
