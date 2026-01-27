@@ -48,6 +48,7 @@ def _apply_speed_ffmpeg(input_path: str, output_path: str, speed: float) -> bool
 
 
 def build_pedalboard_chain(
+    sample_rate: int = 44100,
     pitch_semitones: float = 0.0,
     timbre_shift: float = 0.0,
     gruffness: float = 0.0,
@@ -59,6 +60,9 @@ def build_pedalboard_chain(
     Pure Function (MCCC: Logic Isolation).
     """
     board_effects = []
+    
+    # 0. Safety: Nyquist Limit
+    nyquist = sample_rate / 2.0
     
     # 1. Cleanup (Always active)
     board_effects.append(HighpassFilter(cutoff_frequency_hz=60.0))
@@ -79,7 +83,7 @@ def build_pedalboard_chain(
             board_effects.append(PeakFilter(cutoff_frequency_hz=3000.0, gain_db=timbre_shift*1.0, q=1.0))
         else: # Brighter
             board_effects.append(PeakFilter(cutoff_frequency_hz=300.0, gain_db=-abs(timbre_shift)*1.5, q=1.0))
-            board_effects.append(PeakFilter(cutoff_frequency_hz=4000.0, gain_db=abs(timbre_shift)*2.0, q=0.8))
+            board_effects.append(PeakFilter(cutoff_frequency_hz=min(4000.0, nyquist*0.9), gain_db=abs(timbre_shift)*2.0, q=0.8))
 
     # 4. Compression
     if gruffness > 0:
@@ -88,14 +92,16 @@ def build_pedalboard_chain(
     else:
         # Standard polish
         board_effects.append(Compressor(threshold_db=-18.0, ratio=2.5, attack_ms=5.0, release_ms=150.0))
-
+    
     # 5. Distortion
     if gruffness > 0:
         drive = gruffness * 5.0 
         board_effects.append(Distortion(drive_db=drive))
         
     # 6. Global Polish
-    board_effects.append(LowpassFilter(cutoff_frequency_hz=14000.0))
+    # SAFETY: Clamp Lowpass to be strictly below Nyquist (0.45 * SR is typically safe/audible limit)
+    safe_cutoff = min(14000.0, nyquist * 0.9) 
+    board_effects.append(LowpassFilter(cutoff_frequency_hz=safe_cutoff))
     
     # 7. Reverb
     if reverb_wet_level > 0:
@@ -116,56 +122,15 @@ def apply_pedalboard_effects(
     Applies effects to an audio file.
     Wrapper for I/O + Speed + Chain Execution.
     """
-    # ... I/O Logic ... (unchanged parts handled below)
+    # ... (Speed logic handled by caller or pre-check) ...
+    # This block is just to fix the signature of build_pedalboard_chain call in line 158
     
-    # ... (Start of I/O Block) ...
-    if not _PEDALBOARD_AVAILABLE:
-        if input_path != output_path:
-            import shutil
-            shutil.copy2(input_path, output_path)
-        return False
-        
-    # Optimization check
-    if pitch_semitones == 0 and timbre_shift == 0 and gruffness == 0 and speed == 1.0:
-        import shutil
-        shutil.copy2(input_path, output_path)
-        return True
+    # ... I/O Logic starts (omitted for brevity in replacement, targeting only changed block) ...
+    pass # Implementation detail, replace relevant block below
 
-    temp_speed_path = None
-    processing_input = input_path
     
-    try:
-        # 1. Apply Speed (FFmpeg)
-        if speed != 1.0:
-            temp_speed_path = str(input_path).replace('.wav', '_speed.wav')
-            if _apply_speed_ffmpeg(input_path, temp_speed_path, speed):
-                processing_input = temp_speed_path
-            else:
-                logging.warning("Speed change failed, proceeding with original audio.")
+# REPLACEMENT AT TARGET
 
-        # 2. Read Audio
-        with AudioFile(processing_input) as f:
-            audio = f.read(f.frames)
-            sr = f.samplerate
-            
-        # DIAGNOSTIC: Check Input Signal
-        input_peak = np.max(np.abs(audio))
-        print(f"[PEDALBOARD DEBUG] Input Audio Peak: {input_peak:.4f}", flush=True)
-        if input_peak == 0:
-            logging.warning("Pedalboard received SILENT input audio.")
-
-        # 3. Build Chain
-        board = build_pedalboard_chain(
-            pitch_semitones=pitch_semitones,
-            timbre_shift=timbre_shift,
-            gruffness=gruffness
-        )
-        
-        # DIAGNOSTIC: Step-by-Step Processing to find NaN source
-        current_audio = audio
-        print(f"[PEDALBOARD DEBUG] Starting Chain with SR={sr}, Shape={current_audio.shape}", flush=True)
-        
-        for i, effect in enumerate(board):
             effect_name = str(type(effect).__name__)
             try:
                 # Create a mini-board for just this effect step
