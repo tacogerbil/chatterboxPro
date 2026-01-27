@@ -31,8 +31,28 @@ class ConfigService:
             # 1. Restore Generation Settings
             if 'settings' in data:
                 settings_data = data['settings']
+                # MCCC: Robust Typed Loading
+                # Inspect dataclass fields to convert JSON types (e.g. str -> float) if necessary
+                from dataclasses import fields
+                type_map = {f.name: f.type for f in fields(app_state.settings)}
+                
                 for key, value in settings_data.items():
                     if hasattr(app_state.settings, key):
+                        # Attempt to cast if type is known
+                        target_type = type_map.get(key)
+                        
+                        try:
+                            # Handle simple primitives
+                            if target_type == float and isinstance(value, (str, int)):
+                                value = float(value)
+                            elif target_type == int and isinstance(value, (str, float)):
+                                value = int(value)
+                            elif target_type == bool and isinstance(value, str):
+                                value = value.lower() == "true"
+                        except (ValueError, TypeError):
+                            # Fallback: keep original value but log warning
+                            logging.warning(f"Config type mismatch for {key}: expected {target_type}, got {type(value)}")
+                            
                         setattr(app_state.settings, key, value)
             
             # 2. Restore Global State (Paths, etc.)
