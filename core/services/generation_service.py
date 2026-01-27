@@ -386,9 +386,9 @@ class GenerationService(QObject):
             1, # candidates
             1, # max attempts
             True, # skip ASR validation for preview speed
-            "PreviewSession", # session name
+            "_preview", # session name
             0, # run idx
-            "Previews", # output dir
+            "Outputs_Pro", # output dir (Root folder)
             f"preview_{str(uuid.uuid4())[:8]}", # uuid - unique per preview for locking safety
             s.asr_threshold,
             s.speed,

@@ -74,8 +74,9 @@ def apply_pedalboard_effects(
     """
     if not _PEDALBOARD_AVAILABLE:
         # Fallback copy if pedalboard is missing
-        import shutil
-        shutil.copy2(input_path, output_path)
+        if input_path != output_path:
+            import shutil
+            shutil.copy2(input_path, output_path)
         return False
         
     # Optimization: If no effects active, just copy
