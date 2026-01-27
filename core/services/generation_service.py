@@ -361,6 +361,16 @@ class GenerationService(QObject):
         """
         if not text: return
 
+        # Cleanup old previews to prevent clutter
+        # We try to remove the '_preview' session folder
+        import shutil
+        try:
+            preview_dir = Path("Outputs_Pro") / "_preview"
+            if preview_dir.exists():
+                shutil.rmtree(preview_dir, ignore_errors=True)
+        except Exception as e:
+            logging.warning(f"Failed to clean preview dir: {e}")
+
         # Constants
         preview_output = "preview_temp.wav" # Keep it simple
         
