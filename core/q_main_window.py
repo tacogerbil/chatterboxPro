@@ -16,6 +16,7 @@ from core.services.generation_service import GenerationService
 from core.services.audio_service import AudioService
 from core.services.playlist_service import PlaylistService
 from core.services.assembly_service import AssemblyService
+from core.services.config_service import ConfigService
 
 class ChatterboxProQt(QMainWindow):
     def __init__(self) -> None:
@@ -30,6 +31,10 @@ class ChatterboxProQt(QMainWindow):
         self.audio_service = AudioService()
         self.assembly_service = AssemblyService(self.app_state)
         self.playlist_service = PlaylistService(self.app_state)
+        self.config_service = ConfigService()
+        
+        # Load Last Session
+        self.config_service.load_state(self.app_state)
         
         # UI Components Placeholders
         self.tabs: Optional[QTabWidget] = None
@@ -117,6 +122,12 @@ class ChatterboxProQt(QMainWindow):
         
         # Wire Template Loading (View Migration Parity)
         self.setup_view.template_loaded.connect(self.gen_view.refresh_values)
+
+    def closeEvent(self, event) -> None:
+        """Handle application closure: Save State."""
+        print("Saving session state...", flush=True)
+        self.config_service.save_state(self.app_state)
+        event.accept()
 
 def launch_qt_app() -> None:
     # Create the Application
