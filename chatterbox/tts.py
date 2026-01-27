@@ -387,13 +387,31 @@ class ChatterboxTTS:
             # s3gen.inference returns (wav, flow_cache), we only need wav here.
             # flow_cache is None for CausalMaskedDiffWithXvec in s3gen.flow
             
-            # PEFT Fix: accessing inference method on wrapped model
+            # PEFT Fix: Robust access to inference method
             inference_model = self.s3gen
-            if isinstance(inference_model, PeftModel):
-                # Unwrap to access custom 'inference' method not exposed by PeftModel wrapper
-                # PeftModel -> BasePeftModel -> model (the underlying S3Gen/S3Token2Wav)
-                inference_model = inference_model.base_model.model
+            # Recursive unwrap to find 'inference' method
+            # PeftModel -> LoraModel -> model (S3Gen)
+            for _ in range(6): 
+                if hasattr(inference_model, 'inference'):
+                    break
+                if hasattr(inference_model, 'base_model'):
+                    inference_model = inference_model.base_model
+                elif hasattr(inference_model, 'model'):
+                    inference_model = inference_model.model
+                else:
+                    break
             
+            # Final specific check for DDP if needed, though usually handled above
+            if not hasattr(inference_model, 'inference') and hasattr(inference_model, 'module'):
+                inference_model = inference_model.module
+
+            if not hasattr(inference_model, 'inference'):
+                 # Fatal error with debug info
+                 safe_attrs = [a for a in dir(inference_model) if not a.startswith('__')][:20]
+                 raise AttributeError(f"Could not find 'inference' in {type(self.s3gen)} -> {type(inference_model)}. Attrs: {safe_attrs}")
+
+            print(f"[TTS Debug] Invoking S3Gen inference on {type(inference_model).__name__}", flush=True)
+
             s3gen_output = inference_model.inference(
                 speech_tokens=speech_tokens,
                 ref_dict=self.conds.gen,
