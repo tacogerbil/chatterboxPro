@@ -416,15 +416,23 @@ class ChatterboxTTS:
                 speech_tokens=speech_tokens,
                 ref_dict=self.conds.gen,
             )
+            print(f"[TTS Debug] S3Gen inference returned.", flush=True)
+
             # s3gen.inference in s3gen.py might return a tuple (wav, cache) or just wav
             if isinstance(s3gen_output, tuple):
                 wav = s3gen_output[0]
             else:
                 wav = s3gen_output
 
+            print(f"[TTS Debug] Converting to numpy. Wav shape: {wav.shape}", flush=True)
             wav_np = wav.squeeze(0).detach().cpu().numpy()
+            
             if apply_watermark:
+                print(f"[TTS Debug] Applying watermark...", flush=True)
                 wav_np = self.watermarker.apply_watermark(wav_np, sample_rate=self.sr)
+                print(f"[TTS Debug] Watermark applied.", flush=True)
+                
+            print(f"[TTS Debug] Generation complete. Returning tensor.", flush=True)
             return torch.from_numpy(wav_np).unsqueeze(0)
 
     def load_adapter(self, adapter_path: str, adapter_name: str) -> None:
