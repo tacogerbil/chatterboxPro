@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSlider, QDoubleSpinBox
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QDoubleSpinBox
 from PySide6.QtCore import Qt, Signal
 
 class QLabeledSlider(QWidget):
