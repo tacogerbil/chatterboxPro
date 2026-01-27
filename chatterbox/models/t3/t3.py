@@ -313,8 +313,10 @@ class T3(nn.Module):
 
         # ---- Generation Loop using kv_cache ----
         for i in tqdm(range(max_new_tokens), desc="Sampling", dynamic_ncols=True):
-            if i % 10 == 0 or i > 100:
-                print(f"[T3 Debug] Loop start step {i}")
+            # Log every step to catch the exact freeze point
+            if self.device.type == "cuda":
+                torch.cuda.synchronize()
+            print(f"[T3 Debug] Loop start step {i}")
                 
             logits = output.logits[:, -1, :]
             
@@ -339,8 +341,7 @@ class T3(nn.Module):
             # Convert logits to probabilities and sample the next token.
             probs = torch.softmax(logits, dim=-1)
             
-            if i % 10 == 0 or i > 100:
-                 print(f"[T3 Debug] Sampling step {i}")
+            print(f"[T3 Debug] Sampling step {i}")
             
             # Ensure probability tensor is contiguous and synchronized to prevent kernel hangs
             probs = probs.contiguous()
@@ -364,8 +365,7 @@ class T3(nn.Module):
             next_token_embed = torch.cat([next_token_embed, next_token_embed])
 
             # Forward pass with only the new token and the cached past.
-            if i % 10 == 0 or i > 65: # Print more frequently around the potential crash point
-                 print(f"[T3 Debug] Starting forward pass step {i}.")
+            print(f"[T3 Debug] Starting forward pass step {i}.")
             
             try:
                 output = self.patched_model(
@@ -375,6 +375,8 @@ class T3(nn.Module):
                     output_hidden_states=True,
                     return_dict=True,
                 )
+                if self.device.type == "cuda":
+                    torch.cuda.synchronize() # Force wait to catch async errors immediately
             except Exception as e:
                 print(f"[T3 Loop Error] Step {i}: {e}")
                 raise e
@@ -382,12 +384,11 @@ class T3(nn.Module):
             # Update the kv_cache.
             past = output.past_key_values
             
-            if i % 10 == 0 or i > 65:
-                 pass_len = "Unknown"
-                 try:
-                     pass_len = len(past)
-                 except: pass
-                 print(f"[T3 Debug] Step {i} complete. Past type: {type(past)}, Len: {pass_len}")
+            pass_len = "Unknown"
+            try:
+                 pass_len = len(past)
+            except: pass
+            print(f"[T3 Debug] Step {i} complete. Past type: {type(past)}, Len: {pass_len}")
 
         # Concatenate all predicted tokens along the sequence dimension.
         predicted_tokens = torch.cat(predicted, dim=1)  # shape: (B, num_tokens)
