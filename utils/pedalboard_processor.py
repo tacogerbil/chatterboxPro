@@ -68,23 +68,28 @@ def _build_main_chain(
     # 1. Highpass (Remove rumble before processing)
     board_effects.append(HighpassFilter(cutoff_frequency_hz=60.0))
     
-    # 2. Main Pitch Shift (Subtle)
-    if pitch_semitones != 0:
-        safe_pitch = max(-24.0, min(pitch_semitones, 24.0))
-        board_effects.append(PitchShift(semitones=safe_pitch))
+    # 2. Main Pitch Shift (Latency Match)
+    # Even if pitch is 0, we MUST use the plugin to induce the same processing delay (latency)
+    # as the Parallel Grit chain. Otherwise, blending them causes a "Slapback Echo".
+    safe_pitch = max(-24.0, min(pitch_semitones, 24.0))
+    board_effects.append(PitchShift(semitones=safe_pitch))
         
-    # 3. Timbre Shift (Formant)
+    # 3. Timbre Shift (Artificial Formant EQ)
+    # User feedback: "Doesn't seem to change the voice".
+    # Fix: Drastically increase gain ranges (+/- 8dB -> +/- 16dB) for audible change.
     if timbre_shift != 0:
-        if timbre_shift < 0: # Warmer/Darker
-            f1 = get_safe_nyquist_clamp(350.0, sample_rate)
-            f2 = get_safe_nyquist_clamp(3000.0, sample_rate)
-            board_effects.append(PeakFilter(cutoff_frequency_hz=f1, gain_db=min(abs(timbre_shift)*2.0, 8.0), q=1.0))
-            board_effects.append(PeakFilter(cutoff_frequency_hz=f2, gain_db=max(timbre_shift*1.0, -6.0), q=1.0))
-        else: # Brighter
-            f1 = get_safe_nyquist_clamp(300.0, sample_rate)
-            f2 = get_safe_nyquist_clamp(4000.0, sample_rate)
-            board_effects.append(PeakFilter(cutoff_frequency_hz=f1, gain_db=max(-abs(timbre_shift)*1.5, -8.0), q=1.0))
-            board_effects.append(PeakFilter(cutoff_frequency_hz=f2, gain_db=min(abs(timbre_shift)*2.0, 8.0), q=0.8))
+        if timbre_shift < 0: # Warmer/Darker (Boost Lows/Low-Mids, Cut Highs)
+            f1 = get_safe_nyquist_clamp(300.0, sample_rate) # Body
+            f2 = get_safe_nyquist_clamp(3500.0, sample_rate) # Presence
+            # Massive boost to body, massive cut to presence
+            board_effects.append(PeakFilter(cutoff_frequency_hz=f1, gain_db=min(abs(timbre_shift)*4.0, 16.0), q=1.2))
+            board_effects.append(PeakFilter(cutoff_frequency_hz=f2, gain_db=max(timbre_shift*2.0, -12.0), q=1.0))
+        else: # Brighter (Cut Mud, Boost Air)
+            f1 = get_safe_nyquist_clamp(250.0, sample_rate) # Mud
+            f2 = get_safe_nyquist_clamp(4500.0, sample_rate) # Air
+            
+            board_effects.append(PeakFilter(cutoff_frequency_hz=f1, gain_db=max(-abs(timbre_shift)*2.5, -16.0), q=1.0))
+            board_effects.append(PeakFilter(cutoff_frequency_hz=f2, gain_db=min(abs(timbre_shift)*3.0, 12.0), q=0.8))
             
     # 4. Light Compression (Polish)
     board_effects.append(Compressor(threshold_db=-18.0, ratio=3.0, attack_ms=10.0, release_ms=100.0))
