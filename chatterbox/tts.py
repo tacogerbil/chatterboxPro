@@ -10,7 +10,7 @@ import perth
 import torch.nn.functional as F
 from huggingface_hub import hf_hub_download
 from peft import PeftModel
-from ..utils.file_utils import get_audio_hash
+from utils.file_utils import get_audio_hash
 
 from .models.t3 import T3
 from .models.s3tokenizer import S3_SR, drop_invalid_tokens
