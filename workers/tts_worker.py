@@ -16,6 +16,7 @@ import soundfile as sf
 # Chatterbox-specific imports
 from chatterbox.tts import ChatterboxTTS
 import whisper
+from utils.pedalboard_processor import apply_pedalboard_effects # MCCC: Use external processor
 # --- DEBUG: ASK PYTHON WHERE FFMPEG IS ---
 print(f"\n[DEBUG] Python executable: {sys.executable}")
 ffmpeg_location = shutil.which("ffmpeg")
@@ -232,71 +233,7 @@ def get_similarity_ratio(text1, text2):
     if not norm1 or not norm2: return 0.0
     return difflib.SequenceMatcher(None, norm1, norm2).ratio()
 
-def apply_voice_effects(audio_path, speed, pitch_shift, timbre_shift, gruffness):
-    """Apply voice effects (speed, pitch, timbre, gruffness) using FFmpeg.
-    
-    Args:
-        audio_path: Path to the audio file
-        speed: Speed multiplier
-        pitch_shift: Pitch shift in semitones
-        timbre_shift: Timbre shift (EQ)
-        gruffness: Distortion/Texture intensity
-    """
-    import subprocess
-    
-    filters = []
-    
-    # 1. Speed
-    if speed != 1.0:
-        filters.append(f"atempo={speed}")
-
-    # 2. Pitch (Simple asetrate method if speed is handled, but here we chain)
-    # Pitch shift in semitones. ratio = 2^(n/12)
-    if pitch_shift != 0.0:
-        p_ratio = 2 ** (pitch_shift / 12.0)
-        # Note: We assume 24000Hz (Chatterbox default). 
-        # A more robust way would be to probe, but for MVP optimization we assume 24k.
-        sr = 24000 
-        new_sr = int(sr * p_ratio)
-        filters.append(f"asetrate={new_sr}")
-        filters.append(f"atempo={1/p_ratio}")
-
-    # 3. Timbre (EQ)
-    if timbre_shift != 0.0:
-        # Shift > 0: Brighter (High shelf boost, Low shelf cut)
-        # Shift < 0: Warmer (High shelf cut, Low shelf boost)
-        gain = timbre_shift * 3.0 # Scale slider to dB
-        filters.append(f"treble=g={gain}:f=3000")
-        filters.append(f"bass=g={-gain/2}:f=200")
-
-    # 4. Gruffness (Distortion/Texture)
-    if gruffness > 0.0:
-         # Use slight overdrive
-         drive = 1 + (gruffness * 5) # 1.0 to 6.0
-         filters.append(f"acrusher=level_in={drive}:level_out=1:bits=64:mode=log:dc=1:aa=1")
-
-    if not filters:
-        return 
-
-    filter_str = ",".join(filters)
-    
-    temp_path = Path(str(audio_path).replace('.wav', '_fx.wav'))
-    try:
-        cmd = [
-            'ffmpeg', '-i', str(audio_path),
-            '-filter:a', filter_str,
-            '-y', str(temp_path)
-        ]
-        # Run FFmpeg
-        subprocess.run(cmd, capture_output=True, check=True)
-        if temp_path.exists():
-            # If successful, replace original
-            if audio_path.exists(): audio_path.unlink()
-            shutil.move(temp_path, audio_path)
-            logging.info(f"Applied Voice Effects: {filter_str}")
-    except Exception as e:
-        logging.error(f"Voice Effects Failed: {e}")
-        if temp_path.exists(): os.remove(temp_path)
+# apply_voice_effects removed. Logic moved to utils/pedalboard_processor.py (MCCC: Separation of Concerns)
 
 def worker_process_chunk(task_bundle):
     """The main function executed by each worker process to generate a single audio chunk."""
@@ -512,10 +449,17 @@ def worker_process_chunk(task_bundle):
             shutil.move(chosen_candidate['path'], final_wav_path)
             
             # Apply speed adjustment if needed (FFmpeg post-processing)
-            # Apply voice effects if needed (FFmpeg post-processing)
+            # Apply voice effects if needed (Pedalboard post-processing)
             if any([speed != 1.0, pitch_shift != 0.0, timbre_shift != 0.0, gruffness > 0.0]):
                 try:
-                    apply_voice_effects(final_wav_path, speed, pitch_shift, timbre_shift, gruffness)
+                    # MCCC: Delegated to utils/pedalboard_processor.py
+                    apply_pedalboard_effects(
+                        str(final_wav_path), str(final_wav_path),
+                        pitch_semitones=pitch_shift,
+                        timbre_shift=timbre_shift,
+                        gruffness=gruffness,
+                        speed=speed
+                    )
                 except Exception as e:
                     logging.warning(f"Voice effects failed for chunk #{sentence_number}: {e}")
         

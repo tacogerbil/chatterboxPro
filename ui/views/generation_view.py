@@ -137,32 +137,40 @@ class GenerationView(QWidget):
         
         # --- Sliders ---
         self.exag_slider = QLabeledSlider(
-            "Exaggeration:", 0.0, 1.0, self.state.settings.exaggeration
+            "Exaggeration:", 0.0, 1.0, self.state.settings.exaggeration,
+            left_label="Monotone", right_label="Expressive"
         )
+        self.exag_slider.setToolTip("Emotional intensity. 0.0 = flat/monotone, 0.5 = neutral, 1.0 = very expressive")
         self.exag_slider.value_changed.connect(
             lambda v: setattr(self.state.settings, 'exaggeration', v)
         )
         v_layout.addWidget(self.exag_slider)
         
         self.speed_slider = QLabeledSlider(
-            "Speed:", 0.5, 2.0, self.state.settings.speed
+            "Speed:", 0.5, 2.0, self.state.settings.speed,
+            left_label="0.5x Slower", right_label="2x Faster"
         )
+        self.speed_slider.setToolTip("Speaking rate. 0.5 = half speed, 1.0 = normal, 2.0 = double speed.")
         self.speed_slider.value_changed.connect(
             lambda v: setattr(self.state.settings, 'speed', v)
         )
         v_layout.addWidget(self.speed_slider)
         
         self.temp_slider = QLabeledSlider(
-            "Temperature:", 0.1, 1.5, self.state.settings.temperature
+            "Temperature:", 0.1, 1.5, self.state.settings.temperature,
+            left_label="Consistent", right_label="Varied"
         )
+        self.temp_slider.setToolTip("Creativity/randomness. Lower = consistent/robotic, Higher = varied/natural.")
         self.temp_slider.value_changed.connect(
             lambda v: setattr(self.state.settings, 'temperature', v)
         )
         v_layout.addWidget(self.temp_slider)
 
         self.cfg_slider = QLabeledSlider(
-            "CFG Scale:", 0.1, 1.0, self.state.settings.cfg_weight
+            "CFG Scale:", 0.1, 1.0, self.state.settings.cfg_weight,
+            left_label="Creative", right_label="Exact Match"
         )
+        self.cfg_slider.setToolTip("How closely to match the reference voice. Higher = stronger accent/tone.")
         self.cfg_slider.value_changed.connect(
             lambda v: setattr(self.state.settings, 'cfg_weight', v)
         )
@@ -174,24 +182,30 @@ class GenerationView(QWidget):
         f_layout = QVBoxLayout(fx_group)
         
         self.pitch_slider = QLabeledSlider(
-            "Pitch Shift:", -12.0, 12.0, self.state.settings.pitch_shift, step=1.0
+            "Pitch Shift:", -12.0, 12.0, self.state.settings.pitch_shift, step=0.5,
+            left_label="Deeper (-12)", right_label="Higher (+12)"
         )
+        self.pitch_slider.setToolTip("Shift voice pitch in semitones. Negative = deeper voice, Positive = higher voice.")
         self.pitch_slider.value_changed.connect(
             lambda v: setattr(self.state.settings, 'pitch_shift', v)
         )
         f_layout.addWidget(self.pitch_slider)
         
         self.timbre_slider = QLabeledSlider(
-            "Timbre Shift:", -3.0, 3.0, self.state.settings.timbre_shift, step=0.1
+            "Timbre Shift:", -3.0, 3.0, self.state.settings.timbre_shift, step=0.1,
+            left_label="Warmer/Darker", right_label="Brighter/Thinner"
         )
+        self.timbre_slider.setToolTip("Adjust vocal character (formants). Negative = warmer/darker (boosts lows), Positive = brighter (boosts highs).")
         self.timbre_slider.value_changed.connect(
             lambda v: setattr(self.state.settings, 'timbre_shift', v)
         )
         f_layout.addWidget(self.timbre_slider)
 
         self.gruffness_slider = QLabeledSlider(
-            "Gruffness:", 0.0, 1.0, self.state.settings.gruffness, step=0.1
+            "Gruffness:", 0.0, 1.0, self.state.settings.gruffness, step=0.05,
+            left_label="Clean", right_label="Gravelly"
         )
+        self.gruffness_slider.setToolTip("Add vocal texture/rasp (Batman style). Uses saturation + compression + resonance.")
         self.gruffness_slider.value_changed.connect(
             lambda v: setattr(self.state.settings, 'gruffness', v)
         )

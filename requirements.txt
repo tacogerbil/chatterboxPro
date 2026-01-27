@@ -23,8 +23,10 @@ conformer==0.3.2
 librosa==0.10.0
 pydub==0.25.1
 scipy==1.15.3
+scipy==1.15.3
 resemble-perth==1.0.1
 soundfile==0.12.1
+pedalboard>=0.9.14 # For "Batman Gravel" / Narrator Polish chain
 
 # --- GUI Libraries ---
 # customtkinter lines removed
