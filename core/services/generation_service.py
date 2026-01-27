@@ -419,43 +419,15 @@ class PreviewWorker(QThread):
             result = worker_process_chunk(self.task)
             
             if result and result.get('status') == 'success':
-                 # The worker saves to Outputs/Session/... 
-                 # We need to extract the path.
-                 # Actually worker_process_chunk returns payload which might NOT have absolute path
-                 # But it does save the file.
-                 # Let's check `worker_process_chunk` impl if needed, but usually it returns paths.
-                 # Wait, looking at worker_process_chunk signature/return in other files...
-                 # It returns dict. Let's assume 'audio_path' or similar is in it, or we construct it.
-                 # Actually, for standard generation we rely on standard naming.
-                 # For preview, we passed "Previews" as Dir.
-                 # The worker logic should handle it.
-                 
-                 # Hack: The worker usually returns {'status':..., 'seed':..., 'similarity_ratio':...}
-                 # It might NOT return the path directly if it assumes standard structure.
-                 # However, since we need to play it, we need the path.
-                 # Let's hope the worker returns it or we know where it is.
-                 # Start simple: The worker saves to `{outputs_dir}/{session_name}/...`
-                 pass
-            
-            # Since we can't easily see worker_process_chunk source right now (I didn't open it),
-            # I will trust it executes. 
-            # The preview file is likely constructed inside the worker.
-            
-            # HOTFIX: Since I can't modify worker_process_chunk easily right now without seeing it,
-            # and I need to pass the path back...
-            # I'll rely on the standard output path construction:
-            # {outputs_dir}/{session_name}/{sentence_number}_{uuid}.wav
-            # In my task: outputs_dir="Previews", session="PreviewSession", number=0, uuid="preview_uuid"
-            # So path = "Previews/PreviewSession/0_preview_uuid.wav"
-            
-            from pathlib import Path
-            output_path = Path("Previews") / "PreviewSession" / "0_preview_uuid.wav"
-            
-            # Wait for execution
-            if result.get('status') == 'success':
-                self.finished_signal.emit(str(output_path.absolute()))
+                # FIX: Use the path returned by the worker, which knows the structure (Sentence_wavs/, audio_uuid.wav, etc.)
+                actual_path = result.get('path')
+                if actual_path and Path(actual_path).exists():
+                     self.finished_signal.emit(str(Path(actual_path).absolute()))
+                else:
+                     # Fallback logic only if path missing from result (shouldn't happen with updated worker)
+                     self.error_signal.emit("Worker finished but returned no valid path.")
             else:
-                self.error_signal.emit("Generation failed.")
+                self.error_signal.emit(f"Generation failed: {result.get('error_message', 'Unknown error')}")
 
         except Exception as e:
             self.error_signal.emit(str(e))
