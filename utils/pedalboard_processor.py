@@ -157,15 +157,22 @@ def apply_pedalboard_effects(
         )
         processed = board(audio, sr)
 
-        # 8. Write Output
-        # Ensure output is clipped/limited to prevent digital clipping if gain grew
-        # Simple peak normalization if > 1.0 (or hard clip prevention)
+        # 8. Write Output to Temp File (MCCC: I/O Hygiene)
+        # Prevents overwriting input while it might still be open/locked or read from
+        import uuid
+        temp_output_path = str(output_path).replace('.wav', f'_temp_{uuid.uuid4().hex[:8]}.wav')
+        
+        # Ensure output is clipped/limited
         peak = np.max(np.abs(processed))
         if peak > 1.0:
-            processed = processed / peak * 0.99  # Normalize to -0.1dB
+            processed = processed / peak * 0.99 
 
-        with AudioFile(output_path, "w", sr, processed.shape[0]) as f:
+        with AudioFile(temp_output_path, "w", sr, processed.shape[0]) as f:
             f.write(processed)
+            
+        # 9. Move Temp to Final
+        import shutil
+        shutil.move(temp_output_path, output_path)
             
         return True
 
