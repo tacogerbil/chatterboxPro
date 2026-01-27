@@ -9,6 +9,7 @@ from pathlib import Path
 # MCCC: Side-Effect Isolation - File I/O isolated here
 
 # Try to import pedalboard
+print(f"[DEBUG] Attempting to import pedalboard...", flush=True)
 try:
     from pedalboard import (
         Pedalboard, HighpassFilter, LowpassFilter, PeakFilter,
@@ -16,9 +17,11 @@ try:
     )
     from pedalboard.io import AudioFile
     _PEDALBOARD_AVAILABLE = True
-except ImportError:
+    print(f"[DEBUG] Pedalboard imported successfully.", flush=True)
+except Exception as e:
     _PEDALBOARD_AVAILABLE = False
-    logging.warning("Pedalboard not installed. Voice effects will be disabled.")
+    print(f"[DEBUG] !!! PEDALBOARD IMPORT FAILED !!! Error: {e}", flush=True)
+    logging.warning(f"Pedalboard not installed/working: {e}")
 
 
 def _apply_speed_ffmpeg(input_path: str, output_path: str, speed: float) -> bool:
