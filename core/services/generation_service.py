@@ -252,13 +252,14 @@ class GenerationService(QObject):
                 outputs_dir, 
                 sentence_data['uuid'],
                 s.asr_threshold,
-                s.speed,
-                s.tts_engine,
-                s.pitch_shift,
-                s.timbre_shift,
-                s.gruffness,
-                s.bass_boost,
-                s.treble_boost
+                self.state.settings.speed,
+                self.state.settings.tts_engine,
+                self.state.settings.pitch_shift,
+                self.state.settings.timbre_shift,
+                self.state.settings.gruffness,
+                self.state.settings.bass_boost,
+                self.state.settings.treble_boost,
+                self.state.settings.model_path 
             )
             tasks.append(task)
             

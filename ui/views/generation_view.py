@@ -106,14 +106,27 @@ class GenerationView(QWidget):
         self.path_label = QLabel("Default (system cache)")
         self.path_label.setStyleSheet("color: gray;")
         self.set_path_btn = QPushButton("📁 Set Path")
-        self.set_path_btn.clicked.connect(
-            lambda: QMessageBox.information(self, "Info", "Path setting not yet implemented.")
-        )
+        self.set_path_btn.clicked.connect(self.browse_model_path)
         path_layout.addWidget(self.path_label)
         path_layout.addWidget(self.set_path_btn)
         form.addRow("Model Path:", path_layout)
         
         layout.addWidget(engine_group)
+
+    def browse_model_path(self) -> None:
+        """Opens a directory picker for the model."""
+        path = QFileDialog.getExistingDirectory(self, "Select Model Directory")
+        if path:
+            self.state.settings.model_path = path
+            self.path_label.setText(path)
+            # Make label tooltip show full path
+            self.path_label.setToolTip(path)
+            # Style: Green to indicate custom path set
+            self.path_label.setStyleSheet("color: #27AE60; font-weight: bold;")
+        else:
+            # If user cancels or clears (implied?), maybe provide a clear button?
+            # For now just keep existing.
+            pass
 
     def setup_sliders(self, layout: QVBoxLayout) -> None:
         voice_group = QGroupBox("Voice Settings")

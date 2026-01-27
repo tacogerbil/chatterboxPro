@@ -13,15 +13,21 @@ from chatterbox.tts import ChatterboxTTS
 class ChatterboxEngine(BaseTTSEngine):
     """Adapter for Chatterbox TTS engine."""
     
-    def __init__(self, device: str):
+    def __init__(self, device: str, model_path: str = None, **kwargs):
         super().__init__(device)
         self.model = None
         self.sr = 24000  # Chatterbox sample rate
+        self.model_path = model_path
     
     def _ensure_model_loaded(self):
         """Lazy load the model on first use."""
         if self.model is None:
-            self.model = ChatterboxTTS.from_pretrained(self.device)
+            if self.model_path:
+                print(f"[ChatterboxEngine] Loading from local path: {self.model_path}")
+                self.model = ChatterboxTTS.from_local(self.model_path, self.device)
+            else:
+                print(f"[ChatterboxEngine] Loading from Hub (default)...")
+                self.model = ChatterboxTTS.from_pretrained(self.device)
             self.sr = self.model.sr
     
     def generate(

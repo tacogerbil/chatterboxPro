@@ -14,13 +14,14 @@ AVAILABLE_ENGINES = {
     'f5': F5Engine,
 }
 
-def get_engine(engine_name: str, device: str) -> BaseTTSEngine:
+def get_engine(engine_name: str, device: str, **kwargs) -> BaseTTSEngine:
     """
     Factory function to create TTS engine instances.
     
     Args:
         engine_name: Name of the engine ('chatterbox', 'xtts', etc.)
         device: Device string ('cuda:0', 'cpu', etc.)
+        **kwargs: specific engine args (e.g. model_path)
     
     Returns:
         Initialized TTS engine instance
@@ -35,7 +36,7 @@ def get_engine(engine_name: str, device: str) -> BaseTTSEngine:
         raise ValueError(f"Unknown engine '{engine_name}'. Available engines: {available}")
     
     engine_class = AVAILABLE_ENGINES[engine_name]
-    return engine_class(device)
+    return engine_class(device, **kwargs)
 
 def list_engines():
     """Return list of available engine names."""

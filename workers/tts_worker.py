@@ -40,15 +40,24 @@ if os.name == 'nt':  # Check if we are on Windows
 # --- Worker-Specific Globals ---
 _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL = None, None
 _CURRENT_ENGINE_NAME = None
+_CURRENT_MODEL_PATH = None
 
-def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox'):
+def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', model_path: str = None):
     """Initializes models once per worker process to save memory and time."""
-    global _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL, _CURRENT_ENGINE_NAME
+    global _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL, _CURRENT_ENGINE_NAME, _CURRENT_MODEL_PATH
     pid = os.getpid()
     
-    # Check if we need to switch engines
-    if _WORKER_TTS_ENGINE is not None and _CURRENT_ENGINE_NAME != engine_name:
-        logging.info(f"[Worker-{pid}] Switching from {_CURRENT_ENGINE_NAME} to {engine_name}")
+    # Check if we need to switch engines OR switch model paths
+    config_changed = False
+    if _WORKER_TTS_ENGINE is not None:
+        if _CURRENT_ENGINE_NAME != engine_name:
+            logging.info(f"[Worker-{pid}] Engine switch: {_CURRENT_ENGINE_NAME} -> {engine_name}")
+            config_changed = True
+        elif _CURRENT_MODEL_PATH != model_path:
+            logging.info(f"[Worker-{pid}] Model path switch: {_CURRENT_MODEL_PATH} -> {model_path}")
+            config_changed = True
+            
+    if config_changed and _WORKER_TTS_ENGINE is not None:
         _WORKER_TTS_ENGINE.cleanup()
         _WORKER_TTS_ENGINE = None
     
@@ -56,8 +65,10 @@ def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox'):
         logging.info(f"[Worker-{pid}] Initializing {engine_name} engine on device: {device_str}")
         try:
             from engines import get_engine
-            _WORKER_TTS_ENGINE = get_engine(engine_name, device_str)
+            # Pass model_path via kwargs
+            _WORKER_TTS_ENGINE = get_engine(engine_name, device_str, model_path=model_path)
             _CURRENT_ENGINE_NAME = engine_name
+            _CURRENT_MODEL_PATH = model_path
             
             whisper_device = torch.device(device_str if "cuda" in device_str and torch.cuda.is_available() else "cpu")
             _WORKER_WHISPER_MODEL = whisper.load_model("base.en", device=whisper_device, download_root=str(Path.home() / ".cache" / "whisper"))
@@ -240,13 +251,14 @@ def worker_process_chunk(task_bundle):
     (task_index, original_index, sentence_number, text_chunk, device_str, master_seed, ref_audio_path,
      exaggeration, temperature, cfg_weight, disable_watermark, num_candidates, max_attempts,
      bypass_asr, session_name, run_idx, output_dir_str, uuid, asr_threshold, speed, engine_name,
-     pitch_shift, timbre_shift, gruffness, bass_boost, treble_boost) = task_bundle
+     pitch_shift, timbre_shift, gruffness, bass_boost, treble_boost, model_path) = task_bundle
 
     pid = os.getpid()
     logging.info(f"[Worker-{pid}] Starting chunk (Idx: {original_index}, #: {sentence_number}, UUID: {uuid[:8]}) on device {device_str}")
 
     try:
-        tts_engine, whisper_model = get_or_init_worker_models(device_str, engine_name)
+        # Pass model_path to efficient initializer
+        tts_engine, whisper_model = get_or_init_worker_models(device_str, engine_name, model_path)
         if tts_engine is None or whisper_model is None:
             raise RuntimeError(f"Engine initialization failed for device {device_str}")
     except Exception as e_model_load:

@@ -44,7 +44,11 @@ class GenerationSettings:
     timbre_shift: float = 0.0
     gruffness: float = 0.0
     bass_boost: float = 0.0
+    bass_boost: float = 0.0
     treble_boost: float = 0.0
+    
+    # Custom Model Paths
+    model_path: Optional[str] = None
 
 @dataclass
 class AppState:
