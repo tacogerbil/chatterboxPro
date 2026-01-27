@@ -69,24 +69,26 @@ def _build_main_chain(
     board_effects.append(HighpassFilter(cutoff_frequency_hz=60.0))
     
     # 2. Main Pitch Shift (Latency Match)
-    # Even if pitch is 0, we MUST use the plugin to induce the same processing delay (latency)
-    # as the Parallel Grit chain. Otherwise, blending them causes a "Slapback Echo".
-    safe_pitch = max(-24.0, min(pitch_semitones, 24.0))
+    # FORCE DSP: Use 0.01 if 0 to prevent plugin bypass.
+    # This ensures Main chain incurs the same processing buffer/latency as Grit chain.
+    target_pitch = pitch_semitones
+    if abs(target_pitch) < 0.01:
+        target_pitch = 0.01
+        
+    safe_pitch = max(-24.0, min(target_pitch, 24.0))
     board_effects.append(PitchShift(semitones=safe_pitch))
         
     # 3. Timbre Shift (Artificial Formant EQ)
-    # User feedback: "Doesn't seem to change the voice".
-    # Fix: Drastically increase gain ranges (+/- 8dB -> +/- 16dB) for audible change.
+    # ... (Timbre logic unchanged) ...
     if timbre_shift != 0:
-        if timbre_shift < 0: # Warmer/Darker (Boost Lows/Low-Mids, Cut Highs)
-            f1 = get_safe_nyquist_clamp(300.0, sample_rate) # Body
-            f2 = get_safe_nyquist_clamp(3500.0, sample_rate) # Presence
-            # Massive boost to body, massive cut to presence
+        if timbre_shift < 0: # Warmer/Darker
+            f1 = get_safe_nyquist_clamp(300.0, sample_rate)
+            f2 = get_safe_nyquist_clamp(3500.0, sample_rate)
             board_effects.append(PeakFilter(cutoff_frequency_hz=f1, gain_db=min(abs(timbre_shift)*4.0, 16.0), q=1.2))
             board_effects.append(PeakFilter(cutoff_frequency_hz=f2, gain_db=max(timbre_shift*2.0, -12.0), q=1.0))
-        else: # Brighter (Cut Mud, Boost Air)
-            f1 = get_safe_nyquist_clamp(250.0, sample_rate) # Mud
-            f2 = get_safe_nyquist_clamp(4500.0, sample_rate) # Air
+        else: # Brighter
+            f1 = get_safe_nyquist_clamp(250.0, sample_rate)
+            f2 = get_safe_nyquist_clamp(4500.0, sample_rate)
             
             board_effects.append(PeakFilter(cutoff_frequency_hz=f1, gain_db=max(-abs(timbre_shift)*2.5, -16.0), q=1.0))
             board_effects.append(PeakFilter(cutoff_frequency_hz=f2, gain_db=min(abs(timbre_shift)*3.0, 12.0), q=0.8))
@@ -111,23 +113,28 @@ def _build_grit_chain(
     """
     board_effects = []
     
-    # 1. Octave Down (The Beast)
-    # Fixed -12 semitones to create deep artificially generated sub-harmonics
+    # 1. Noise Gate (Tighten the start/stop)
+    # Prevents rumble tail from dragging behind (Echo feel)
+    from pedalboard import NoiseGate
+    board_effects.append(NoiseGate(threshold_db=-40.0, release_ms=15.0, attack_ms=1.0))
+    
+    # 2. Octave Down (The Beast)
     board_effects.append(PitchShift(semitones=-12.0))
     
-    # 2. Heavy Distortion
-    # Scale drive with gruffness: 10dB (mild) to 40dB (nuclear)
-    drive = 10.0 + (gruffness * 30.0) 
+    # 3. Heavy Distortion
+    # Scale drive with gruffness: 20dB to 50dB (More Nuclear)
+    drive = 20.0 + (gruffness * 30.0) 
     board_effects.append(Distortion(drive_db=drive))
     
-    # 3. Lowpass (Remove Fizz/Harshness)
-    # Essential! We only want the low rumble.
-    # 600Hz usually nice, maybe up to 800Hz if very gruff.
-    cutoff = 600.0 + (gruffness * 200.0) 
+    # 4. Lowpass (Remove Fizz/Harshness)
+    # FIX: "Side-by-side" / "Echo" complaint.
+    # Lower cutoff drastically to 300Hz. This confines the grit to Sub-Bass/Chest.
+    # 300Hz phase issues are much less audible as "echo" than 800Hz.
+    cutoff = 250.0 + (gruffness * 100.0) # 250Hz - 350Hz range
     board_effects.append(LowpassFilter(cutoff_frequency_hz=get_safe_nyquist_clamp(cutoff, sample_rate)))
     
-    # 4. Smashed Compression (even out the rumble)
-    board_effects.append(Compressor(threshold_db=-20.0, ratio=8.0, attack_ms=2.0, release_ms=50.0))
+    # 5. Smashed Compression (even out the rumble)
+    board_effects.append(Compressor(threshold_db=-24.0, ratio=10.0, attack_ms=1.0, release_ms=30.0))
     
     return Pedalboard(board_effects)
 
