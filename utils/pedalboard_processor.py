@@ -154,14 +154,37 @@ def apply_pedalboard_effects(
         if input_peak == 0:
             logging.warning("Pedalboard received SILENT input audio.")
 
-        # 3. Build & Run Chain
-        # Calls the Pure Function
+        # 3. Build Chain
         board = build_pedalboard_chain(
             pitch_semitones=pitch_semitones,
             timbre_shift=timbre_shift,
             gruffness=gruffness
         )
-        processed = board(audio, sr)
+        
+        # DIAGNOSTIC: Step-by-Step Processing to find NaN source
+        current_audio = audio
+        print(f"[PEDALBOARD DEBUG] Starting Chain with SR={sr}, Shape={current_audio.shape}", flush=True)
+        
+        for i, effect in enumerate(board):
+            effect_name = str(type(effect).__name__)
+            try:
+                # Create a mini-board for just this effect step
+                mini_board = Pedalboard([effect])
+                current_audio = mini_board(current_audio, sr)
+                
+                step_peak = np.max(np.abs(current_audio))
+                print(f"[PEDALBOARD DEBUG] Step {i+1}: {effect_name} -> Peak: {step_peak:.4f}", flush=True)
+                
+                if np.isnan(current_audio).any():
+                    print(f"[PEDALBOARD DEBUG] !!! NaN DETECTED after {effect_name} !!!", flush=True)
+                    logging.error(f"Pedalboard NaN explosion at effect: {effect_name}")
+                    return False
+                    
+            except Exception as e:
+                 print(f"[PEDALBOARD DEBUG] Step {i+1} ({effect_name}) CRASHED: {e}", flush=True)
+                 return False
+
+        processed = current_audio
 
         # 8. Write Output to Temp File (MCCC: I/O Hygiene)
         # Prevents overwriting input while it might still be open/locked or read from
@@ -169,6 +192,11 @@ def apply_pedalboard_effects(
         temp_output_path = str(output_path).replace('.wav', f'_temp_{uuid.uuid4().hex[:8]}.wav')
         
         # Ensure output is clipped/limited
+        if np.isnan(processed).any():
+            logging.error("PEDALBOARD ERROR: Processed audio contains NaNs!")
+            print("[PEDALBOARD DEBUG] !!! Processed Audio is NaN !!!", flush=True)
+            return False
+
         peak = np.max(np.abs(processed))
         print(f"[PEDALBOARD DEBUG] Processed Output Peak: {peak:.4f}", flush=True)
 
