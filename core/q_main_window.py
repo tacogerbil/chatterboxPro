@@ -10,6 +10,7 @@ from ui.views.setup_view import SetupView
 from ui.views.playlist_view import PlaylistView
 from ui.views.controls_view import ControlsView
 from ui.views.finalize_view import FinalizeView
+from ui.views.config_view import ConfigView
 
 from core.services.generation_service import GenerationService
 from core.services.audio_service import AudioService
@@ -75,7 +76,11 @@ class ChatterboxProQt(QMainWindow):
         self.tabs.addTab(self.setup_view, "Setup Session")
         self.tabs.addTab(self.gen_view, "Generation")
         self.tabs.addTab(self.chapters_view, "Chapters")
+        self.tabs.addTab(self.chapters_view, "Chapters")
         self.tabs.addTab(self.finalize_view, "Finalize & Export")
+        
+        self.config_view = ConfigView()
+        self.tabs.addTab(self.config_view, "Config")
 
     def _setup_playlist_controls(self) -> None:
         # ControlsView needs services map
@@ -117,16 +122,8 @@ def launch_qt_app() -> None:
     # Create the Application
     app = QApplication(sys.argv)
     
-    # Apply modern theme (pyqtdarktheme)
-    try:
-        import qdarktheme
-        if hasattr(qdarktheme, 'setup_theme'):
-             qdarktheme.setup_theme("dark", custom_colors={"primary": "#27AE60"}) 
-        else:
-             app.setStyleSheet(qdarktheme.load_stylesheet(theme="dark"))
-             print("Warning: Using legacy pyqtdarktheme (0.1.7). 'custom_colors' not supported.")
-    except Exception as e:
-        print(f"Warning: Could not apply qdarktheme: {e}")
+    # Theme is handled in the main entry point (chatter_pro.py) via qt-material
+    # Legacy pyqtdarktheme removed.
 
     print("--- Launching Chatterbox Pro (Qt) ---")
     

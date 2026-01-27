@@ -361,15 +361,10 @@ class GenerationView(QWidget):
         self.sample_text_edit.setPlaceholderText("Enter text to preview voice...")
         self.sample_text_edit.setText("Hello! This is a test of the voice settings. How does it sound?")
         self.sample_text_edit.setMaximumHeight(60)
-        self.sample_text_edit.setStyleSheet("""
-            QTextEdit {
-                color: #FFFFFF;
-                background-color: #2D2D2D;
-                border: 1px solid #3A3A3A;
-                border-radius: 4px;
-                padding: 4px;
-            }
-        """) # Fix visibility (Robust)
+        self.sample_text_edit.setPlaceholderText("Enter text to preview voice...")
+        self.sample_text_edit.setText("Hello! This is a test of the voice settings. How does it sound?")
+        self.sample_text_edit.setMaximumHeight(60)
+        # Theme handled globally by qt-material
         p_layout.addWidget(self.sample_text_edit)
         
         # Preview Button
