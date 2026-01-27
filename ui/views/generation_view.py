@@ -341,6 +341,7 @@ class GenerationView(QWidget):
         self.sample_text_edit.setPlaceholderText("Enter text to preview voice...")
         self.sample_text_edit.setText("Hello! This is a test of the voice settings. How does it sound?")
         self.sample_text_edit.setMaximumHeight(60)
+        self.sample_text_edit.setStyleSheet("color: white; background-color: #2D2D2D;") # Fix visibility
         p_layout.addWidget(self.sample_text_edit)
         
         # Preview Button
