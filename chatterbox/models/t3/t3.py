@@ -350,12 +350,8 @@ class T3(nn.Module):
             if self.device.type == "cuda":
                 torch.cuda.synchronize()
 
-            # Custom sampling to avoid torch.multinomial freeze on Windows/CUDA
-            # Using cumsum + searchsorted is deterministic and stable
-            cdf = probs.cumsum(dim=-1)
-            rand_vals = torch.rand((probs.shape[0], 1), device=self.device)
-            # searchsorted returns the index where rand_vals would be inserted to maintain order
-            next_token = torch.searchsorted(cdf, rand_vals).clamp(max=probs.size(-1) - 1)
+            # Robust safe sampling replacement for correct PEFT/CUDA interop
+            next_token = safe_multinomial(probs, num_samples=1).squeeze(-1)
 
             predicted.append(next_token)
             generated_ids = torch.cat([generated_ids, next_token], dim=1)
