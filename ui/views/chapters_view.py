@@ -4,6 +4,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QColor, QBrush, QPalette
 from PySide6.QtCore import Qt, Signal, QModelIndex, QRect, QEvent
+from typing import Optional
+from core.state import AppState
 
 class ChapterDelegate(QStyledItemDelegate):
     jump_clicked = Signal(int)
@@ -95,7 +97,7 @@ class ChapterDelegate(QStyledItemDelegate):
 class ChaptersView(QWidget):
     jump_requested = Signal(int)
 
-    def __init__(self, app_state: AppState, parent=Optional[QWidget]) -> None:
+    def __init__(self, app_state: AppState, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.app_state = app_state
         self.logic = ChapterService()
