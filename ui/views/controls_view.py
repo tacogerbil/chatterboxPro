@@ -10,6 +10,8 @@ class ControlsView(QWidget):
     The "Editing Panel" comprising Playback, Editing, and Batch operations.
     Ported from legacy `ui/controls_frame.py`.
     """
+    structure_changed = Signal() # Emitted when chapters are added/converted
+
     def __init__(self, services, playlist_view, parent=None):
         super().__init__(parent)
         self.services = services # Dict {playlist: PlaylistService, generation: GenerationService}
@@ -90,17 +92,26 @@ class ControlsView(QWidget):
         layout = QGridLayout()
         
         # Row 0
+        # Row 0
         btn_edit = QPushButton("✎ Edit"); btn_edit.clicked.connect(self._edit_text)
-        btn_split = QPushButton("➗ Split"); btn_split.clicked.connect(self._split_chunk)
-        btn_ins_txt = QPushButton("➕ Insert Text"); btn_ins_txt.clicked.connect(self._insert_text)
-        btn_ins_pause = QPushButton("⏸ Insert Pause"); btn_ins_pause.clicked.connect(self._insert_pause)
-        btn_ins_chap = QPushButton("📑 Insert Chapter"); btn_ins_chap.clicked.connect(self._insert_chapter)
+        
+        # Reduced width/label for Split to make room
+        btn_split = QPushButton("➗"); btn_split.setToolTip("Split Chunk"); btn_split.setMaximumWidth(40)
+        btn_split.clicked.connect(self._split_chunk)
+        
+        btn_ins_txt = QPushButton("➕ Text"); btn_ins_txt.clicked.connect(self._insert_text)
+        btn_ins_pause = QPushButton("⏸ Pause"); btn_ins_pause.clicked.connect(self._insert_pause)
+        
+        btn_ins_chap = QPushButton("📑 New Chap"); btn_ins_chap.clicked.connect(self._insert_chapter)
+        btn_conv_chap = QPushButton("📑 Convert"); btn_conv_chap.setToolTip("Convert Selection to Chapter")
+        btn_conv_chap.clicked.connect(self._convert_to_chapter)
         
         layout.addWidget(btn_edit, 0, 0)
         layout.addWidget(btn_split, 0, 1)
         layout.addWidget(btn_ins_txt, 0, 2)
         layout.addWidget(btn_ins_pause, 0, 3)
         layout.addWidget(btn_ins_chap, 0, 4)
+        layout.addWidget(btn_conv_chap, 0, 5)
         
         # Row 1
         btn_mark = QPushButton("M Mark"); btn_mark.clicked.connect(self._mark_current)
@@ -233,6 +244,7 @@ class ControlsView(QWidget):
         if idx == -1: return
         if self.playlist_service.split_chunk(idx):
              self._refresh()
+             self.structure_changed.emit()
         else:
             QMessageBox.warning(self, "Split Failed", "Could not split chunk (maybe too short?)")
 
@@ -242,6 +254,7 @@ class ControlsView(QWidget):
         if ok and text:
             self.playlist_service.insert_item(idx, text)
             self._refresh()
+            self.structure_changed.emit()
 
     def _insert_pause(self):
         idx = self._get_selected_index()
@@ -249,6 +262,7 @@ class ControlsView(QWidget):
         if ok:
              self.playlist_service.insert_item(idx, "[PAUSE]", is_pause=True, duration=dur)
              self._refresh()
+             self.structure_changed.emit()
 
     def _insert_chapter(self):
         idx = self._get_selected_index()
@@ -256,6 +270,17 @@ class ControlsView(QWidget):
         if ok and title:
              self.playlist_service.insert_item(idx, title, is_chapter=True)
              self._refresh()
+             self.structure_changed.emit()
+
+    def _convert_to_chapter(self):
+        idx = self._get_selected_index()
+        if idx == -1: return
+        
+        if self.playlist_service.convert_to_chapter(idx):
+            self._refresh()
+            self.structure_changed.emit()
+        else:
+            QMessageBox.information(self, "Info", "Already a chapter or invalid selection.")
 
     def _mark_current(self):
         indices = self._get_selected_indices()
@@ -289,11 +314,13 @@ class ControlsView(QWidget):
         if QMessageBox.question(self, "Confirm", f"Delete {len(indices)} items?") == QMessageBox.Yes:
             self.playlist_service.delete_items(indices)
             self._refresh()
+            self.structure_changed.emit()
 
     def _move_items(self, direction):
         indices = self._get_selected_indices()
         if self.playlist_service.move_items(indices, direction):
             self._refresh()
+            self.structure_changed.emit()
             # Restore selection (tricky due to re-indexing, but service returns new indices)
             # Todo: update selection
 
@@ -326,11 +353,17 @@ class ControlsView(QWidget):
 
     def _merge_failed(self):
         count = self.playlist_service.merge_failed_down()
-        if count: self._refresh(); QMessageBox.information(self, "Merged", f"Merged {count} chunks.")
+        if count: 
+            self._refresh()
+            self.structure_changed.emit()
+            QMessageBox.information(self, "Merged", f"Merged {count} chunks.")
         
     def _split_all_failed(self):
         count = self.playlist_service.split_all_failed()
-        if count: self._refresh(); QMessageBox.information(self, "Split", f"Split {count} chunks.")
+        if count: 
+            self._refresh()
+            self.structure_changed.emit()
+            QMessageBox.information(self, "Split", f"Split {count} chunks.")
         
     def _clean_chars(self):
         indices = self._get_selected_indices()

@@ -143,6 +143,9 @@ class ChatterboxProQt(QMainWindow):
         self.setup_view.session_updated.connect(lambda: self.playlist_view.refresh())
         self.setup_view.session_updated.connect(lambda: self.chapters_view.model.refresh())
         
+        # Wire Controls Structure Change (Sync Chapter List)
+        self.controls_view.structure_changed.connect(lambda: self.chapters_view.model.refresh())
+        
         # Wire Chapter Jump (MCCC: Fixed Regression)
         self.chapters_view.jump_requested.connect(self.on_chapter_jump)
         

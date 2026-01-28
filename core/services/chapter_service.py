@@ -35,7 +35,7 @@ class ChapterService:
 
         # 3. Construct Chapters
         for k, (idx, item) in enumerate(starts):
-            title = item.get('text', 'Chapter').strip()[:50] # Truncate check
+            title = item.get('original_sentence', 'Chapter').strip()[:50] # Truncate check
             
             # End index is start of next chapter - 1, or end of list
             if k + 1 < len(starts):

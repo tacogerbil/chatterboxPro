@@ -92,6 +92,20 @@ class PlaylistService:
         self.state.sentences.insert(index, new_item)
         self._renumber()
 
+    def convert_to_chapter(self, index: int) -> bool:
+        """Converts an existing item into a Chapter Heading."""
+        item = self.get_selected_item(index)
+        if not item: return False
+        
+        if not item.get('is_chapter_heading'):
+            item['is_chapter_heading'] = True
+            # Ideally reset generation status? Or keeps audio but acts as header?
+            # Usually headers are skipped in generation or treated separately.
+            # Let's keep content but mark modified.
+            item['marked'] = True 
+            return True
+        return False
+
     def delete_items(self, indices: List[int]) -> int:
         """Deletes items at indices. Returns count deleted."""
         if not indices: return 0
