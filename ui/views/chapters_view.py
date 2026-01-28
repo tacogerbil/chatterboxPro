@@ -131,9 +131,20 @@ class ChaptersView(QWidget):
         self.delegate = ChapterDelegate()
         self.delegate.jump_clicked.connect(self.jump_requested)
         self.list_view.setItemDelegate(self.delegate)
-        self.list_view.setMouseTracking(True) # Required for button hover effects if we added them
+        self.list_view.setMouseTracking(True) 
         
         layout.addWidget(self.list_view)
+        
+        # MCCC Audit: Restore "No Chapters Detected" Placeholder
+        self.empty_label = QLabel("No chapters detected.\n\nUse 'Insert Chapter' in the Editing panel\nor re-process text.")
+        self.empty_label.setAlignment(Qt.AlignCenter)
+        self.empty_label.setStyleSheet("color: gray; font-size: 14px; padding: 20px;")
+        layout.addWidget(self.empty_label)
+        
+        # Listen to model changes to toggle view
+        self.model.modelReset.connect(self._update_empty_state)
+        self.model.rowsInserted.connect(self._update_empty_state)
+        self.model.rowsRemoved.connect(self._update_empty_state)
         
         # Footer: Selection + Actions
         footer_layout = QHBoxLayout()
@@ -145,6 +156,8 @@ class ChaptersView(QWidget):
         sel_none = QPushButton("Deselect All")
         sel_none.clicked.connect(self.deselect_all)
         footer_layout.addWidget(sel_none)
+        
+        # New Feature: Check Highlighted
         
         # New Feature: Check Highlighted
         check_high = QPushButton("Check Highlighted")
@@ -232,4 +245,12 @@ class ChaptersView(QWidget):
         real_idx = self.model.get_chapter_index(index.row())
         if real_idx >= 0:
             self.jump_requested.emit(real_idx)
+            
+    def _update_empty_state(self, *args) -> None:
+        """MCCC: Toggles between ListView and EmptyLabel based on content."""
+        has_items = self.model.rowCount() > 0
+        self.list_view.setVisible(has_items)
+        self.empty_label.setVisible(not has_items)
+        if hasattr(self, 'gen_btn'):
+            self.gen_btn.setEnabled(has_items)
         

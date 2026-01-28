@@ -290,10 +290,7 @@ class ControlsView(QWidget):
         idx = self._get_selected_index()
         next_idx = self.playlist_service.find_next_status(idx, direction, 'failed')
         if next_idx != -1:
-            # Select it (need mapping to View)
-            # PlaylistView logic to select row
-            # self.playlist.select_row(next_idx) ?
-            pass
+            self.playlist.jump_to_row(next_idx)
 
     def _search(self):
         q = self.search_edit.text()
@@ -314,8 +311,7 @@ class ControlsView(QWidget):
     def _show_search_match(self):
         if not self.matches: return
         target = self.matches[self.match_idx]
-        # self.playlist.jump_to_row(target) 
-        pass
+        self.playlist.jump_to_row(target)
 
     def _merge_failed(self):
         count = self.playlist_service.merge_failed_down()
