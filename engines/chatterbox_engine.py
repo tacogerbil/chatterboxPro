@@ -14,7 +14,7 @@ from chatterbox.tts import ChatterboxTTS
 # To prevent future breakage, set this to the specific commit hash of the model you want to use.
 # Example: "a1b2c3d4..."
 # Leave as None to always use the latest version (Risk of drift).
-MODEL_REVISION = "05e904af2b5c7f8e482687a9dd7336c5c824467d9" # Pinned to current stable SHA (Jan 2026)
+MODEL_REVISION = None # Back to Latest (SHA caused 404)
 
 class ChatterboxEngine(BaseTTSEngine):
     """Adapter for Chatterbox TTS engine."""
@@ -35,20 +35,67 @@ class ChatterboxEngine(BaseTTSEngine):
                 model_file = Path(self.model_path) / "ve.pt"
                 if not model_file.exists():
                     print(f"[ChatterboxEngine] Model file {model_file} not found.")
-                    print(f"[ChatterboxEngine] Auto-downloading 'resemble-ai/chatterbox' to {self.model_path}...")
                     
+                    found_in_cache = False
                     try:
-                        from huggingface_hub import snapshot_download
-                        snapshot_download(
-                            repo_id="ResembleAI/chatterbox", 
-                            local_dir=self.model_path,
-                            local_dir_use_symlinks=False, # Ensure actual files for portability
-                            revision=MODEL_REVISION 
-                        )
-                        print("[ChatterboxEngine] Download complete.")
+                        import shutil
+                        import os
+                        
+                        # 0. Check Local Repo Source (Highest Priority)
+                        # If the user has the model inside the 'chatterbox' package in this repo
+                        repo_root = Path(__file__).parent.parent / "chatterbox"
+                        local_repo_ve = repo_root / "ve.pt"
+                        
+                        print(f"[ChatterboxEngine] Checking local repo at: {repo_root}")
+                        
+                        if local_repo_ve.exists():
+                             print(f"[ChatterboxEngine] Found model in local repo: {repo_root}")
+                             print(f"[ChatterboxEngine] Copying from Repo to Target: {self.model_path}...")
+                             # We Copy here (safe) or Move? Copy is safer for repo integrity, but user might want space.
+                             # Let's Copy to be safe, user can delete original if they want.
+                             for item in repo_root.iterdir():
+                                if item.name == "ve.pt" or item.name == "config.json" or item.suffix == ".bin":  # Copy known model files
+                                     shutil.copy2(item, self.model_path)
+                             print("[ChatterboxEngine] Transfer complete.")
+                             found_in_cache = True
+                        
+                        # 1. Try to find in Local HuggingFace Cache (Second Priority)
+                        elif not found_in_cache:
+                            user_home = Path.home()
+                            cache_search_path = user_home / ".cache" / "huggingface" / "hub"
+                            
+                            # Pattern: models--ResembleAI--chatterbox/snapshots/<hash>/ve.pt
+                            if cache_search_path.exists():
+                                print(f"[ChatterboxEngine] Searching local cache: {cache_search_path}")
+                                # Recursive glob to look deep in snapshots
+                                potential_model_files = list(cache_search_path.glob("models--ResembleAI--chatterbox/snapshots/*/ve.pt"))
+                                
+                                if potential_model_files:
+                                    source_ve = potential_model_files[0]
+                                    source_dir = source_ve.parent
+                                    print(f"[ChatterboxEngine] Found existing model in cache: {source_dir}")
+                                    print(f"[ChatterboxEngine] MOVING to {self.model_path} (Saving Space)...")
+                                    
+                                    # Move all files from source snapshot to target
+                                    for item in source_dir.iterdir():
+                                        if item.is_file() or item.is_dir():
+                                            shutil.move(str(item), str(self.model_path))
+                                            
+                                    print("[ChatterboxEngine] Transfer complete.")
+                                    found_in_cache = True
+                                
                     except Exception as e:
-                        print(f"[ChatterboxEngine] Download failed: {e}")
-                        # Let it fail naturally at from_local call below if download didn't fix it
+                        print(f"[ChatterboxEngine] Local transfer failed: {e}")
+
+                    # 2. Strict Local Failure (No Auto-Download)
+                    if not found_in_cache:
+                        error_msg = (
+                            f"Model file 've.pt' not found in {self.model_path}.\n"
+                            f"Also could not find it in local repo ({repo_root}) or local cache.\n"
+                            "Please Ensure the Chatterbox model files are present in your installation."
+                        )
+                        print(f"[ChatterboxEngine] CRITICAL: {error_msg}")
+                        raise FileNotFoundError(error_msg)
                 
                 self.model = ChatterboxTTS.from_local(self.model_path, self.device)
             else:
