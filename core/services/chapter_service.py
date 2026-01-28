@@ -7,20 +7,50 @@ class ChapterService:
     - Resolving selected chapters to sentence indices
     """
     
-    def detect_chapters(self, sentences: List[Dict[str, Any]]) -> List[Tuple[int, Dict[str, Any]]]:
+    def detect_chapters(self, sentences: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Scans sentences for 'is_chapter_heading' flag.
-        Returns a list of (index, item) tuples.
+        Returns a list of dicts:
+        [{'title': str, 'start_idx': int, 'end_idx': int}, ...]
         """
-        found_chapters = []
+        chapters = []
         if not sentences:
-            return found_chapters
+            return chapters
             
+        # 1. Find all chapter starts
+        starts = []
         for i, item in enumerate(sentences):
             if item.get('is_chapter_heading'):
-                found_chapters.append((i, item))
+                starts.append((i, item))
         
-        return found_chapters
+        # 2. Add implicit first chapter if none at 0? 
+        # (Optional, but good UX if text starts without header)
+        if not starts and sentences:
+             # Treat whole thing as one chapter?
+             pass 
+        elif starts and starts[0][0] > 0:
+             # There is content before first heading. 
+             # Should we treat it as "Prologue"?
+             pass
+
+        # 3. Construct Chapters
+        for k, (idx, item) in enumerate(starts):
+            title = item.get('text', 'Chapter').strip()[:50] # Truncate check
+            
+            # End index is start of next chapter - 1, or end of list
+            if k + 1 < len(starts):
+                end_idx = starts[k+1][0] - 1
+            else:
+                end_idx = len(sentences) - 1
+                
+            chapters.append({
+                'title': title,
+                'start_idx': idx,
+                'end_idx': end_idx,
+                'uuid': item.get('uuid')
+            })
+            
+        return chapters
 
     def get_indices_for_chapters(self, 
                                all_sentences: List[Dict[str, Any]], 
