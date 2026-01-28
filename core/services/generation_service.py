@@ -307,10 +307,27 @@ class GenerationService(QObject):
         devices, max_workers = self._configure_workers(s.target_gpus)
         
         # 3. Prepare Logic (Seed, etc)
-        run_seed = s.master_seed if s.master_seed != 0 else random.randint(1, 2**32 - 1)
+        # MCCC Audit: Handle Multiple Full Outputs
+        # If indices_to_process is None (Full Run), respect num_full_outputs.
+        # If explicit indices (Repair/Retry), run only once (run_idx=0).
         
-        # 4. Create Tasks
-        tasks = self._prepare_tasks(process_indices, devices, run_seed, outputs_dir)
+        num_runs = 1
+        if indices_to_process is None: # Only for full runs
+             num_runs = max(1, s.num_full_outputs)
+        
+        tasks = []
+        for run_i in range(num_runs):
+            # Vary seed per run
+            current_seed = s.master_seed + run_i if s.master_seed != 0 else random.randint(1, 2**32 - 1)
+            
+            run_tasks = self._prepare_tasks(process_indices, devices, current_seed, outputs_dir)
+            
+            # Update run_idx for all tasks in this batch
+            if run_i > 0:
+                for t in run_tasks:
+                    t.run_idx = run_i
+            
+            tasks.extend(run_tasks)
             
         # 5. Start Thread
         self.worker_thread = GenerationThread(tasks, max_workers, outputs_dir)

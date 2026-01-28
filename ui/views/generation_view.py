@@ -280,6 +280,22 @@ class GenerationView(QWidget):
         )
         a_layout.addRow("Target Devs:", self.gpu_edit)
         
+        self.order_combo = QComboBox()
+        self.order_combo.addItems(["fastest", "sequential"])
+        self.order_combo.setCurrentText(self.state.settings.generation_order)
+        self.order_combo.currentTextChanged.connect(
+            lambda t: setattr(self.state.settings, 'generation_order', t)
+        )
+        a_layout.addRow("Gen Order:", self.order_combo)
+        
+        self.order_combo = QComboBox()
+        self.order_combo.addItems(["fastest", "sequential"])
+        self.order_combo.setCurrentText(self.state.settings.generation_order)
+        self.order_combo.currentTextChanged.connect(
+            lambda t: setattr(self.state.settings, 'generation_order', t)
+        )
+        a_layout.addRow("Gen Order:", self.order_combo)
+        
         self.seed_spin = QSpinBox()
         self.seed_spin.setRange(0, 9999999)
         self.seed_spin.setValue(self.state.settings.master_seed)
@@ -295,6 +311,50 @@ class GenerationView(QWidget):
             lambda v: setattr(self.state.settings, 'num_candidates', v)
         )
         a_layout.addRow("Candidates:", self.cand_spin)
+
+        # MCCC Audit Restoration:
+        self.outputs_spin = QSpinBox()
+        self.outputs_spin.setRange(1, 100)
+        self.outputs_spin.setValue(self.state.settings.num_full_outputs)
+        self.outputs_spin.valueChanged.connect(
+            lambda v: setattr(self.state.settings, 'num_full_outputs', v)
+        )
+        a_layout.addRow("Full Outputs:", self.outputs_spin)
+        
+        self.retries_spin = QSpinBox()
+        self.retries_spin.setRange(0, 10)
+        self.retries_spin.setValue(self.state.settings.max_attempts)
+        self.retries_spin.valueChanged.connect(
+            lambda v: setattr(self.state.settings, 'max_attempts', v)
+        )
+        a_layout.addRow("ASR Max Retries:", self.retries_spin)
+
+        # Checkboxes/Switches
+        chk_layout = QVBoxLayout()
+        
+        self.chk_asr = QGroupBox("ASR Validation")
+        self.chk_asr.setCheckable(True)
+        self.chk_asr.setChecked(self.state.settings.asr_validation_enabled)
+        self.chk_asr.toggled.connect(
+            lambda c: setattr(self.state.settings, 'asr_validation_enabled', c)
+        )
+        # ASR Threshold inside logic
+        asr_l = QFormLayout(self.chk_asr)
+        self.asr_thresh = QLabeledSlider("Threshold", 0.1, 1.0, self.state.settings.asr_threshold)
+        self.asr_thresh.value_changed.connect(
+             lambda v: setattr(self.state.settings, 'asr_threshold', v)
+        )
+        asr_l.addRow(self.asr_thresh)
+        chk_layout.addWidget(self.chk_asr)
+        
+        self.chk_watermark = QCheckBox("Disable Perth Watermark")
+        self.chk_watermark.setChecked(self.state.settings.disable_watermark)
+        self.chk_watermark.stateChanged.connect(
+             lambda s: setattr(self.state.settings, 'disable_watermark', s == Qt.Checked or s == 2)
+        )
+        chk_layout.addWidget(self.chk_watermark)
+        
+        a_layout.addRow(chk_layout)
 
         self.adv_container.hide()
         self.adv_btn.toggled.connect(self.adv_container.setVisible)
@@ -451,9 +511,29 @@ class GenerationView(QWidget):
         if hasattr(self, 'bass_slider'): self.bass_slider.set_value(s.bass_boost)
         if hasattr(self, 'treble_slider'): self.treble_slider.set_value(s.treble_boost)
         
+        if hasattr(self, 'order_combo'): self.order_combo.setCurrentText(s.generation_order)
+        if hasattr(self, 'outputs_spin'): self.outputs_spin.setValue(s.num_full_outputs)
+        if hasattr(self, 'retries_spin'): self.retries_spin.setValue(s.max_attempts)
+        if hasattr(self, 'chk_asr'): self.chk_asr.setChecked(s.asr_validation_enabled)
+        if hasattr(self, 'asr_thresh'): self.asr_thresh.set_value(s.asr_threshold)
+        if hasattr(self, 'chk_watermark'): self.chk_watermark.setChecked(s.disable_watermark)
+        if hasattr(self, 'timbre_slider'): self.timbre_slider.set_value(s.timbre_shift)
+        if hasattr(self, 'gruffness_slider'): self.gruffness_slider.set_value(s.gruffness)
+        if hasattr(self, 'bass_slider'): self.bass_slider.set_value(s.bass_boost)
+        if hasattr(self, 'treble_slider'): self.treble_slider.set_value(s.treble_boost)
+        
+        self.gpu_edit.setText(s.target_gpus)
+        self.seed_spin.setValue(s.master_seed)
         self.gpu_edit.setText(s.target_gpus)
         self.seed_spin.setValue(s.master_seed)
         self.cand_spin.setValue(s.num_candidates)
+        
+        # Restored
+        if hasattr(self, 'outputs_spin'): self.outputs_spin.setValue(s.num_full_outputs)
+        if hasattr(self, 'retries_spin'): self.retries_spin.setValue(s.max_attempts)
+        if hasattr(self, 'chk_asr'): self.chk_asr.setChecked(s.asr_validation_enabled)
+        if hasattr(self, 'asr_thresh'): self.asr_thresh.set_value(s.asr_threshold)
+        if hasattr(self, 'chk_watermark'): self.chk_watermark.setChecked(s.disable_watermark)
 
 
 

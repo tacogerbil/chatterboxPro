@@ -34,6 +34,7 @@ class SetupView(QWidget):
         self.setup_header(layout)
         self.setup_session_controls(layout)
         self.setup_processing_controls(layout)
+        self.setup_key_params(layout) # Restored
         self.setup_voice_controls(layout)
         self.setup_main_controls(layout)
         self.setup_system_check(layout)
@@ -97,6 +98,39 @@ class SetupView(QWidget):
             lambda s: setattr(self.state, 'aggro_clean_on_parse', s == Qt.Checked or s == 2)
         )
         layout.addWidget(self.aggro_chk)
+        
+    def setup_key_params(self, layout: QVBoxLayout) -> None:
+        """Restores the 'Key Parameters (Loaded)' display from Reference."""
+        group = QGroupBox("Key Parameters (Summary)")
+        f_layout = QFormLayout(group)
+        
+        self.lbl_ref_audio = QLabel("--")
+        self.lbl_exaggeration = QLabel("--")
+        self.lbl_temp = QLabel("--")
+        
+        f_layout.addRow("Reference Audio:", self.lbl_ref_audio)
+        f_layout.addRow("Exaggeration:", self.lbl_exaggeration)
+        f_layout.addRow("Temperature:", self.lbl_temp)
+        
+        # Edit Button to jump to Generation Tab? (Optional, kept simpler for now)
+        layout.addWidget(group)
+        
+    def refresh_params_display(self) -> None:
+        """Updates the Parameter labels from AppState."""
+        # Ref Audio
+        ref = self.state.ref_audio_path
+        self.lbl_ref_audio.setText(os.path.basename(ref) if ref else "None")
+        if ref: self.lbl_ref_audio.setToolTip(ref)
+            
+        # Settings
+        s = self.state.settings
+        self.lbl_exaggeration.setText(f"{s.exaggeration:.2f}")
+        self.lbl_temp.setText(f"{s.temperature:.2f}")
+
+    def showEvent(self, event) -> None:
+        """Auto-refresh on tab show."""
+        self.refresh_params_display()
+        super().showEvent(event)
 
     def setup_voice_controls(self, layout: QVBoxLayout) -> None:
         tpl_group = QGroupBox("Generation Voices")

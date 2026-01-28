@@ -465,7 +465,13 @@ def worker_process_chunk(task: WorkerTask):
                 os.remove(temp_path_str)
 
     # --- Final Selection Logic ---
-    final_wav_path = Path(output_dir_str) / session_name / "Sentence_wavs" / f"audio_{uuid}.wav"
+    # --- Final Selection Logic ---
+    # MCCC: Respect run_idx for multiple output support
+    wavs_folder = "Sentence_wavs"
+    if run_idx > 0:
+        wavs_folder = f"Sentence_wavs_run_{run_idx+1}"
+        
+    final_wav_path = Path(output_dir_str) / session_name / wavs_folder / f"audio_{uuid}.wav"
     final_wav_path.parent.mkdir(exist_ok=True, parents=True)
     
     chosen_candidate = None

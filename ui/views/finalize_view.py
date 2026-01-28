@@ -161,16 +161,18 @@ class FinalizeView(QWidget):
         self.btn_assemble.setText("Assemble Single File")
         self.btn_export.setEnabled(True)
 
-    def assemble(self):
+    def assemble(self, output_path: str = None):
         if not hasattr(self, 'assembly_service'): return
         
-        # Default name
-        default_name = f"{self.state.session_name}_audiobook.mp3"
-        
-        path, _ = QFileDialog.getSaveFileName(self, "Assemble Audiobook", 
-                                              default_name, 
-                                              "MP3 Files (*.mp3);;WAV Files (*.wav)")
-        if not path: return
+        if output_path:
+             path = output_path
+        else:
+            # Interactive Mode
+            default_name = f"{self.state.session_name}_audiobook.mp3"
+            path, _ = QFileDialog.getSaveFileName(self, "Assemble Audiobook", 
+                                                  default_name, 
+                                                  "MP3 Files (*.mp3);;WAV Files (*.wav)")
+            if not path: return
         
         # Gather Metadata
         metadata = {
@@ -207,3 +209,21 @@ class FinalizeView(QWidget):
         self.btn_export.setEnabled(False); self.btn_export.setText("Exporting...")
 
         self.assembly_service.export_chapters(path)
+
+    def auto_assemble(self):
+        """MCCC: Non-interactive assembly for 'Auto-Assemble' feature."""
+        import os
+        # Default to session dir
+        # Outputs_Pro/SessionName/SessionName.mp3
+        # Logic matches Reference behavior approx.
+        filename = f"{self.state.session_name}.mp3"
+        # We need the full path. AssemblyService usually knows the output dir, 
+        # but here we pass the destination file.
+        # Assuming we are in project root or relative to it?
+        # Better to query AppState or Config for default output dir.
+        # Hardcoding "Outputs_Pro" for now as per other services.
+        output_dir = "Outputs_Pro"
+        path = f"{output_dir}/{self.state.session_name}/{filename}"
+        
+        print(f"[Auto-Assemble] Triggered for: {path}")
+        self.assemble(output_path=path)

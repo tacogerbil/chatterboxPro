@@ -14,6 +14,7 @@ class GenerationSettings:
     master_seed: int = 0
     num_candidates: int = 1
     max_attempts: int = 3
+    generation_order: str = "fastest" # "fastest" or "sequential"
     
     # ASR Settings
     asr_validation_enabled: bool = True

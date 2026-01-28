@@ -139,11 +139,26 @@ class ChatterboxProQt(QMainWindow):
         
         # Wire Chapter Jump (MCCC: Fixed Regression)
         self.chapters_view.jump_requested.connect(self.on_chapter_jump)
+        
+        # Wire Generation Finished (MCCC: Fixed Regression)
+        self.gen_service.finished.connect(self.on_generation_finished)
 
-    def on_chapter_jump(self, row_idx: int) -> None:
-        """Handles jump request from Chapters View."""
         print(f"Jumping to playlist row: {row_idx}")
         self.playlist_view.jump_to_row(row_idx)
+
+    def on_generation_finished(self) -> None:
+        """Called when GenerationService finishes a run."""
+        # 1. Update UI Status
+        self.statusBar().showMessage("Generation Finished.")
+        
+        # 2. Check for Auto-Assemble
+        if self.app_state.auto_assemble_after_run:
+            self.statusBar().showMessage("Generation Finished. Starting Auto-Assembly...")
+            self.finalize_view.auto_assemble()
+        else:
+            QMessageBox.information(self, "Generation Complete", 
+                                  "All tasks finished.\n\n"
+                                  "Go to the 'Finalize' tab to assemble your audiobook.")
 
     def closeEvent(self, event) -> None:
         """Handle application closure: Save State."""
