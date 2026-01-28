@@ -24,6 +24,25 @@ class ChatterboxEngine(BaseTTSEngine):
         if self.model is None:
             if self.model_path:
                 print(f"[ChatterboxEngine] Loading from local path: {self.model_path}")
+                
+                # Check for critical model file
+                model_file = Path(self.model_path) / "ve.pt"
+                if not model_file.exists():
+                    print(f"[ChatterboxEngine] Model file {model_file} not found.")
+                    print(f"[ChatterboxEngine] Auto-downloading 'resemble-ai/chatterbox' to {self.model_path}...")
+                    
+                    try:
+                        from huggingface_hub import snapshot_download
+                        snapshot_download(
+                            repo_id="resemble-ai/chatterbox", 
+                            local_dir=self.model_path,
+                            local_dir_use_symlinks=False # Ensure actual files for portability
+                        )
+                        print("[ChatterboxEngine] Download complete.")
+                    except Exception as e:
+                        print(f"[ChatterboxEngine] Download failed: {e}")
+                        # Let it fail naturally at from_local call below if download didn't fix it
+                
                 self.model = ChatterboxTTS.from_local(self.model_path, self.device)
             else:
                 print(f"[ChatterboxEngine] Loading from Hub (default)...")
