@@ -55,11 +55,11 @@ class PlaylistView(QWidget):
         self.list_view.setSelectionMode(QListView.ExtendedSelection)
         self.list_view.setAlternatingRowColors(True)
         
-        # Consistent Dark Palette
+        # User Requested: Light Gray + Slightly Darker + Black Text
         p = self.list_view.palette()
-        p.setColor(QPalette.Base, QColor("#2b2b2b"))
-        p.setColor(QPalette.AlternateBase, QColor("#252525"))
-        p.setColor(QPalette.Text, QColor("#eeeeee"))
+        p.setColor(QPalette.Base, QColor("#F5F5F5"))
+        p.setColor(QPalette.AlternateBase, QColor("#EBEBEB"))
+        p.setColor(QPalette.Text, QColor("#000000"))
         self.list_view.setPalette(p)
 
         self.list_view.selectionModel().selectionChanged.connect(self.update_stats)
