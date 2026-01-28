@@ -17,6 +17,7 @@ from core.services.audio_service import AudioService
 from core.services.playlist_service import PlaylistService
 from core.services.assembly_service import AssemblyService
 from core.services.config_service import ConfigService
+from core.services.project_service import ProjectService
 
 class ChatterboxProQt(QMainWindow):
     def __init__(self, app_state: Optional[AppState] = None, config_service: Optional[ConfigService] = None) -> None:
