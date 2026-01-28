@@ -8,38 +8,30 @@ from core.models.playlist_model import PlaylistModel
 class PlaylistDelegate(QStyledItemDelegate):
     """
     Renders playlist items with color coding based on status/type.
+    MCCC Compliance: Uses initStyleOption to modify background, 
+    letting super().paint() handle text rendering for CSS compatibility.
     """
-    def paint(self, painter, option, index):
-        painter.save()
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
         
-        # Get data
-        text = index.data(Qt.DisplayRole)
+        # Get Status
         status = index.data(PlaylistModel.StatusRole)
-        # Use a hypothetical visual role or infer from text/index in model
-        # For true MVP parity, we rely on StatusRole.
         
-        # Background Colors
-        bg_color = QColor(Qt.transparent)
-        
-        if option.state & QStyle.State_Selected:
-            bg_color = option.palette.highlight().color()
-        elif status == "failed":
-            bg_color = QColor("#FFCCCC") # Light Red
-        elif status == "success":
-            bg_color = QColor("#CCFFCC") # Light Green
+        # Apply Status Colors (Modify background brush)
+        # Note: We must respect selection state. If selected, let default selection color win.
+        if not (option.state & QStyle.State_Selected):
+            if status == "failed":
+                # Dark Red for Dark Theme readability or standard Red?
+                # Using a semi-transparent overlay allowing theme to shine? 
+                # Or just a solid distinct color.
+                option.backgroundBrush = QBrush(QColor("#543030")) # Darker Red (better for dark theme)
+            elif status == "success":
+                option.backgroundBrush = QBrush(QColor("#2E4B2E")) # Darker Green
             
-        painter.fillRect(option.rect, bg_color)
-        
-        # Text
-        painter.setPen(option.palette.text().color())
-        if option.state & QStyle.State_Selected:
-             painter.setPen(option.palette.highlightedText().color())
-             
-        # Draw Text
-        rect = option.rect.adjusted(5, 0, -5, 0) # Padding
-        painter.drawText(rect, Qt.AlignVCenter | Qt.AlignLeft, text)
-        
-        painter.restore()
+            # If default/pending, leave standard background
+
+    # Remove manual paint() to allow CSS Text Color to apply naturally
+
 
 class PlaylistView(QWidget):
     def __init__(self, app_state: AppState, parent=None):
