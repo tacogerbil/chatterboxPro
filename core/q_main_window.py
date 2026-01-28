@@ -142,14 +142,26 @@ def launch_qt_app() -> None:
     # Create the Application
     app = QApplication(sys.argv)
     
-    # Initialize Theme via Manager
+    # MCCC: Bootstrap State & Config BEFORE Window Creation
+    from core.state import AppState
+    from core.services.config_service import ConfigService
     from ui.theme_manager import ThemeManager
-    ThemeManager.initialize_theme(app)
+    
+    # 1. Init State
+    app_state = AppState()
+    config_service = ConfigService()
+    
+    # 2. Load Persistence (Theme name is in here now)
+    config_service.load_state(app_state)
+    
+    # 3. Apply Theme (Pure Function)
+    print(f"[Startup] Applying Theme: {app_state.theme_name}")
+    ThemeManager.apply_theme(app, app_state.theme_name, app_state.theme_invert)
 
     print("--- Launching Chatterbox Pro (Qt) ---")
     
-    # Create and Show Window
-    window = ChatterboxProQt()
+    # 4. Create Window with Injected State
+    window = ChatterboxProQt(app_state=app_state, config_service=config_service)
     window.show()
     
     sys.exit(app.exec())

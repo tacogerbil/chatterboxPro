@@ -37,16 +37,32 @@ if __name__ == "__main__":
     qt_app = QApplication(sys.argv)
     qt_app.setApplicationName("Chatterbox Pro")
     
-    # --- UI Theme (qt-material) ---
+    # --- UI Theme & State Bootstrap ---
     try:
+        from core.state import AppState
+        from core.services.config_service import ConfigService
         from ui.theme_manager import ThemeManager
-        ThemeManager.initialize_theme(qt_app)
+        from core.q_main_window import QChatterboxPro # Alias for ChatterboxProQt
+        
+        # 1. Init State
+        app_state = AppState()
+        config_service = ConfigService()
+        
+        # 2. Load Persistence
+        config_service.load_state(app_state)
+        
+        # 3. Apply Theme
+        print(f"Loading Theme: {app_state.theme_name}")
+        ThemeManager.apply_theme(qt_app, app_state.theme_name, app_state.theme_invert)
+        
+        # 4. Create Window with Injection
+        window = QChatterboxPro(app_state=app_state, config_service=config_service)
+        window.show()
+        
     except Exception as e:
-        print(f"Warning: Could not apply qt-material theme: {e}")
-    
-    # Initialize Main Window (New Codebase)
-    window = QChatterboxPro(dependency_manager=deps)
-    window.show()
+        print(f"Critical Startup Error: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Run Event Loop
     sys.exit(qt_app.exec())
