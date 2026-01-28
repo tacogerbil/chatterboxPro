@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, Signal, QModelIndex, QRect, QEvent
 from typing import Optional
 from core.state import AppState
 from core.services.generation_service import GenerationService
+from core.services.chapter_service import ChapterService
 
 class ChapterDelegate(QStyledItemDelegate):
     jump_clicked = Signal(int)
