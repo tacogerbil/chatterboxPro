@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListView, 
-                               QPushButton, QLabel, QStyle, QStyledItemDelegate, QGroupBox, QFormLayout)
-from PySide6.QtGui import QColor, QFont, QPen, QBrush
-from PySide6.QtCore import Qt, QModelIndex
+                               QLabel, QStyle, QStyledItemDelegate, QGroupBox, QFormLayout)
+from PySide6.QtGui import QColor, QBrush
+from PySide6.QtCore import Qt
 from core.state import AppState
 from core.models.playlist_model import PlaylistModel
 
@@ -21,16 +21,9 @@ class PlaylistDelegate(QStyledItemDelegate):
         # Note: We must respect selection state. If selected, let default selection color win.
         if not (option.state & QStyle.State_Selected):
             if status == "failed":
-                # Dark Red for Dark Theme readability or standard Red?
-                # Using a semi-transparent overlay allowing theme to shine? 
-                # Or just a solid distinct color.
-                option.backgroundBrush = QBrush(QColor("#543030")) # Darker Red (better for dark theme)
+                option.backgroundBrush = QBrush(QColor("#543030")) # Darker Red
             elif status == "success":
                 option.backgroundBrush = QBrush(QColor("#2E4B2E")) # Darker Green
-            
-            # If default/pending, leave standard background
-
-    # Remove manual paint() to allow CSS Text Color to apply naturally
 
 
 class PlaylistView(QWidget):

@@ -87,7 +87,7 @@ class SetupView(QWidget):
         self.edit_btn = QPushButton("Edit Source Text")
         self.edit_btn.setToolTip("Opens file in external editor, then reloads")
         self.edit_btn.setStyleSheet("background-color: #2E86C1; color: white; padding: 10px; font-weight: bold;")
-        self.edit_btn.clicked.connect(self.edit_and_process_workflow)
+        self.edit_btn.clicked.connect(self.open_editor_and_process)
         layout.addWidget(self.edit_btn)
         
         # Aggro Clean Switch
@@ -210,19 +210,13 @@ class SetupView(QWidget):
                 self.session_name_edit.setText(name)
                 self.state.session_name = name
 
-    def edit_and_process_workflow(self) -> None:
+    def open_editor_and_process(self) -> None:
         """
-        Direct Internal Editor Workflow (Restored per User Request).
-        Opens the ReviewTextDialog immediately.
+        Opens the internal source editor. 
+        On save, writes back to disk and processes chunks.
         """
-        if not self.state.source_file_path:
-             QMessageBox.warning(self, "No File", "Please select a source file first.")
-             return
-             
-        self.process_text()
-
-    def process_text(self) -> None:
         if not self.state.source_file_path: 
+            QMessageBox.warning(self, "No File", "Please select a source file first.")
             return
         
         try:
@@ -238,15 +232,18 @@ class SetupView(QWidget):
             
             if dlg.exec():
                 final_text = dlg.result_text
-                # Save changes back to file? User said "I edit and close it".
-                # If we don't save to file, we drift from source.
-                # Let's save it to source_file_path if possible, or just process.
-                # MCCC: Ideally we save.
+                
+                # 3. Save changes to source file
                 try:
                     with open(self.state.source_file_path, 'w', encoding='utf-8') as f:
                         f.write(final_text)
                 except Exception as e:
                     print(f"Warning: Could not save back to source file: {e}")
+
+                self._perform_text_processing(final_text)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
 
                 self._perform_text_processing(final_text)
                 
