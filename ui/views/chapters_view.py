@@ -1,19 +1,101 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListView, 
-    QPushButton, QLabel, QMessageBox, QCheckBox
+    QPushButton, QLabel, QMessageBox, QCheckBox, QStyledItemDelegate, QStyle, QApplication, QStyleOptionViewItem
 )
-from PySide6.QtCore import Qt, Signal, QModelIndex
-from typing import Optional, List
+from PySide6.QtGui import QColor, QBrush, QPalette
+from PySide6.QtCore import Qt, Signal, QModelIndex, QRect, QEvent
 
-from core.state import AppState
-from core.models.chapter_model import ChapterModel
-from core.services.chapter_service import ChapterService
-from core.services.generation_service import GenerationService
+class ChapterDelegate(QStyledItemDelegate):
+    jump_clicked = Signal(int)
+
+    def paint(self, painter, option, index):
+        # 1. Init Style
+        self.initStyleOption(option, index)
+        painter.save()
+        
+        style = option.widget.style() if option.widget else QApplication.style()
+        
+        # 2. Draw Background (Selection)
+        style.drawPrimitive(QStyle.PE_PanelItemViewItem, option, painter, option.widget)
+        
+        # 3. Calculate Rects
+        rect = option.rect
+        button_width = 80
+        # Button Rect (Right aligned)
+        button_rect = QRect(rect.right() - button_width - 5, rect.top() + 2, button_width, rect.height() - 4)
+        
+        # Checkbox Rect (Left aligned Standard)
+        check_rect = style.subElementRect(QStyle.SE_ItemViewItemCheckIndicator, option, option.widget)
+        # Fallback if style returns empty rect (Common in some custom styles if they don't see the flag)
+        if check_rect.width() <= 0 or check_rect.height() <= 0:
+             check_rect = QRect(rect.left() + 5, rect.top() + (rect.height() - 20)//2, 20, 20)
+
+        # Text Rect (Between Check and Button)
+        text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, option, option.widget)
+        # If check rect was manually calculated, text rect logic needs update too
+        if text_rect.left() < check_rect.right():
+             text_rect.setLeft(check_rect.right() + 5)
+        
+        text_rect.setRight(button_rect.left() - 10)
+        
+        # 4. Draw Checkbox (Explicitly - ALWAYS)
+        check_opt = QStyleOptionViewItem(option)
+        check_opt.rect = check_rect
+        check_opt.state = check_opt.state & ~QStyle.State_HasFocus
+        
+        if option.checkState == Qt.Checked:
+            check_opt.state |= QStyle.State_On
+        else:
+            check_opt.state |= QStyle.State_Off
+            
+        style.drawPrimitive(QStyle.PE_IndicatorItemViewItemCheck, check_opt, painter, option.widget)
+            
+        # 5. Draw Text
+        text = option.text
+        # Handle truncation if needed
+        # Style usually handles eliding if we pass the rect
+        if option.state & QStyle.State_Selected:
+            painter.setPen(option.palette.highlightedText().color())
+        else:
+            painter.setPen(option.palette.text().color())
+            
+        # Draw aligned text
+        # AlignLeft | AlignVCenter is standard
+        style.drawItemText(painter, text_rect, Qt.AlignLeft | Qt.AlignVCenter, option.palette, 
+                           True, text, QPalette.Text)
+
+        # 6. Draw "SELECT" Button
+        # Background
+        btn_color = QColor("#D35400")
+        painter.setBrush(QBrush(btn_color))
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(button_rect, 4, 4)
+        
+        # Text
+        painter.setPen(Qt.white)
+        painter.drawText(button_rect, Qt.AlignCenter, "SELECT")
+        
+        painter.restore()
+
+    def editorEvent(self, event, model, option, index):
+        # Handle Clicks
+        if event.type() == QEvent.MouseButtonRelease:
+            # Check if click was in button rect
+            rect = option.rect
+            button_width = 80
+            button_rect = QRect(rect.right() - button_width - 5, rect.top() + 2, button_width, rect.height() - 4)
+            
+            if button_rect.contains(event.pos()):
+                real_idx = model.get_chapter_index(index.row())
+                self.jump_clicked.emit(real_idx)
+                return True
+                
+        return super().editorEvent(event, model, option, index)
 
 class ChaptersView(QWidget):
     jump_requested = Signal(int)
 
-    def __init__(self, app_state: AppState, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, app_state: AppState, parent=Optional[QWidget]) -> None:
         super().__init__(parent)
         self.app_state = app_state
         self.logic = ChapterService()
@@ -44,6 +126,13 @@ class ChaptersView(QWidget):
         self.list_view.setAlternatingRowColors(True)
         self.list_view.setSelectionMode(QListView.ExtendedSelection)
         self.list_view.doubleClicked.connect(self.on_double_click)
+        
+        # Delegate
+        self.delegate = ChapterDelegate()
+        self.delegate.jump_clicked.connect(self.jump_requested)
+        self.list_view.setItemDelegate(self.delegate)
+        self.list_view.setMouseTracking(True) # Required for button hover effects if we added them
+        
         layout.addWidget(self.list_view)
         
         # Footer: Selection + Actions

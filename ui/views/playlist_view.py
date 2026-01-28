@@ -106,3 +106,13 @@ class PlaylistView(QWidget):
         # Filter for column 0 to avoid duplicates if multiple columns exist (though listview usually has 1)
         valid_indices = sorted([idx.row() for idx in indexes if idx.column() == 0])
         return valid_indices
+
+    def jump_to_row(self, row_index: int) -> None:
+        """MCCC: Handles navigation request from other components."""
+        idx = self.model.index(row_index, 0)
+        if idx.isValid():
+            self.list_view.clearSelection()
+            self.list_view.setCurrentIndex(idx)
+            self.list_view.scrollTo(idx, QListView.PositionAtCenter)
+            # Ensure stats update
+            self.update_stats()

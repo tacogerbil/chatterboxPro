@@ -69,7 +69,11 @@ class ControlsView(QWidget):
         search_widget = QWidget()
         s_layout = QHBoxLayout(search_widget); s_layout.setContentsMargins(0,0,0,0)
         s_layout.addWidget(QLabel("🔍"))
+        s_layout.addWidget(QLabel("🔍"))
         self.search_edit = QLineEdit(); self.search_edit.setPlaceholderText("Search text...")
+        # MCCC: Force visible size and style to prevent red-box/rendering artifacts
+        self.search_edit.setMinimumWidth(150)
+        self.search_edit.setStyleSheet("QLineEdit { color: white; border: 1px solid #555; padding: 2px; }") 
         self.search_edit.returnPressed.connect(self._search)
         s_layout.addWidget(self.search_edit)
         

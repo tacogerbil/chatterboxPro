@@ -90,6 +90,7 @@ class ChatterboxProQt(QMainWindow):
         self.tabs.addTab(self.setup_view, "Setup Session")
         self.tabs.addTab(self.gen_view, "Generation")
         self.tabs.addTab(self.chapters_view, "Chapters")
+        self.tabs.addTab(self.gen_view, "Generation")
         self.tabs.addTab(self.chapters_view, "Chapters")
         self.tabs.addTab(self.finalize_view, "Finalize & Export")
         
@@ -135,6 +136,14 @@ class ChatterboxProQt(QMainWindow):
         # Wire Session Update (Sync Playlist/Chapters)
         self.setup_view.session_updated.connect(lambda: self.playlist_view.refresh())
         self.setup_view.session_updated.connect(lambda: self.chapters_view.model.refresh())
+        
+        # Wire Chapter Jump (MCCC: Fixed Regression)
+        self.chapters_view.jump_requested.connect(self.on_chapter_jump)
+
+    def on_chapter_jump(self, row_idx: int) -> None:
+        """Handles jump request from Chapters View."""
+        print(f"Jumping to playlist row: {row_idx}")
+        self.playlist_view.jump_to_row(row_idx)
 
     def closeEvent(self, event) -> None:
         """Handle application closure: Save State."""
