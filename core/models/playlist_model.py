@@ -23,7 +23,9 @@ class PlaylistModel(QAbstractListModel):
         
         if role == Qt.DisplayRole:
             # Show index + snippet
-            text = item.get('text', '')
+            # MCCC: Strict adherence to data model (original_sentence)
+            text = item.get('original_sentence', '')
+                
             if len(text) > 80: text = text[:77] + "..."
             return f"[{row+1}] {text}"
             
