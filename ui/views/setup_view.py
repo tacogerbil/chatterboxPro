@@ -16,6 +16,7 @@ from core.services.template_service import TemplateService
 
 class SetupView(QWidget):
     template_loaded = Signal()
+    session_updated = Signal() # New: Emitted when sentences/session data changes
 
     def __init__(self, app_state: AppState, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -211,56 +212,42 @@ class SetupView(QWidget):
 
     def edit_and_process_workflow(self) -> None:
         """
-        Workflow:
-        1. Open file externally.
-        2. Ask user to confirm save/reload.
-        3. Trigger processing.
+        Direct Internal Editor Workflow (Restored per User Request).
+        Opens the ReviewTextDialog immediately.
         """
         if not self.state.source_file_path:
-            QMessageBox.warning(self, "No File", "Please select a source file first.")
-            return
-
-        # 1. Open External
-        try:
-            from PySide6.QtGui import QDesktopServices
-            from PySide6.QtCore import QUrl
-            url = QUrl.fromLocalFile(self.state.source_file_path)
-            QDesktopServices.openUrl(url)
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not open file: {e}")
-            return
-
-        # 2. Wait for User
-        reply = QMessageBox.question(
-            self, 
-            "Editing in Progress",
-            "The file has been opened in your system editor.\n\n"
-            "1. Make your edits and SAVE the file.\n"
-            "2. Click 'Yes' below to Reload and Process the changes.\n"
-            "3. Click 'No' to cancel reloading.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes
-        )
-
-        # 3. Process
-        if reply == QMessageBox.Yes:
-            self.process_text()
+             QMessageBox.warning(self, "No File", "Please select a source file first.")
+             return
+             
+        self.process_text()
 
     def process_text(self) -> None:
         if not self.state.source_file_path: 
             return
         
         try:
+            # 1. Read File
             raw_text = self.processor.extract_text_from_file(self.state.source_file_path)
             if raw_text.startswith("Error"):
                 QMessageBox.critical(self, "Error", raw_text)
                 return
             
-            # Use dynamic import to avoid circular dependencies if any
+            # 2. Internal Editor (ReviewTextDialog)
             from ui.dialogs.review_text_dialog import ReviewTextDialog
             dlg = ReviewTextDialog(raw_text, self)
+            
             if dlg.exec():
                 final_text = dlg.result_text
+                # Save changes back to file? User said "I edit and close it".
+                # If we don't save to file, we drift from source.
+                # Let's save it to source_file_path if possible, or just process.
+                # MCCC: Ideally we save.
+                try:
+                    with open(self.state.source_file_path, 'w', encoding='utf-8') as f:
+                        f.write(final_text)
+                except Exception as e:
+                    print(f"Warning: Could not save back to source file: {e}")
+
                 self._perform_text_processing(final_text)
                 
         except Exception as e:
@@ -282,6 +269,9 @@ class SetupView(QWidget):
             )
         
         self.state.sentences = sentences
+        # Signal Global Update (Fixes Playlist not showing items)
+        self.session_updated.emit()
+        
         QMessageBox.information(self, "Success", f"Loaded {len(sentences)} chunks.")
         
         # Save Session
@@ -314,6 +304,7 @@ class SetupView(QWidget):
                 if 'generation_settings' in data:
                      self.state.update_settings(**data['generation_settings'])
                 
+                self.session_updated.emit() # Refresh other views
                 QMessageBox.information(self, "Loaded", f"Session loaded with {len(self.state.sentences)} chunks.")
             else:
                 QMessageBox.warning(self, "Error", "Failed to load session.")

@@ -131,6 +131,10 @@ class ChatterboxProQt(QMainWindow):
         
         # Wire Template Loading (View Migration Parity)
         self.setup_view.template_loaded.connect(self.gen_view.refresh_values)
+        
+        # Wire Session Update (Sync Playlist/Chapters)
+        self.setup_view.session_updated.connect(lambda: self.playlist_view.refresh())
+        self.setup_view.session_updated.connect(lambda: self.chapters_view.model.refresh())
 
     def closeEvent(self, event) -> None:
         """Handle application closure: Save State."""
