@@ -42,7 +42,8 @@ class ChatterboxProQt(QMainWindow):
         self.audio_service = AudioService()
         self.assembly_service = AssemblyService(self.app_state)
         self.playlist_service = PlaylistService(self.app_state)
-        
+        self.project_service = ProjectService() # Data Persistence
+
         # State loaded externally in DI scenario, or above if fallback.
         
         # UI Components Placeholders
@@ -83,13 +84,14 @@ class ChatterboxProQt(QMainWindow):
     def _setup_tabs(self) -> None:
         self.tabs = QTabWidget()
         self.setup_view = SetupView(self.app_state)
+        # Inject project_service if needed (although setup_view currently creates its own)
+        # We can update setup_view to use ours in _inject_dependencies if we want strict DI.
+        
         self.gen_view = GenerationView(self.app_state)
         self.chapters_view = ChaptersView(self.app_state)
         self.finalize_view = FinalizeView(self.app_state)
         
         self.tabs.addTab(self.setup_view, "Setup Session")
-        self.tabs.addTab(self.gen_view, "Generation")
-        self.tabs.addTab(self.chapters_view, "Chapters")
         self.tabs.addTab(self.gen_view, "Generation")
         self.tabs.addTab(self.chapters_view, "Chapters")
         self.tabs.addTab(self.finalize_view, "Finalize & Export")
@@ -124,6 +126,9 @@ class ChatterboxProQt(QMainWindow):
         
         # Inject dependencies for Auto-Fix Loop in GenService
         self.gen_service.set_playlist_service(self.playlist_service)
+        
+        # Inject Project Service into SetupView (prefer shared instance)
+        self.setup_view.project_service = self.project_service
 
     def _connect_signals(self) -> None:
         """Connects global signals between components."""
@@ -170,7 +175,14 @@ class ChatterboxProQt(QMainWindow):
     def closeEvent(self, event) -> None:
         """Handle application closure: Save State."""
         print("Saving session state...", flush=True)
+        # 1. Save App Config
         self.config_service.save_state(self.app_state)
+        
+        # 2. Save Session Data (Sentences, Splits, Pauses)
+        if self.app_state.session_name:
+             print(f"Saving active session: {self.app_state.session_name}")
+             self.project_service.save_current_session(self.app_state)
+             
         event.accept()
 
 def launch_qt_app() -> None:

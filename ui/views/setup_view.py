@@ -56,8 +56,13 @@ class SetupView(QWidget):
         new_btn.clicked.connect(self.new_session)
         load_btn = QPushButton("Load Session")
         load_btn.clicked.connect(self.load_session_dialog)
+        
+        save_btn = QPushButton("💾 Save Session")
+        save_btn.clicked.connect(self.manual_save_session)
+        
         header_layout.addWidget(new_btn)
         header_layout.addWidget(load_btn)
+        header_layout.addWidget(save_btn)
         layout.addLayout(header_layout)
 
     def setup_session_controls(self, layout: QVBoxLayout) -> None:
@@ -340,6 +345,16 @@ class SetupView(QWidget):
                 QMessageBox.information(self, "Loaded", f"Session loaded with {len(self.state.sentences)} chunks.")
             else:
                 QMessageBox.warning(self, "Error", "Failed to load session.")
+
+    def manual_save_session(self) -> None:
+        if not self.state.session_name:
+            QMessageBox.warning(self, "Error", "No active session to save.")
+            return
+            
+        if self.project_service.save_current_session(self.state):
+            QMessageBox.information(self, "Saved", f"Session '{self.state.session_name}' saved successfully.")
+        else:
+            QMessageBox.critical(self, "Error", "Failed to save session.")
 
     def toggle_generation(self) -> None:
         QMessageBox.information(self, "Start", "Generation started! (Wiring pending in Phase 5)")

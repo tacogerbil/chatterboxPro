@@ -95,6 +95,22 @@ class ProjectService:
             logging.error(f"Failed to save session '{session_name}': {e}")
             return False
 
+    def save_current_session(self, app_state: Any) -> bool:
+        """
+        Convenience method to save the currently active session in AppState.
+        """
+        if not app_state.session_name:
+            # Cannot save unnamed session
+            return False
+            
+        import dataclasses
+        data = {
+            "source_file_path": app_state.source_file_path,
+            "sentences": app_state.sentences,
+            "generation_settings": dataclasses.asdict(app_state.settings)
+        }
+        return self.save_session(app_state.session_name, data)
+
     def load_session(self, session_dir_path: str) -> Optional[Dict[str, Any]]:
         """
         Loads session data from a directory.
