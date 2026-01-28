@@ -278,7 +278,7 @@ class GenerationView(QWidget):
         self.gpu_edit.textChanged.connect(
             lambda t: setattr(self.state.settings, 'target_gpus', t)
         )
-        a_layout.addRow("Target Devs:", self.gpu_edit)
+        a_layout.addRow("Target Devices:", self.gpu_edit)
         
         self.order_combo = QComboBox()
         self.order_combo.addItems(["fastest", "sequential"])
@@ -286,15 +286,7 @@ class GenerationView(QWidget):
         self.order_combo.currentTextChanged.connect(
             lambda t: setattr(self.state.settings, 'generation_order', t)
         )
-        a_layout.addRow("Gen Order:", self.order_combo)
-        
-        self.order_combo = QComboBox()
-        self.order_combo.addItems(["fastest", "sequential"])
-        self.order_combo.setCurrentText(self.state.settings.generation_order)
-        self.order_combo.currentTextChanged.connect(
-            lambda t: setattr(self.state.settings, 'generation_order', t)
-        )
-        a_layout.addRow("Gen Order:", self.order_combo)
+        a_layout.addRow("Generation Order:", self.order_combo)
         
         self.seed_spin = QSpinBox()
         self.seed_spin.setRange(0, 9999999)
@@ -310,7 +302,7 @@ class GenerationView(QWidget):
         self.cand_spin.valueChanged.connect(
             lambda v: setattr(self.state.settings, 'num_candidates', v)
         )
-        a_layout.addRow("Candidates:", self.cand_spin)
+        a_layout.addRow("Candidates Per Chunk:", self.cand_spin)
 
         # MCCC Audit Restoration:
         self.outputs_spin = QSpinBox()
@@ -340,7 +332,7 @@ class GenerationView(QWidget):
         )
         # ASR Threshold inside logic
         asr_l = QFormLayout(self.chk_asr)
-        self.asr_thresh = QLabeledSlider("Threshold", 0.1, 1.0, self.state.settings.asr_threshold)
+        self.asr_thresh = QLabeledSlider("Acceptance Threshold", 0.1, 1.0, self.state.settings.asr_threshold)
         self.asr_thresh.value_changed.connect(
              lambda v: setattr(self.state.settings, 'asr_threshold', v)
         )
@@ -517,23 +509,10 @@ class GenerationView(QWidget):
         if hasattr(self, 'chk_asr'): self.chk_asr.setChecked(s.asr_validation_enabled)
         if hasattr(self, 'asr_thresh'): self.asr_thresh.set_value(s.asr_threshold)
         if hasattr(self, 'chk_watermark'): self.chk_watermark.setChecked(s.disable_watermark)
-        if hasattr(self, 'timbre_slider'): self.timbre_slider.set_value(s.timbre_shift)
-        if hasattr(self, 'gruffness_slider'): self.gruffness_slider.set_value(s.gruffness)
-        if hasattr(self, 'bass_slider'): self.bass_slider.set_value(s.bass_boost)
-        if hasattr(self, 'treble_slider'): self.treble_slider.set_value(s.treble_boost)
         
-        self.gpu_edit.setText(s.target_gpus)
-        self.seed_spin.setValue(s.master_seed)
         self.gpu_edit.setText(s.target_gpus)
         self.seed_spin.setValue(s.master_seed)
         self.cand_spin.setValue(s.num_candidates)
-        
-        # Restored
-        if hasattr(self, 'outputs_spin'): self.outputs_spin.setValue(s.num_full_outputs)
-        if hasattr(self, 'retries_spin'): self.retries_spin.setValue(s.max_attempts)
-        if hasattr(self, 'chk_asr'): self.chk_asr.setChecked(s.asr_validation_enabled)
-        if hasattr(self, 'asr_thresh'): self.asr_thresh.set_value(s.asr_threshold)
-        if hasattr(self, 'chk_watermark'): self.chk_watermark.setChecked(s.disable_watermark)
 
 
 
