@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListView, 
                                QLabel, QStyle, QStyledItemDelegate, QGroupBox, QFormLayout)
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtGui import QColor, QBrush, QPalette
 from PySide6.QtCore import Qt
 from core.state import AppState
 from core.models.playlist_model import PlaylistModel
@@ -53,6 +53,15 @@ class PlaylistView(QWidget):
         self.list_view.setModel(self.model)
         self.list_view.setItemDelegate(PlaylistDelegate()) 
         self.list_view.setSelectionMode(QListView.ExtendedSelection)
+        self.list_view.setAlternatingRowColors(True)
+        
+        # Consistent Dark Palette
+        p = self.list_view.palette()
+        p.setColor(QPalette.Base, QColor("#2b2b2b"))
+        p.setColor(QPalette.AlternateBase, QColor("#252525"))
+        p.setColor(QPalette.Text, QColor("#eeeeee"))
+        self.list_view.setPalette(p)
+
         self.list_view.selectionModel().selectionChanged.connect(self.update_stats)
         left_layout.addWidget(self.list_view)
         

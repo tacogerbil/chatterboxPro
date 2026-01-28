@@ -188,10 +188,11 @@ class ChaptersView(QWidget):
         self.list_view.setModel(self.model)
         self.list_view.setAlternatingRowColors(True)
         
-        # Custom Palette for subtle gray alternation (Fixing "Cyan" issue)
+        # Custom Palette for subtle gray alternation from user request
         p = self.list_view.palette()
-        p.setColor(QPalette.Base, QColor("#1e1e1e")) # Dark background
-        p.setColor(QPalette.AlternateBase, QColor("#2d2d2d")) # Slightly lighter gray
+        p.setColor(QPalette.Base, QColor("#2b2b2b"))       # Dark Gray Base
+        p.setColor(QPalette.AlternateBase, QColor("#252525")) # Subtle darker/lighter variant
+        p.setColor(QPalette.Text, QColor("#eeeeee"))       # Ensure text is white
         self.list_view.setPalette(p)
         
         self.list_view.setSelectionMode(QListView.ExtendedSelection)
