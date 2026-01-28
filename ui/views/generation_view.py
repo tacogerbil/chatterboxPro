@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QGroupBox, QFormLayout, 
     QPushButton, QHBoxLayout, QMessageBox, QComboBox, 
-    QLineEdit, QSpinBox, QPlainTextEdit, QScrollArea
+    QLineEdit, QSpinBox, QPlainTextEdit, QScrollArea, QCheckBox
 )
 from PySide6.QtCore import Qt, QThread, Slot
 from typing import Optional, List, Dict, Any
