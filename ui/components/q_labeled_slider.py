@@ -35,6 +35,7 @@ class QLabeledSlider(QWidget):
         
         # SpinBox
         self.spinbox = QDoubleSpinBox()
+        self.spinbox.setFixedWidth(70)
         self.spinbox.setRange(from_val, to_val)
         self.spinbox.setSingleStep(step)
         self.spinbox.setValue(initial_val)
