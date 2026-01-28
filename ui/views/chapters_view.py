@@ -205,29 +205,8 @@ class ChaptersView(QWidget):
         layout.addWidget(self.list_view)
         
         # Initial Theme Apply
+        # Initial Theme Apply
         self.update_theme(self.app_state.theme_name)
-
-    def update_theme(self, theme_name: str) -> None:
-        """
-        Updates the list palette based on whether the theme is dark or light.
-        MCCC: Isolates visual logic.
-        """
-        is_dark = "light" not in theme_name.lower()
-        
-        p = self.list_view.palette()
-        if is_dark:
-            # Dark Theme Palette
-            p.setColor(QPalette.Base, QColor("#2b2b2b"))       # Dark Gray
-            p.setColor(QPalette.AlternateBase, QColor("#252525")) # Subtle darker
-            p.setColor(QPalette.Text, QColor("#eeeeee"))       # White Text
-        else:
-            # Light Theme Palette
-            p.setColor(QPalette.Base, QColor("#F5F5F5"))       # Light Gray
-            p.setColor(QPalette.AlternateBase, QColor("#EBEBEB")) # Subtle darker
-            p.setColor(QPalette.Text, QColor("#000000"))       # Black Text
-            
-        self.list_view.setPalette(p)
-        self.list_view.update()
         
         # MCCC Audit: Restore "No Chapters Detected" Placeholder
         self.empty_label = QLabel("No chapters detected.\n\nUse 'Insert Chapter' in the Editing panel\nor re-process text.")
@@ -239,7 +218,7 @@ class ChaptersView(QWidget):
         self.model.modelReset.connect(self._update_empty_state)
         self.model.rowsInserted.connect(self._update_empty_state)
         self.model.rowsRemoved.connect(self._update_empty_state)
-        
+
         # Footer: Selection + Actions
         footer_layout = QHBoxLayout()
         
@@ -250,8 +229,6 @@ class ChaptersView(QWidget):
         sel_none = QPushButton("Deselect All")
         sel_none.clicked.connect(self.deselect_all)
         footer_layout.addWidget(sel_none)
-        
-        # New Feature: Check Highlighted
         
         # New Feature: Check Highlighted
         check_high = QPushButton("Check Highlighted")
@@ -277,6 +254,30 @@ class ChaptersView(QWidget):
         footer_layout.addWidget(self.gen_btn)
         
         layout.addLayout(footer_layout)
+
+    def update_theme(self, theme_name: str) -> None:
+        """
+        Updates the list palette based on whether the theme is dark or light.
+        MCCC: Isolates visual logic.
+        """
+        is_dark = "light" not in theme_name.lower()
+        
+        p = self.list_view.palette()
+        if is_dark:
+            # Dark Theme Palette
+            p.setColor(QPalette.Base, QColor("#2b2b2b"))       # Dark Gray
+            p.setColor(QPalette.AlternateBase, QColor("#252525")) # Subtle darker
+            p.setColor(QPalette.Text, QColor("#eeeeee"))       # White Text
+        else:
+            # Light Theme Palette
+            p.setColor(QPalette.Base, QColor("#F5F5F5"))       # Light Gray
+            p.setColor(QPalette.AlternateBase, QColor("#EBEBEB")) # Subtle darker
+            p.setColor(QPalette.Text, QColor("#000000"))       # Black Text
+            
+        self.list_view.setPalette(p)
+        self.list_view.update()
+        
+
 
     def select_all(self) -> None:
         for i in range(self.model.rowCount()):
