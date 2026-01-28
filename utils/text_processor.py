@@ -281,6 +281,7 @@ class TextPreprocessor:
             processed_sentences.append({
                 "uuid": uuid.uuid4().hex,
                 "sentence_number": str(i + 1), "original_sentence": clean_sentence,
+                "text": clean_sentence, # Added missing key for PlaylistModel
                 "paragraph": "yes" if is_paragraph else "no", "tts_generated": "no", "marked": False,
                 "is_chapter_heading": is_chapter_heading
             })
