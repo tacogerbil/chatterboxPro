@@ -80,6 +80,8 @@ class SetupView(QWidget):
         
         layout.addLayout(form_layout)
 
+
+    def setup_processing_controls(self, layout: QVBoxLayout) -> None:
         # Edit & Process Button (Consolidated Workflow)
         self.edit_btn = QPushButton("Edit Source Text")
         self.edit_btn.setToolTip("Opens file in external editor, then reloads")
