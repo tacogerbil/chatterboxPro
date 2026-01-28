@@ -301,10 +301,15 @@ class SetupView(QWidget):
         if dir_path:
             data = self.project_service.load_session(dir_path)
             if data:
+                # Update State & UI
                 self.state.session_name = data.get('session_name', '')
                 self.session_name_edit.setText(self.state.session_name)
+                
                 self.state.sentences = data.get('sentences', [])
-                self.file_path_edit.setText(data.get('source_file_path', ''))
+                
+                src_path = data.get('source_file_path', '')
+                self.state.source_file_path = src_path # FIX: Sync state
+                self.file_path_edit.setText(src_path)
                 
                 if 'generation_settings' in data:
                      self.state.update_settings(**data['generation_settings'])
