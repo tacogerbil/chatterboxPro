@@ -77,6 +77,10 @@ class AppState:
     auto_assemble_after_run: bool = False
     aggro_clean_on_parse: bool = False
     
+    # UI Theme State (MCCC: Consolidated Config)
+    theme_name: str = "dark_teal.xml"
+    theme_invert: bool = False
+    
     def update_settings(self, **kwargs):
         """Update settings from a dictionary."""
         for key, value in kwargs.items():

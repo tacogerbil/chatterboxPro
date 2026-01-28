@@ -19,22 +19,31 @@ from core.services.assembly_service import AssemblyService
 from core.services.config_service import ConfigService
 
 class ChatterboxProQt(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, app_state: Optional[AppState] = None, config_service: Optional[ConfigService] = None) -> None:
         super().__init__()
         self.setWindowTitle("Chatterbox Pro (Qt Edition)")
         self.resize(1200, 800)
         
-        self.app_state = AppState()
+        # Dependency Injection or Factory Creation
+        if app_state:
+            self.app_state = app_state
+        else:
+            self.app_state = AppState()
+            
+        if config_service:
+            self.config_service = config_service
+        else:
+            self.config_service = ConfigService()
+            # If we created it fresh, load state now
+            self.config_service.load_state(self.app_state)
         
         # Instantiate Backend Services
         self.gen_service = GenerationService(self.app_state)
         self.audio_service = AudioService()
         self.assembly_service = AssemblyService(self.app_state)
         self.playlist_service = PlaylistService(self.app_state)
-        self.config_service = ConfigService()
         
-        # Load Last Session
-        self.config_service.load_state(self.app_state)
+        # State loaded externally in DI scenario, or above if fallback.
         
         # UI Components Placeholders
         self.tabs: Optional[QTabWidget] = None
@@ -84,7 +93,7 @@ class ChatterboxProQt(QMainWindow):
         self.tabs.addTab(self.chapters_view, "Chapters")
         self.tabs.addTab(self.finalize_view, "Finalize & Export")
         
-        self.config_view = ConfigView()
+        self.config_view = ConfigView(app_state=self.app_state)
         self.tabs.addTab(self.config_view, "Config")
 
     def _setup_playlist_controls(self) -> None:
@@ -133,8 +142,9 @@ def launch_qt_app() -> None:
     # Create the Application
     app = QApplication(sys.argv)
     
-    # Theme is handled in the main entry point (chatter_pro.py) via qt-material
-    # Legacy pyqtdarktheme removed.
+    # Initialize Theme via Manager
+    from ui.theme_manager import ThemeManager
+    ThemeManager.initialize_theme(app)
 
     print("--- Launching Chatterbox Pro (Qt) ---")
     

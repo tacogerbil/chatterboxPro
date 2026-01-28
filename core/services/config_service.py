@@ -60,7 +60,8 @@ class ConfigService:
             safe_globals = {
                 'session_name', 'source_file_path', 'ref_audio_path', 
                 'auto_regen_main', 'auto_regen_sub', 
-                'auto_assemble_after_run', 'aggro_clean_on_parse'
+                'auto_assemble_after_run', 'aggro_clean_on_parse',
+                'theme_name', 'theme_invert'
             }
             
             for key in safe_globals:
@@ -86,7 +87,9 @@ class ConfigService:
                 'auto_regen_main': app_state.auto_regen_main,
                 'auto_regen_sub': app_state.auto_regen_sub,
                 'auto_assemble_after_run': app_state.auto_assemble_after_run,
-                'aggro_clean_on_parse': app_state.aggro_clean_on_parse
+                'aggro_clean_on_parse': app_state.aggro_clean_on_parse,
+                'theme_name': app_state.theme_name,
+                'theme_invert': app_state.theme_invert
             }
             
             # Combine

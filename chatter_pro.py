@@ -39,17 +39,8 @@ if __name__ == "__main__":
     
     # --- UI Theme (qt-material) ---
     try:
-        from qt_material import apply_stylesheet
-        from PySide6.QtCore import QSettings
-        
-        # Load persisted theme, default to 'dark_teal.xml'
-        settings = QSettings("ChatterboxPro", "ThemeConfig")
-        saved_theme = settings.value("current_theme", "dark_teal.xml")
-        invert = settings.value("invert_desc", False, type=bool)
-        
-        print(f"Loading Theme: {saved_theme}")
-        apply_stylesheet(qt_app, theme=saved_theme, invert_secondary=invert)
-        
+        from ui.theme_manager import ThemeManager
+        ThemeManager.initialize_theme(qt_app)
     except Exception as e:
         print(f"Warning: Could not apply qt-material theme: {e}")
     
