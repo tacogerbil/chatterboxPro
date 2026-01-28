@@ -11,6 +11,7 @@ from PySide6.QtCore import QObject, Signal, QThread, Slot
 from workers.tts_worker import worker_process_chunk
 from utils.text_processor import punc_norm
 from core.state import AppState
+from core.structs import WorkerTask
 
 # Constants for Status
 STATUS_YES = 'yes'
@@ -227,10 +228,7 @@ class GenerationService(QObject):
         if hasattr(self.state, 'generation_order') and self.state.generation_order == "In Order":
              sorted_indices = sorted(indices, key=lambda i: int(self.state.sentences[i].get('sentence_number', 0)))
         else:
-             # Default: Fastest First
              sorted_indices = sorted(indices, key=lambda i: len(self.state.sentences[i]['original_sentence']), reverse=True)
-
-        from core.structs import WorkerTask
         
         for i, original_idx in enumerate(sorted_indices):
             sentence_data = self.state.sentences[original_idx]
