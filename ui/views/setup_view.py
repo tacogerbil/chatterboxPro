@@ -245,10 +245,7 @@ class SetupView(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 
-                self._perform_text_processing(final_text)
-                
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+
 
     def _perform_text_processing(self, text: str) -> None:
         """Helper to handle the logic of processing text after user review."""
