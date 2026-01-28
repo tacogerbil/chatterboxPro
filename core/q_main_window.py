@@ -142,6 +142,10 @@ class ChatterboxProQt(QMainWindow):
         
         # Wire Generation Finished (MCCC: Fixed Regression)
         self.gen_service.finished.connect(self.on_generation_finished)
+        
+        # Wire Dynamic Theme Updates (List Colors)
+        self.config_view.theme_combo.currentTextChanged.connect(self.chapters_view.update_theme)
+        self.config_view.theme_combo.currentTextChanged.connect(self.playlist_view.update_theme)
 
 
     def on_chapter_jump(self, row_idx: int) -> None:

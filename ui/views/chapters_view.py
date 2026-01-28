@@ -188,12 +188,10 @@ class ChaptersView(QWidget):
         self.list_view.setModel(self.model)
         self.list_view.setAlternatingRowColors(True)
         
-        # User Requested: Light Gray + Slightly Darker + Black Text
-        p = self.list_view.palette()
-        p.setColor(QPalette.Base, QColor("#F5F5F5"))       # Light Gray Base
-        p.setColor(QPalette.AlternateBase, QColor("#EBEBEB")) # Very subtle darker gray
-        p.setColor(QPalette.Text, QColor("#000000"))       # Black Text
-        self.list_view.setPalette(p)
+        self.list_view.setAlternatingRowColors(True)
+        # Palette set in update_theme() called at end of setup
+        
+        self.list_view.setSelectionMode(QListView.ExtendedSelection)
         
         self.list_view.setSelectionMode(QListView.ExtendedSelection)
         self.list_view.doubleClicked.connect(self.on_double_click)
@@ -205,6 +203,31 @@ class ChaptersView(QWidget):
         self.list_view.setMouseTracking(True) 
         
         layout.addWidget(self.list_view)
+        
+        # Initial Theme Apply
+        self.update_theme(self.app_state.theme_name)
+
+    def update_theme(self, theme_name: str) -> None:
+        """
+        Updates the list palette based on whether the theme is dark or light.
+        MCCC: Isolates visual logic.
+        """
+        is_dark = "light" not in theme_name.lower()
+        
+        p = self.list_view.palette()
+        if is_dark:
+            # Dark Theme Palette
+            p.setColor(QPalette.Base, QColor("#2b2b2b"))       # Dark Gray
+            p.setColor(QPalette.AlternateBase, QColor("#252525")) # Subtle darker
+            p.setColor(QPalette.Text, QColor("#eeeeee"))       # White Text
+        else:
+            # Light Theme Palette
+            p.setColor(QPalette.Base, QColor("#F5F5F5"))       # Light Gray
+            p.setColor(QPalette.AlternateBase, QColor("#EBEBEB")) # Subtle darker
+            p.setColor(QPalette.Text, QColor("#000000"))       # Black Text
+            
+        self.list_view.setPalette(p)
+        self.list_view.update()
         
         # MCCC Audit: Restore "No Chapters Detected" Placeholder
         self.empty_label = QLabel("No chapters detected.\n\nUse 'Insert Chapter' in the Editing panel\nor re-process text.")

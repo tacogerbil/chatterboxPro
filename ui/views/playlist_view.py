@@ -55,17 +55,20 @@ class PlaylistView(QWidget):
         self.list_view.setSelectionMode(QListView.ExtendedSelection)
         self.list_view.setAlternatingRowColors(True)
         
-        # User Requested: Light Gray + Slightly Darker + Black Text
-        p = self.list_view.palette()
-        p.setColor(QPalette.Base, QColor("#F5F5F5"))
-        p.setColor(QPalette.AlternateBase, QColor("#EBEBEB"))
-        p.setColor(QPalette.Text, QColor("#000000"))
-        self.list_view.setPalette(p)
-
+        self.list_view.setSelectionMode(QListView.ExtendedSelection)
+        self.list_view.setAlternatingRowColors(True)
+        
+        # Palette set in update_theme()
+        
         self.list_view.selectionModel().selectionChanged.connect(self.update_stats)
         left_layout.addWidget(self.list_view)
         
+        # Initial Theme Apply
+        self.update_theme(self.app_state.theme_name)
+        
         top_layout.addWidget(left_container, stretch=3)
+        
+        # Right Side: Stats Panel
         
         # Right Side: Stats Panel
         stats_group = QGroupBox("Chunk Stats")
@@ -125,3 +128,24 @@ class PlaylistView(QWidget):
             self.list_view.scrollTo(idx, QListView.PositionAtCenter)
             # Ensure stats update
             self.update_stats()
+
+    def update_theme(self, theme_name: str) -> None:
+        """
+        Updates the list palette based on whether the theme is dark or light.
+        """
+        is_dark = "light" not in theme_name.lower()
+        
+        p = self.list_view.palette()
+        if is_dark:
+            # Dark Theme Palette
+            p.setColor(QPalette.Base, QColor("#2b2b2b"))
+            p.setColor(QPalette.AlternateBase, QColor("#252525"))
+            p.setColor(QPalette.Text, QColor("#eeeeee"))
+        else:
+            # Light Theme Palette
+            p.setColor(QPalette.Base, QColor("#F5F5F5"))
+            p.setColor(QPalette.AlternateBase, QColor("#EBEBEB"))
+            p.setColor(QPalette.Text, QColor("#000000"))
+            
+        self.list_view.setPalette(p)
+        self.list_view.update()
