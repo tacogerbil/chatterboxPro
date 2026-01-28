@@ -105,9 +105,11 @@ class SetupView(QWidget):
         f_layout = QFormLayout(group)
         
         self.lbl_ref_audio = QLabel("--")
+        self.lbl_voice_name = QLabel("--") # New
         self.lbl_exaggeration = QLabel("--")
         self.lbl_temp = QLabel("--")
         
+        f_layout.addRow("Voice Profile:", self.lbl_voice_name) # New
         f_layout.addRow("Reference Audio:", self.lbl_ref_audio)
         f_layout.addRow("Exaggeration:", self.lbl_exaggeration)
         f_layout.addRow("Temperature:", self.lbl_temp)
@@ -117,6 +119,8 @@ class SetupView(QWidget):
         
     def refresh_params_display(self) -> None:
         """Updates the Parameter labels from AppState."""
+        self.lbl_voice_name.setText(self.state.voice_name) # New
+
         # Ref Audio
         ref = self.state.ref_audio_path
         self.lbl_ref_audio.setText(os.path.basename(ref) if ref else "None")
@@ -359,6 +363,9 @@ class SetupView(QWidget):
                 for key, value in data.items():
                     if hasattr(self.state.settings, key):
                         setattr(self.state.settings, key, value)
+                
+                self.state.voice_name = name # Update State
+                self.refresh_params_display() # Update UI
                 
                 QMessageBox.information(self, "Success", f"Loaded voice '{name}'.")
                 self.template_loaded.emit() 

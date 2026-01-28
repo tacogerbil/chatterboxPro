@@ -58,6 +58,7 @@ class AppState:
     """
     # Session Data
     session_name: str = ""
+    voice_name: str = "Custom / Unsaved" # Track loaded voice name
     source_file_path: str = ""
     sentences: List[Dict[str, Any]] = field(default_factory=list)
     

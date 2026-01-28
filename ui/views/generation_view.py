@@ -418,6 +418,7 @@ class GenerationView(QWidget):
                  self.state.ref_audio_path = path
                  self.ref_audio_edit.setText(path)
                  
+             self.state.voice_name = name # Update State
              self.refresh_values()
              QMessageBox.information(self, "Loaded", f"Voice '{name}' loaded.")
          else:
