@@ -77,5 +77,21 @@ class ThemeManager:
             
             app.setPalette(palette)
             
+            # MCCC: Force Input Colors (Enforce Visibility)
+            # qt-material often relies on specific selectors that might miss generic widgets
+            # or be overridden by layout styles. We enforce a global baseline for inputs.
+            # Using !important logic via specificity if needed, but usually just appending helps.
+            
+            patch_css = f"""
+            QLineEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox {{
+                color: {text_color_str};
+                selection-background-color: {theme_config.get('primaryColor', '#2E86C1')};
+            }}
+            QComboBox::item {{
+                color: {text_color_str};
+            }}
+            """
+            app.setStyleSheet(app.styleSheet() + patch_css)
+            
         except Exception as e:
             logging.warning(f"[ThemeManager] Could not sync palette: {e}")

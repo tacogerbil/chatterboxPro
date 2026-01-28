@@ -81,6 +81,9 @@ class AppState:
     theme_name: str = "dark_teal.xml"
     theme_invert: bool = False
     
+    # Global Engine Config
+    model_path: Optional[str] = None
+    
     def update_settings(self, **kwargs):
         """Update settings from a dictionary."""
         for key, value in kwargs.items():

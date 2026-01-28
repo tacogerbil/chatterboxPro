@@ -103,8 +103,16 @@ class GenerationView(QWidget):
         form.addRow("TTS Engine:", self.engine_combo)
         
         path_layout = QHBoxLayout()
-        self.path_label = QLabel("Default (system cache)")
-        self.path_label.setStyleSheet("color: gray;")
+        # Init Label with current state
+        lbl_text = self.state.model_path if self.state.model_path else "Default (system cache)"
+        self.path_label = QLabel(lbl_text)
+        
+        if self.state.model_path:
+             self.path_label.setToolTip(self.state.model_path)
+             self.path_label.setStyleSheet("color: #27AE60; font-weight: bold;")
+        else:
+             self.path_label.setStyleSheet("color: gray;")
+             
         self.set_path_btn = QPushButton("📁 Set Path")
         self.set_path_btn.clicked.connect(self.browse_model_path)
         path_layout.addWidget(self.path_label)
@@ -117,15 +125,13 @@ class GenerationView(QWidget):
         """Opens a directory picker for the model."""
         path = QFileDialog.getExistingDirectory(self, "Select Model Directory")
         if path:
-            self.state.settings.model_path = path
+            self.state.model_path = path # FIX: Use root AppState
             self.path_label.setText(path)
             # Make label tooltip show full path
             self.path_label.setToolTip(path)
             # Style: Green to indicate custom path set
             self.path_label.setStyleSheet("color: #27AE60; font-weight: bold;")
         else:
-            # If user cancels or clears (implied?), maybe provide a clear button?
-            # For now just keep existing.
             pass
 
     def setup_sliders(self, layout: QVBoxLayout) -> None:
