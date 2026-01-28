@@ -10,6 +10,12 @@ from typing import Dict, Any
 from .base_engine import BaseTTSEngine
 from chatterbox.tts import ChatterboxTTS
 
+# MCCC: Version Pinning
+# To prevent future breakage, set this to the specific commit hash of the model you want to use.
+# Example: "a1b2c3d4..."
+# Leave as None to always use the latest version (Risk of drift).
+MODEL_REVISION = "05e904af2b5c7f8e482687a9dd7336c5c824467d9" # Pinned to current stable SHA (Jan 2026)
+
 class ChatterboxEngine(BaseTTSEngine):
     """Adapter for Chatterbox TTS engine."""
     
@@ -34,9 +40,10 @@ class ChatterboxEngine(BaseTTSEngine):
                     try:
                         from huggingface_hub import snapshot_download
                         snapshot_download(
-                            repo_id="resemble-ai/chatterbox", 
+                            repo_id="ResembleAI/chatterbox", 
                             local_dir=self.model_path,
-                            local_dir_use_symlinks=False # Ensure actual files for portability
+                            local_dir_use_symlinks=False, # Ensure actual files for portability
+                            revision=MODEL_REVISION 
                         )
                         print("[ChatterboxEngine] Download complete.")
                     except Exception as e:
