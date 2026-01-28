@@ -25,6 +25,11 @@ class PlaylistModel(QAbstractListModel):
             # Show index + snippet
             # MCCC: Strict adherence to data model (original_sentence)
             text = item.get('original_sentence', '')
+            
+            # Format Pause Items
+            if item.get('is_pause'):
+                duration = item.get('duration', 0)
+                text = f"[PAUSE : {duration}ms]"
                 
             if len(text) > 80: text = text[:77] + "..."
             return f"[{row+1}] {text}"

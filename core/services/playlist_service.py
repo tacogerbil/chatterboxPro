@@ -30,6 +30,18 @@ class PlaylistService:
             return True
         return False
 
+    def edit_pause(self, index: int, duration: int) -> bool:
+        """Updates duration of a pause item."""
+        item = self.get_selected_item(index)
+        if not item or not item.get('is_pause'): return False
+        
+        if duration != item.get('duration'):
+             item['duration'] = duration
+             item['tts_generated'] = 'n/a' # Pauses don't 'generate' but status is usually n/a or yes
+             item['marked'] = True
+             return True
+        return False
+
     def split_chunk(self, index: int) -> bool:
         item = self.get_selected_item(index)
         if not item: return False

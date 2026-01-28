@@ -206,6 +206,17 @@ class ControlsView(QWidget):
         if idx == -1: return
         
         item = self.playlist_service.get_selected_item(idx)
+        
+        # Check if Pause - Use Duration Editor
+        if item.get('is_pause'):
+            old_dur = item.get('duration', 500)
+            new_dur, ok = QInputDialog.getInt(self, "Edit Pause", "Duration (ms):", value=old_dur, min=100, max=10000)
+            if ok and new_dur != old_dur:
+                self.playlist_service.edit_pause(idx, new_dur)
+                self._refresh()
+            return
+
+        # Normal Text Editing
         old_text = item.get('original_sentence', '')
         
         from ui.dialogs.editor_dialog import EditorDialog
