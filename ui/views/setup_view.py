@@ -80,12 +80,12 @@ class SetupView(QWidget):
         
         layout.addLayout(form_layout)
 
-    def setup_processing_controls(self, layout: QVBoxLayout) -> None:
-        # Load/Process Button
-        self.load_btn = QPushButton("Edit Source Text")
-        self.load_btn.setStyleSheet("background-color: #2E86C1; color: white; padding: 10px; font-weight: bold;")
-        self.load_btn.clicked.connect(self.process_text)
-        layout.addWidget(self.load_btn)
+        # Edit & Process Button (Consolidated Workflow)
+        self.edit_btn = QPushButton("Edit Source Text")
+        self.edit_btn.setToolTip("Opens file in external editor, then reloads")
+        self.edit_btn.setStyleSheet("background-color: #2E86C1; color: white; padding: 10px; font-weight: bold;")
+        self.edit_btn.clicked.connect(self.edit_and_process_workflow)
+        layout.addWidget(self.edit_btn)
         
         # Aggro Clean Switch
         self.aggro_chk = QCheckBox("Remove all special characters on processing")
@@ -206,6 +206,43 @@ class SetupView(QWidget):
                 name = os.path.splitext(os.path.basename(path))[0]
                 self.session_name_edit.setText(name)
                 self.state.session_name = name
+
+    def edit_and_process_workflow(self) -> None:
+        """
+        Workflow:
+        1. Open file externally.
+        2. Ask user to confirm save/reload.
+        3. Trigger processing.
+        """
+        if not self.state.source_file_path:
+            QMessageBox.warning(self, "No File", "Please select a source file first.")
+            return
+
+        # 1. Open External
+        try:
+            from PySide6.QtGui import QDesktopServices
+            from PySide6.QtCore import QUrl
+            url = QUrl.fromLocalFile(self.state.source_file_path)
+            QDesktopServices.openUrl(url)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not open file: {e}")
+            return
+
+        # 2. Wait for User
+        reply = QMessageBox.question(
+            self, 
+            "Editing in Progress",
+            "The file has been opened in your system editor.\n\n"
+            "1. Make your edits and SAVE the file.\n"
+            "2. Click 'Yes' below to Reload and Process the changes.\n"
+            "3. Click 'No' to cancel reloading.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+
+        # 3. Process
+        if reply == QMessageBox.Yes:
+            self.process_text()
 
     def process_text(self) -> None:
         if not self.state.source_file_path: 

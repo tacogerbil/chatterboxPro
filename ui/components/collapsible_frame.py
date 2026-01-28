@@ -19,11 +19,17 @@ class CollapsibleFrame(QWidget):
                 text-align: left; 
                 font-weight: bold; 
                 border: none;
-                background-color: transparent;
-                padding: 5px;
+                background-color: #455A64; 
+                color: white;
+                padding: 2px 10px;
+                height: 24px;
+                border-radius: 4px;
             }
             QPushButton:hover {
-                background-color: #E0E0E0;
+                background-color: #546E7A;
+            }
+            QPushButton:checked {
+                background-color: #37474F;
             }
         """)
         self.toggle_btn.setCheckable(True)
