@@ -18,6 +18,13 @@ class ThemeManager:
         """
         try:
             from qt_material import apply_stylesheet
+            from PySide6.QtWidgets import QStyleFactory
+            
+            # MCCC: Ensure Consistent Base Style (Fusion)
+            # This provides correct native heuristics, disabled states, and contrast rules
+            # before we apply our custom palette and spreadsheet.
+            if "Fusion" in QStyleFactory.keys():
+                app.setStyle("Fusion")
             
             # 'invert_secondary' is sometimes needed for specific themes to look right
             extra = {'invert_secondary': invert_secondary} if invert_secondary else {}
@@ -40,8 +47,8 @@ class ThemeManager:
     @staticmethod
     def _sync_palette(app: QApplication, theme_name: str, extra: dict):
         """
-        MCCC Compliance: Synchronizes the QPalette with the qt-material config.
-        Crucial for QStyledItemDelegates that read Palette instead of CSS.
+        MCCC Compliance: Synchronizes the QPalette with the qt-material config using Canonical Qt Roles.
+        Crucial for QStyledItemDelegates, placeholders, and unstyled widgets.
         """
         try:
             from qt_material import get_theme
@@ -51,33 +58,41 @@ class ThemeManager:
             # Load theme config (returns dict of colors)
             theme_config = get_theme(theme_name, **extra)
             
-            # Create Palette
-            palette = QPalette()
+            # 1. Start with Standard Fusion Palette (Canonical Base)
+            palette = app.style().standardPalette()
             
-            # Map Common Colors
-            # Note: qt-material uses keys like 'primaryColor', 'secondaryColor', 'textColor', 'secondaryLightColor'
+            # 2. Extract Colors from Theme Config
+            # qt-material keys: primaryColor (Accent), secondaryColor (Background), textColor
+            primary_color = QColor(theme_config.get('primaryColor', '#2E86C1'))
+            secondary_color = QColor(theme_config.get('secondaryColor', '#232629'))
+            text_color = QColor(theme_config.get('textColor', '#ffffff'))
             
-            bg_color = QColor(theme_config.get('primaryColor', '#000000')) # Usually dark in dark themes
-            # Correct mapping might need inspection of qt-material dict keys.
-            # Assuming 'textColor' exists.
+            # Derived Colors
+            placeholder_color = QColor(text_color)
+            placeholder_color.setAlpha(128) # 50% opacity
             
-            text_color_str = theme_config.get('textColor', '#ffffff')
-            bg_color_str = theme_config.get('primaryColor', '#222222') # Often the base
+            # 3. Map to Canonical Roles (User Specified MCCC)
             
-            # Set Text Roles
-            text_color = QColor(text_color_str)
-            palette.setColor(QPalette.WindowText, text_color)
+            # Window / Backgrounds
+            palette.setColor(QPalette.Window, secondary_color)
+            palette.setColor(QPalette.Base, secondary_color) # Or secondaryLightColor if available
+            palette.setColor(QPalette.AlternateBase, primary_color) # Valid contrast? Or lighter bg?
+            # Keeping Base == Window is safest for dark themes unless we strictly know the hierarchy.
+            
+            # Text / Foreground
             palette.setColor(QPalette.Text, text_color)
+            palette.setColor(QPalette.WindowText, text_color)
             palette.setColor(QPalette.ButtonText, text_color)
-            palette.setColor(QPalette.ToolTipText, text_color)
-            # Crucial for inputs with no text yet
-            palette.setColor(QPalette.PlaceholderText, text_color)
+            palette.setColor(QPalette.BrightText, Qt.red) # Warning/Error logic usually
             
-            # Set Background Roles to prevent white-on-white defaults if CSS fails
-            bg_color = QColor(bg_color_str)
-            palette.setColor(QPalette.Window, bg_color)
-            palette.setColor(QPalette.Base, bg_color)
-            palette.setColor(QPalette.AlternateBase, bg_color)
+            # Inputs
+            palette.setColor(QPalette.PlaceholderText, placeholder_color)
+            
+            # Interactive / Accents
+            palette.setColor(QPalette.Highlight, primary_color)
+            palette.setColor(QPalette.HighlightedText, text_color) # Assuming text works on accent
+            palette.setColor(QPalette.Link, primary_color) # Use accent for links
+            palette.setColor(QPalette.LinkVisited, primary_color.darker())
             
             app.setPalette(palette)
             
