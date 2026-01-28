@@ -143,6 +143,9 @@ class ChatterboxProQt(QMainWindow):
         # Wire Generation Finished (MCCC: Fixed Regression)
         self.gen_service.finished.connect(self.on_generation_finished)
 
+
+    def on_chapter_jump(self, row_idx: int) -> None:
+        """Handle signal from ChaptersView to jump to a playlist row."""
         print(f"Jumping to playlist row: {row_idx}")
         self.playlist_view.jump_to_row(row_idx)
 
