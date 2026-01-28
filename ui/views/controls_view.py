@@ -91,42 +91,52 @@ class ControlsView(QWidget):
     def _setup_editing(self, group):
         layout = QGridLayout()
         
-        # Row 0
-        # Row 0
+        button_style = "QPushButton { padding: 4px; margin: 1px; font-size: 11px; }"
+        
+        # Row 0: Editing & Insertions
         btn_edit = QPushButton("✎ Edit"); btn_edit.clicked.connect(self._edit_text)
-        
-        # Reduced width/label for Split to make room
-        btn_split = QPushButton("➗"); btn_split.setToolTip("Split Chunk"); btn_split.setMaximumWidth(40)
-        btn_split.clicked.connect(self._split_chunk)
-        
+        btn_edit.setStyleSheet(button_style)
+
         btn_ins_txt = QPushButton("➕ Text"); btn_ins_txt.clicked.connect(self._insert_text)
+        btn_ins_txt.setStyleSheet(button_style)
+
         btn_ins_pause = QPushButton("⏸ Pause"); btn_ins_pause.clicked.connect(self._insert_pause)
+        btn_ins_pause.setStyleSheet(button_style)
         
         btn_ins_chap = QPushButton("📑 New Chap"); btn_ins_chap.clicked.connect(self._insert_chapter)
-        btn_conv_chap = QPushButton("📑 Convert"); btn_conv_chap.setToolTip("Convert Selection to Chapter")
+        btn_ins_chap.setStyleSheet(button_style)
+
+        btn_conv_chap = QPushButton("➡️ Conv Chap"); btn_conv_chap.setToolTip("Convert Selection to Chapter")
         btn_conv_chap.clicked.connect(self._convert_to_chapter)
+        btn_conv_chap.setStyleSheet(button_style)
         
         layout.addWidget(btn_edit, 0, 0)
-        layout.addWidget(btn_split, 0, 1)
-        layout.addWidget(btn_ins_txt, 0, 2)
-        layout.addWidget(btn_ins_pause, 0, 3)
-        layout.addWidget(btn_ins_chap, 0, 4)
-        layout.addWidget(btn_conv_chap, 0, 5)
+        layout.addWidget(btn_ins_txt, 0, 1)
+        layout.addWidget(btn_ins_pause, 0, 2)
+        layout.addWidget(btn_ins_chap, 0, 3)
+        layout.addWidget(btn_conv_chap, 0, 4)
         
-        # Row 1
+        # Row 1: Markers, Status & Split
         btn_mark = QPushButton("M Mark"); btn_mark.clicked.connect(self._mark_current)
-        btn_pass = QPushButton("✓ Mark Passed"); btn_pass.clicked.connect(self._mark_passed)
-        btn_pass.setStyleSheet("background-color: #2ECC71; color: white;")
+        btn_mark.setStyleSheet(button_style)
+
+        # Moved Split Here per User Request
+        btn_split = QPushButton("➗ Split"); btn_split.clicked.connect(self._split_chunk)
+        btn_split.setStyleSheet(button_style)
         
-        btn_reset = QPushButton("🔄 Reset Gen"); btn_reset.clicked.connect(self._reset_gen)
-        btn_reset.setStyleSheet("background-color: #C0392B; color: white;")
+        btn_pass = QPushButton("✓ Passed"); btn_pass.clicked.connect(self._mark_passed)
+        btn_pass.setStyleSheet(button_style + "background-color: #2ECC71; color: white;")
+        
+        btn_reset = QPushButton("🔄 Reset"); btn_reset.clicked.connect(self._reset_gen)
+        btn_reset.setStyleSheet(button_style + "background-color: #C0392B; color: white;")
         
         btn_del = QPushButton("❌ Delete"); btn_del.clicked.connect(self._delete_items)
-        btn_del.setStyleSheet("background-color: #A93226; color: white; font-weight: bold; text-decoration: underline;")
+        btn_del.setStyleSheet(button_style + "background-color: #A93226; color: white; font-weight: bold;")
         
         layout.addWidget(btn_mark, 1, 0)
-        layout.addWidget(btn_pass, 1, 1)
-        layout.addWidget(btn_reset, 1, 2, 1, 2)
+        layout.addWidget(btn_split, 1, 1)
+        layout.addWidget(btn_pass, 1, 2)
+        layout.addWidget(btn_reset, 1, 3)
         layout.addWidget(btn_del, 1, 4)
         
         group.add_layout(layout)
