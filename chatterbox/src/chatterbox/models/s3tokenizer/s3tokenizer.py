@@ -139,9 +139,6 @@ class S3Tokenizer(S3TokenizerV2):
             The path to audio or either a NumPy array or Tensor containing the
             audio waveform in 16 kHz
 
-        padding: int
-            Number of zero samples to pad to the right
-
         Returns
         -------
         torch.Tensor, shape = (128, n_frames)
@@ -151,8 +148,6 @@ class S3Tokenizer(S3TokenizerV2):
             audio = torch.from_numpy(audio)
 
         audio = audio.to(self.device)
-        if padding > 0:
-            audio = F.pad(audio, (0, padding))
         stft = torch.stft(
             audio, self.n_fft, S3_HOP,
             window=self.window.to(self.device),
