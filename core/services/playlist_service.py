@@ -7,7 +7,7 @@ from utils.text_processor import TextPreprocessor
 class PlaylistService:
     """
     Handles modification of the sentence list (splitting, merging, editing, etc.).
-    Ported from legacy MainWindow logic.
+
     """
     def __init__(self, app_state: AppState):
         self.state = app_state

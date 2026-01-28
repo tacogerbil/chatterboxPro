@@ -30,7 +30,7 @@ class GenerationThread(QThread):
     error_occurred = Signal(str)
     stopped = Signal()
 
-    # task type can be explicit but passing class via generic in legacy thread is messy, simple Any/struct reference is fine
+    # Task structure passed via content dictionary for simplicity
     def __init__(self, tasks: List[Any], max_workers: int, outputs_dir: str) -> None:
         super().__init__()
         self.tasks = tasks

@@ -188,12 +188,12 @@ class ChaptersView(QWidget):
         self.list_view.setModel(self.model)
         self.list_view.setAlternatingRowColors(True)
         
-        self.list_view.setAlternatingRowColors(True)
+
         # Palette set in update_theme() called at end of setup
         
         self.list_view.setSelectionMode(QListView.ExtendedSelection)
         
-        self.list_view.setSelectionMode(QListView.ExtendedSelection)
+
         self.list_view.doubleClicked.connect(self.on_double_click)
         
         # Delegate
@@ -205,7 +205,7 @@ class ChaptersView(QWidget):
         layout.addWidget(self.list_view)
         
         # Initial Theme Apply
-        # Initial Theme Apply
+
         self.update_theme(self.app_state.theme_name)
         
         # MCCC Audit: Restore "No Chapters Detected" Placeholder
@@ -275,7 +275,7 @@ class ChaptersView(QWidget):
             p.setColor(QPalette.Text, QColor("#000000"))       # Black Text
             
         self.list_view.setPalette(p)
-        # self.list_view.update() # CAUSES CRASH: TypeError argument mismatch
+
         
 
 

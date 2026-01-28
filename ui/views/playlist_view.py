@@ -55,8 +55,7 @@ class PlaylistView(QWidget):
         self.list_view.setSelectionMode(QListView.ExtendedSelection)
         self.list_view.setAlternatingRowColors(True)
         
-        self.list_view.setSelectionMode(QListView.ExtendedSelection)
-        self.list_view.setAlternatingRowColors(True)
+
         
         # Palette set in update_theme()
         
@@ -148,4 +147,4 @@ class PlaylistView(QWidget):
             p.setColor(QPalette.Text, QColor("#000000"))
             
         self.list_view.setPalette(p)
-        # self.list_view.update() # CAUSES CRASH: TypeError argument mismatch
+
