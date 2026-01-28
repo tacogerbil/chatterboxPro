@@ -70,28 +70,16 @@ class ThemeManager:
             palette.setColor(QPalette.Text, text_color)
             palette.setColor(QPalette.ButtonText, text_color)
             palette.setColor(QPalette.ToolTipText, text_color)
+            # Crucial for inputs with no text yet
+            palette.setColor(QPalette.PlaceholderText, text_color)
             
-            # Set Background Roles?
-            # Be careful not to break the CSS 'engine' by overriding too much, 
-            # but setting specific roles helps Delegates.
+            # Set Background Roles to prevent white-on-white defaults if CSS fails
+            bg_color = QColor(bg_color_str)
+            palette.setColor(QPalette.Window, bg_color)
+            palette.setColor(QPalette.Base, bg_color)
+            palette.setColor(QPalette.AlternateBase, bg_color)
             
             app.setPalette(palette)
-            
-            # MCCC: Force Input Colors (Enforce Visibility)
-            # qt-material often relies on specific selectors that might miss generic widgets
-            # or be overridden by layout styles. We enforce a global baseline for inputs.
-            # Using !important logic via specificity if needed, but usually just appending helps.
-            
-            patch_css = f"""
-            QLineEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox {{
-                color: {text_color_str};
-                selection-background-color: {theme_config.get('primaryColor', '#2E86C1')};
-            }}
-            QComboBox::item {{
-                color: {text_color_str};
-            }}
-            """
-            app.setStyleSheet(app.styleSheet() + patch_css)
             
         except Exception as e:
             logging.warning(f"[ThemeManager] Could not sync palette: {e}")
