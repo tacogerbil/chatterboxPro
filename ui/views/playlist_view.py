@@ -148,4 +148,4 @@ class PlaylistView(QWidget):
             p.setColor(QPalette.Text, QColor("#000000"))
             
         self.list_view.setPalette(p)
-        self.list_view.update()
+        # self.list_view.update() # CAUSES CRASH: TypeError argument mismatch

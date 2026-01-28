@@ -27,7 +27,7 @@ def setup_logging():
         ]
     )
     # Redirect stderr to log
-    # sys.stderr = open(os.path.join(log_dir, "stderr.log"), 'w')
+    sys.stderr = open(os.path.join(log_dir, "stderr.log"), 'w')
 
 if __name__ == "__main__":
     setup_logging()
