@@ -151,6 +151,7 @@ class TextPreprocessor:
             return {
                 "uuid": uuid.uuid4().hex,
                 "original_sentence": final_text, 
+                "text": final_text,
                 "paragraph": "no",
                 "tts_generated": "no", 
                 "marked": False,
