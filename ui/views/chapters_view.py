@@ -3,11 +3,70 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QMessageBox, QCheckBox, QStyledItemDelegate, QStyle, QApplication, QStyleOptionViewItem
 )
 from PySide6.QtGui import QColor, QBrush, QPalette
-from PySide6.QtCore import Qt, Signal, QModelIndex, QRect, QEvent
-from typing import Optional
+from PySide6.QtCore import Qt, Signal, QModelIndex, QRect, QEvent, QAbstractListModel
+from typing import Optional, List, Dict, Any
 from core.state import AppState
 from core.services.generation_service import GenerationService
 from core.services.chapter_service import ChapterService
+
+class ChapterModel(QAbstractListModel):
+    def __init__(self, app_state: AppState):
+        super().__init__()
+        self.app_state = app_state
+        self.logic = ChapterService()
+        self._chapters: List[Dict[str, Any]] = []
+        self._checked_state: Dict[int, bool] = {} # Map original_idx -> is_checked
+        self.refresh()
+
+    def refresh(self):
+        self.beginResetModel()
+        # Detect chapters from current sentences
+        self._chapters = self.logic.detect_chapters(self.app_state.sentences)
+        # Reset checked state on refresh? Or try to preserve? For safety, reset.
+        self._checked_state = {}
+        self.endResetModel()
+
+    def rowCount(self, parent=QModelIndex()) -> int:
+        return len(self._chapters)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid() or not (0 <= index.row() < len(self._chapters)):
+            return None
+        
+        chapter = self._chapters[index.row()]
+        
+        if role == Qt.DisplayRole:
+            return f"{chapter['title']} (Sentences {chapter['start_idx']+1}-{chapter['end_idx']+1})"
+            
+        if role == Qt.CheckStateRole:
+            # We map row index to check state.
+            # Ideally we map absolute chapter index, but row index is fine if we clear on refresh.
+            return Qt.Checked if self._checked_state.get(index.row(), False) else Qt.Unchecked
+            
+        return None
+
+    def setData(self, index, value, role=Qt.EditRole):
+        if not index.isValid() or role != Qt.CheckStateRole:
+            return False
+            
+        self._checked_state[index.row()] = (value == Qt.Checked)
+        self.dataChanged.emit(index, index, [role])
+        return True
+
+    def flags(self, index):
+        if not index.isValid():
+            return Qt.NoItemFlags
+        return Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable
+
+    def get_selected_indices(self) -> List[int]:
+        """Returns the list of INDICES in the chapter list that are checked."""
+        return [row for row, checked in self._checked_state.items() if checked]
+
+    def get_chapter_index(self, row: int) -> int:
+        """Returns the start sentence index for the chapter at the given row."""
+        if 0 <= row < len(self._chapters):
+            return self._chapters[row]['start_idx']
+        return -1
 
 class ChapterDelegate(QStyledItemDelegate):
     jump_clicked = Signal(int)
