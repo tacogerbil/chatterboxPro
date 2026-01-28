@@ -390,31 +390,36 @@ class GenerationService(QObject):
         
         # Create task tuple (similar to _prepare_tasks but simplified)
         # Note: Index -1 indicates this is a transient preview, not a sentence item
-        task = (
-            -1, # sequence index
-            -1, # original_index
-            0,  # sentence_number
-            punc_norm(text),
-            device, 
-            random.randint(1, 999999), # random seed
-            self.state.ref_audio_path if self.state.ref_audio_path and self.state.ref_audio_path.strip() else None, 
-            s.exaggeration, s.temperature,
-            s.cfg_weight, s.disable_watermark,
-            1, # candidates
-            1, # max attempts
-            True, # skip ASR validation for preview speed
-            "_preview", # session name
-            0, # run idx
-            "Outputs_Pro", # output dir (Root folder)
-            f"preview_{str(uuid.uuid4())[:8]}", # uuid - unique per preview for locking safety
-            s.asr_threshold,
-            s.speed,
-            s.tts_engine,
-            s.pitch_shift,
-            s.timbre_shift,
-            s.gruffness,
-            s.bass_boost,
-            s.treble_boost
+        # Create task object (MCCC: Explicit Interface)
+        # Note: Index -1 indicates this is a transient preview
+        task = WorkerTask(
+            task_index=-1,
+            original_index=-1,
+            sentence_number=0,
+            text_chunk=punc_norm(text),
+            device_str=device,
+            master_seed=random.randint(1, 999999),
+            ref_audio_path=self.state.ref_audio_path if self.state.ref_audio_path and self.state.ref_audio_path.strip() else None,
+            exaggeration=s.exaggeration,
+            temperature=s.temperature,
+            cfg_weight=s.cfg_weight,
+            disable_watermark=s.disable_watermark,
+            num_candidates=1,
+            max_attempts=1,
+            bypass_asr=True, # skip ASR for preview speed
+            session_name="_preview",
+            run_idx=0,
+            output_dir_str="Outputs_Pro",
+            uuid=f"preview_{str(uuid.uuid4())[:8]}",
+            asr_threshold=s.asr_threshold,
+            speed=s.speed,
+            tts_engine=s.tts_engine,
+            pitch_shift=s.pitch_shift,
+            timbre_shift=s.timbre_shift,
+            gruffness=s.gruffness,
+            bass_boost=s.bass_boost,
+            treble_boost=s.treble_boost,
+            model_path=s.model_path
         )
         
         # We can reuse GenerationThread, or just spawn a simple thread 
@@ -429,7 +434,7 @@ class PreviewWorker(QThread):
     finished_signal = Signal(str)
     error_signal = Signal(str)
     
-    def __init__(self, task: Tuple) -> None:
+    def __init__(self, task: Any) -> None:
         super().__init__()
         self.task = task
         
