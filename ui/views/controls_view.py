@@ -203,12 +203,6 @@ class ControlsView(QWidget):
             self.audio_service.play_file(str(candidate_1))
         else:
             QMessageBox.warning(self, "Not Found", f"Audio file not found for item.\n(Path: {audio_path})")
-        if not session_name: return
-        
-        from pathlib import Path
-        path = Path("Outputs_Pro") / session_name / "Sentence_wavs" / f"audio_{uuid_str}.wav"
-        
-        self.audio_service.play_file(str(path))
 
     def _stop_playback(self):
         if self.audio_service:
@@ -229,15 +223,23 @@ class ControlsView(QWidget):
 
     def _edit_text(self):
         idx = self._get_selected_index()
-        if idx == -1: return
+        if idx == -1: 
+            logging.warning("Edit: No index selected.")
+            return
         
         item = self.playlist_service.get_selected_item(idx)
+        if not item:
+            logging.warning(f"Edit: Item at {idx} is None.")
+            return
+
+        logging.info(f"Editing Item {idx}: Pause={item.get('is_pause')}")
         
         # Check if Pause - Use Duration Editor
         if item.get('is_pause'):
             old_dur = item.get('duration', 500)
             new_dur, ok = QInputDialog.getInt(self, "Edit Pause", "Duration (ms):", value=old_dur, min=100, max=10000)
             if ok and new_dur != old_dur:
+                logging.info(f"Updating pause duration to {new_dur}")
                 self.playlist_service.edit_pause(idx, new_dur)
                 self._refresh()
             return

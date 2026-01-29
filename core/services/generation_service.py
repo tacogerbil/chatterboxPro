@@ -356,12 +356,17 @@ class GenerationService(QObject):
             self.state.sentences[original_idx]['audio_path'] = result.get('path')
         
         status = result.get('status')
+        asr = result.get('similarity_ratio', 0.0)
+        
         if status == 'success':
             self.state.sentences[original_idx]['tts_generated'] = STATUS_YES
             self.state.sentences[original_idx]['marked'] = False
+            logging.info(f"Chunk [{original_idx+1}] Success: ASR Match={asr*100:.1f}%")
         else:
             self.state.sentences[original_idx]['tts_generated'] = STATUS_FAILED
             self.state.sentences[original_idx]['marked'] = True
+            error_msg = result.get('error_message', 'Unknown Error')
+            logging.warning(f"Chunk [{original_idx+1}] Failed: {error_msg} (ASR={asr*100:.1f}%)")
         
         # Emit update for UI
         self.item_updated.emit(original_idx)
