@@ -244,12 +244,15 @@ class ControlsView(QWidget):
             if item.get('is_pause'):
                 print("DEBUG: Attempting QInputDialog for Pause...", flush=True)
                 old_dur = item.get('duration', 500)
-                new_dur, ok = QInputDialog.getInt(self, "Edit Pause", "Duration (ms):", value=old_dur, min=100, max=10000)
+                # Correct arguments: parent, title, label, value, min, max, step
+                new_dur, ok = QInputDialog.getInt(self, "Edit Pause", "Duration (ms):", old_dur, 100, 10000, 50)
                 print(f"DEBUG: QInputDialog returned: ok={ok}, val={new_dur}", flush=True)
                 if ok and new_dur != old_dur:
                     logging.info(f"Updating pause duration to {new_dur}")
-                    self.playlist_service.edit_pause(idx, new_dur)
-                    self._refresh()
+                    if self.playlist_service.edit_pause(idx, new_dur):
+                        self._refresh()
+                        # Force playlist repaint
+                        self.playlist.list_view.viewport().update()
                 return
 
             # Normal Text Editing
@@ -262,8 +265,13 @@ class ControlsView(QWidget):
             if dlg.exec():
                 new_text = dlg.result_text
                 if new_text != old_text:
-                    self.playlist_service.edit_text(idx, new_text)
-                    self._refresh()
+                    if self.playlist_service.edit_text(idx, new_text):
+                        self._refresh()
+                        # Force playlist repaint
+                        self.playlist.list_view.viewport().update()
+                        print("DEBUG: Text updated and View refreshed.", flush=True)
+                    else:
+                        print("DEBUG: edit_text returned False (no change?)", flush=True)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -289,7 +297,8 @@ class ControlsView(QWidget):
 
     def _insert_pause(self):
         idx = self._get_selected_index()
-        dur, ok = QInputDialog.getInt(self, "Insert Pause", "Duration (ms):", value=500)
+        # Fix: positional args (parent, title, label, value, min, max, step)
+        dur, ok = QInputDialog.getInt(self, "Insert Pause", "Duration (ms):", 500, 100, 10000, 50)
         if ok:
              self.playlist_service.insert_item(idx, "[PAUSE]", is_pause=True, duration=dur)
              self._refresh()
