@@ -117,6 +117,14 @@ class PlaylistView(QWidget):
         full_data = self.model.get_item(indices[0])
         if not full_data: return
         
+        if full_data.get('is_pause'):
+             # Pause Item Handling (MCCC: Distinct UX)
+             duration = full_data.get('duration', self.app_state.settings.silence_duration)
+             self.lbl_status.setText(f"PAUSE ({duration}ms)")
+             self.lbl_seed.setText("--")
+             self.lbl_asr.setText("--")
+             return
+
         self.lbl_status.setText(str(full_data.get('tts_generated', 'no')))
         self.lbl_seed.setText(str(full_data.get('generation_seed') or full_data.get('seed', '--')))
         

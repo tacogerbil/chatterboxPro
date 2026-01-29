@@ -2,6 +2,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QHBoxLayout, Q
                                QLineEdit, QLabel, QMessageBox, QInputDialog, QCheckBox)
 from PySide6.QtCore import Qt, Signal
 import logging
+import os
 from ui.components.collapsible_frame import CollapsibleFrame
 from core.services.playlist_service import PlaylistService
 from core.services.generation_service import GenerationService
@@ -380,12 +381,9 @@ class ControlsView(QWidget):
         self._refresh()
 
     def _reset_gen(self):
-        # Reset current?
         indices = self._get_selected_indices()
         for i in indices:
-            item = self.playlist_service.get_selected_item(i)
-            item['tts_generated'] = None
-            item['marked'] = False
+            self.playlist_service.reset_item(i)
         self._refresh()
 
     def _delete_items(self):

@@ -18,6 +18,22 @@ class PlaylistService:
             return self.state.sentences[index]
         return None
 
+    def reset_item(self, index: int) -> bool:
+        """Resets generation status and clears artifacts for a single item."""
+        item = self.get_selected_item(index)
+        if not item: return False
+        
+        item['tts_generated'] = 'no'
+        item['marked'] = True
+        
+        # Clear artifacts to prevent stale UI stats
+        keys_to_clear = ['audio_path', 'similarity_ratio', 'generation_seed', 'asr_match', 'ffmpeg_cmd']
+        for k in keys_to_clear:
+            if k in item:
+                del item[k]
+                
+        return True
+
     def edit_text(self, index: int, new_text: str) -> bool:
         item = self.get_selected_item(index)
         if not item: return False
