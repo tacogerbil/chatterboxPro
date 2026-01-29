@@ -188,16 +188,21 @@ class ControlsView(QWidget):
             return
 
         # Resolve path
-        # Using ProjectService helper would be best, but we can construct it or use path in item if stored.
-        # Item has 'uuid'.
-        # We need session name.
+        audio_path = item.get('audio_path')
+        if audio_path and Path(audio_path).exists():
+             self.audio_service.play_file(audio_path)
+             return
+             
+        # Fallback to manual construction (Legacy support)
         session_name = self.playlist_service.state.session_name
         uuid_str = item.get('uuid')
         
-        # Construct path manually or via service method if we had one accessible?
-        # Let's assume standard path: Outputs_Pro/{session}/Sentence_wavs/audio_{uuid}.wav
-        # We can use ProjectService if accessible. 
-        # But for now, construct path.
+        # Try standard location
+        candidate_1 = Path(f"Outputs_Pro/{session_name}/Sentence_wavs/audio_{uuid_str}.wav")
+        if candidate_1.exists():
+            self.audio_service.play_file(str(candidate_1))
+        else:
+            QMessageBox.warning(self, "Not Found", f"Audio file not found for item.\n(Path: {audio_path})")
         if not session_name: return
         
         from pathlib import Path

@@ -351,6 +351,10 @@ class GenerationService(QObject):
         self.state.sentences[original_idx]['generation_seed'] = result.get('seed')
         self.state.sentences[original_idx]['similarity_ratio'] = result.get('similarity_ratio')
         
+        # MCCC: Store audio path for playback
+        if result.get('path'):
+            self.state.sentences[original_idx]['audio_path'] = result.get('path')
+        
         status = result.get('status')
         if status == 'success':
             self.state.sentences[original_idx]['tts_generated'] = STATUS_YES

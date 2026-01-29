@@ -10,6 +10,7 @@ from ui.views.setup_view import SetupView
 from ui.views.playlist_view import PlaylistView
 from ui.views.controls_view import ControlsView
 from ui.views.finalize_view import FinalizeView
+from ui.views.log_view import LogView
 from ui.views.config_view import ConfigView
 
 from core.services.generation_service import GenerationService
@@ -99,6 +100,10 @@ class ChatterboxProQt(QMainWindow):
         
         self.config_view = ConfigView(app_state=self.app_state)
         self.tabs.addTab(self.config_view, "Config")
+        
+        # Logs Tab
+        self.log_view = LogView()
+        self.tabs.addTab(self.log_view, "Logs")
 
     def _setup_playlist_controls(self) -> None:
         # ControlsView needs services map
