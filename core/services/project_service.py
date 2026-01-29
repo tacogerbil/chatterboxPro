@@ -86,6 +86,16 @@ class ProjectService:
             session_path.resolve().mkdir(parents=True, exist_ok=True)
             
             json_path = session_path / f"{session_name}_session.json"
+            
+            # Create Backup if exists
+            if json_path.exists():
+                try:
+                    backup_path = session_path / f"{session_name}_session.bak"
+                    shutil.copy2(json_path, backup_path)
+                    logging.info(f"Created backup: {backup_path}")
+                except Exception as e:
+                    logging.warning(f"Failed to create backup: {e}")
+            
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
                 

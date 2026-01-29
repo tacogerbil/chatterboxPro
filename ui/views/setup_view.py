@@ -328,11 +328,17 @@ class SetupView(QWidget):
         if dir_path:
             data = self.project_service.load_session(dir_path)
             if data:
+                # DEBUG: Log keys
+                logging.info(f"Session Load Keys: {list(data.keys())}")
+                if 'sentences' in data:
+                    logging.info(f"Sentences type: {type(data['sentences'])}, len: {len(data['sentences'])}")
+                
                 # Update State & UI
                 self.state.session_name = data.get('session_name', '')
                 self.session_name_edit.setText(self.state.session_name)
                 
-                self.state.sentences = data.get('sentences', [])
+                loaded_sentences = data.get('sentences', [])
+                self.state.sentences = loaded_sentences
                 
                 src_path = data.get('source_file_path', '')
                 self.state.source_file_path = src_path # FIX: Sync state
@@ -342,9 +348,20 @@ class SetupView(QWidget):
                      self.state.update_settings(**data['generation_settings'])
                 
                 self.session_updated.emit() # Refresh other views
-                QMessageBox.information(self, "Loaded", f"Session loaded with {len(self.state.sentences)} chunks.")
+                
+                msg = f"Session loaded with {len(self.state.sentences)} chunks."
+                
+                # Auto-Recovery Suggestion
+                if len(self.state.sentences) == 0 and src_path and os.path.exists(src_path):
+                    msg += "\n\nSource file found. Would you like to re-process text now?"
+                    reply = QMessageBox.question(self, "Loaded (Empty)", msg, 
+                                               QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                    if reply == QMessageBox.Yes:
+                        self.open_editor_and_process()
+                else:
+                    QMessageBox.information(self, "Loaded", msg)
             else:
-                QMessageBox.warning(self, "Error", "Failed to load session.")
+                QMessageBox.warning(self, "Error", "Failed to load session content (JSON missing or invalid).")
 
     def manual_save_session(self) -> None:
         if not self.state.session_name:
