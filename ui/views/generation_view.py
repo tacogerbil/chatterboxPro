@@ -314,7 +314,7 @@ class GenerationView(QWidget):
         a_layout.addRow("Full Outputs:", self.outputs_spin)
         
         self.retries_spin = QSpinBox()
-        self.retries_spin.setRange(0, 10)
+        self.retries_spin.setRange(0, 50)
         self.retries_spin.setValue(self.state.settings.max_attempts)
         self.retries_spin.valueChanged.connect(
             lambda v: setattr(self.state.settings, 'max_attempts', v)
