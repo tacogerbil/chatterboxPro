@@ -35,7 +35,52 @@ class AudioService(QObject):
         
         self.current_file = None
 
-    # ... (play_file, stop, etc remain same)
+    def play_file(self, file_path: str):
+        """Plays the specified audio file."""
+        if not file_path: return
+        
+        path = Path(file_path)
+        if not path.exists():
+            self.playback_error.emit(f"File not found: {path}")
+            return
+            
+        try:
+            self.player.stop()
+            self.player.setSource(QUrl.fromLocalFile(str(path)))
+            self.audio_output.setVolume(1.0) # Full volume
+            self.player.play()
+            self.current_file = str(path)
+            self.playback_started.emit(self.current_file)
+            logging.info(f"AudioService: Playing {path}")
+        except Exception as e:
+            msg = f"Failed to play audio: {e}"
+            logging.error(msg)
+            self.playback_error.emit(msg)
+
+    @Slot(QMediaPlayer.MediaStatus)
+    def _on_status_changed(self, status):
+        """Robust End of Media detection."""
+        if status == QMediaPlayer.EndOfMedia:
+            logging.info("AudioService: EndOfMedia reached.")
+            # Check queue
+            if hasattr(self, 'is_queue_active') and self.is_queue_active:
+                self._play_next_in_queue()
+            else:
+                self.playback_stopped.emit()
+
+    @Slot(QMediaPlayer.PlaybackState)
+    def _on_state_changed(self, state):
+        # We rely on mediaStatusChanged for natural end of playback.
+        # This handler handles manual stops or changes.
+        pass
+
+    @Slot(QMediaPlayer.Error, str)
+    def _on_error(self, error, error_string):
+        self.playback_error.emit(f"QMediaPlayer Error: {error_string}")
+        logging.error(f"QMediaPlayer Error: {error_string}")
+        # If in queue, try next?
+        if hasattr(self, 'is_queue_active') and self.is_queue_active:
+             self._play_next_in_queue()
 
     def play_queue(self, items: list[dict]):
         """
