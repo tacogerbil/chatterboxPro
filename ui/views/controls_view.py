@@ -178,29 +178,30 @@ class ControlsView(QWidget):
     # --- Actions ---
     
     def _play_selected(self):
-        if not self.audio_service: return
-        
         idx = self._get_selected_index()
         if idx == -1: return
         
         item = self.playlist_service.get_selected_item(idx)
-        if not item or item.get("tts_generated") != "yes":
-            QMessageBox.warning(self, "No Audio", "Selected item has no generated audio.")
-            return
-
-        # Resolve path
-        audio_path = item.get('audio_path')
-        if audio_path and Path(audio_path).exists():
-             self.audio_service.play_file(audio_path)
-             return
-             
-        # Fallback to manual construction (Legacy support)
-        session_name = self.playlist_service.state.session_name
-        uuid_str = item.get('uuid')
+        print(f"DEBUG: Play request for Item {idx}", flush=True) # Debug
         
-        # Try standard location
-        candidate_1 = Path(f"Outputs_Pro/{session_name}/Sentence_wavs/audio_{uuid_str}.wav")
-        if candidate_1.exists():
+        if not item: return
+
+        # 1. Try saved path
+        path = item.get('audio_path')
+        print(f"DEBUG: Saved audio_path: {path}", flush=True) # Debug
+        
+        if not path:
+             # 2. Try constructing default path (fallback)
+             # Default: output/wavs/sentence_{uuid}.wav
+             filename = f"sentence_{item.get('uuid')}.wav"
+             path = os.path.join(os.getcwd(), "output", "wavs", filename)
+             print(f"DEBUG: Constructed path: {path}", flush=True) # Debug
+
+        if not path or not os.path.exists(path):
+            logging.warning(f"Audio file not found: {path}")
+            print(f"DEBUG: File NOT FOUND at {path}", flush=True) # Debug
+            QMessageBox.warning(self, "Playback Error", f"File not found:\n{path}")
+            return
             self.audio_service.play_file(str(candidate_1))
         else:
             QMessageBox.warning(self, "Not Found", f"Audio file not found for item.\n(Path: {audio_path})")

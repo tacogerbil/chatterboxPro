@@ -201,6 +201,12 @@ class PlaylistService:
                 next_item['tts_generated'] = 'no'
                 next_item['marked'] = True
                 
+                # MCCC: Clear associated metrics and artifacts for the merged item
+                keys_to_clear = ['audio_path', 'asr_match', 'seed', 'ffmpeg_cmd']
+                for k in keys_to_clear:
+                    if k in next_item:
+                        del next_item[k]
+                
                 # Remove current
                 self.state.sentences.pop(i)
                 merged_count += 1
