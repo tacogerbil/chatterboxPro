@@ -192,10 +192,26 @@ class ControlsView(QWidget):
         
         if not path:
              # 2. Try constructing default path (fallback)
-             # Default: output/wavs/sentence_{uuid}.wav
-             filename = f"sentence_{item.get('uuid')}.wav"
-             path = os.path.join(os.getcwd(), "output", "wavs", filename)
-             print(f"DEBUG: Constructed path: {path}", flush=True) # Debug
+             # Check for both "audio_{uuid}.wav" (New) and "sentence_{uuid}.wav" (Legacy)
+             uuid_str = item.get('uuid')
+             base_dir = os.path.join(os.getcwd(), "output", "wavs") # Or "Output_Pro/Session/..."?
+             # Better: Use saved session path if available?
+             # For now, check standard output names relative to CWD
+             
+             candidates = [
+                 os.path.join(base_dir, f"audio_{uuid_str}.wav"),
+                 os.path.join(base_dir, f"sentence_{uuid_str}.wav"),
+                 # Also try finding it in the session specific folder if possible, but path *should* be saved.
+             ]
+             
+             for c in candidates:
+                 if os.path.exists(c):
+                     path = c
+                     print(f"DEBUG: Found fallback audio at: {path}", flush=True)
+                     break
+             
+             if not path:
+                  print(f"DEBUG: Fallback search failed. Checked: {candidates}", flush=True)
 
         if not path or not os.path.exists(path):
             logging.warning(f"Audio file not found: {path}")

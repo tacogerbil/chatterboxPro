@@ -57,11 +57,9 @@ class PlaylistView(QWidget):
         self.list_view.setSelectionMode(QListView.ExtendedSelection)
         self.list_view.setAlternatingRowColors(True)
         
-
-        
-        # Palette set in update_theme()
-        
+        # Connect selection and data changes to stats update
         self.list_view.selectionModel().selectionChanged.connect(self.update_stats)
+        self.model.dataChanged.connect(self.on_data_changed)
         left_layout.addWidget(self.list_view)
         
         # Initial Theme Apply
@@ -98,20 +96,36 @@ class PlaylistView(QWidget):
     def refresh(self):
         self.model.refresh()
         
+    def on_data_changed(self, top_left, bottom_right, roles=None):
+        """Called when model data changes. Updates stats if selected item changed."""
+        selected = self.get_selected_indices()
+        if not selected: return
+        
+        # Check if change intersection with selection
+        # Simplified: just update if anything changes (cheap operation)
+        self.update_stats()
+
     def update_stats(self):
-        indexes = self.list_view.selectedIndexes()
-        if indexes:
-            # Stats for single selection
-            idx = indexes[0]
-            row = idx.row()
-            item = self.app_state.sentences[row]
-            
-            self.lbl_status.setText(item.get('tts_generated', 'pending'))
-            self.lbl_seed.setText(str(item.get('generation_seed', '--')))
-            ratio = item.get('similarity_ratio')
-            self.lbl_asr.setText(f"{ratio:.2%}" if ratio else "N/A")
-        else:
+        indices = self.get_selected_indices()
+        
+        if not indices or len(indices) > 1:
+            self.lbl_status.setText("--")
+            self.lbl_seed.setText("--")
             self.lbl_asr.setText("--")
+            return
+            
+        full_data = self.model.get_item(indices[0])
+        if not full_data: return
+        
+        self.lbl_status.setText(str(full_data.get('tts_generated', 'no')))
+        self.lbl_seed.setText(str(full_data.get('generation_seed') or full_data.get('seed', '--')))
+        
+        # Format ASR
+        asr = full_data.get('similarity_ratio') or full_data.get('asr_match')
+        if asr is not None:
+             self.lbl_asr.setText(f"{float(asr)*100:.2f}%")
+        else:
+             self.lbl_asr.setText("--")
             
     def get_selected_indices(self) -> list[int]:
         """Returns a list of selected sentence indices (ints)."""
