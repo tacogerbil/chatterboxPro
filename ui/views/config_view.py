@@ -54,8 +54,6 @@ class ConfigView(QWidget):
         
         t_layout.addRow("Custom Theme:", btn_layout)
         
-        t_layout.addRow("Custom Theme:", btn_layout)
-        
         layout.addWidget(theme_group)
         
         # --- Group 2: Generation Defaults ---
