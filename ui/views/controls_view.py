@@ -304,9 +304,18 @@ class ControlsView(QWidget):
         # Iterate from selected index to end
         for i in range(idx, len(sentences)):
             item = sentences[i]
+            
+            # Handle Pauses
+            if item.get('is_pause'):
+                duration = item.get('duration', 0)
+                if duration > 0:
+                    queue.append({'type': 'pause', 'duration': duration})
+                continue
+                
+            # Handle Audio
             path = item.get('audio_path')
             
-            # If path missing, try fallback reconstruction (same logic as _play_selected)
+            # If path missing, try fallback
             if not path:
                 uuid_str = item.get('uuid')
                 base_dir = os.path.join(os.getcwd(), "output", "wavs")
@@ -320,11 +329,10 @@ class ControlsView(QWidget):
                         break
             
             if path and os.path.exists(path):
-                # Ensure absolute path
-                queue.append(os.path.abspath(path))
+                queue.append({'type': 'file', 'path': os.path.abspath(path)})
         
         if not queue:
-            QMessageBox.warning(self, "Playback", "No audio files found starting from selection.")
+            QMessageBox.warning(self, "Playback", "No audio or pauses found starting from selection.")
             return
             
         logging.info(f"Controls: Play Queue with {len(queue)} items.")
