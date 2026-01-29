@@ -76,7 +76,7 @@ class ControlsView(QWidget):
         self.search_edit = QLineEdit(); self.search_edit.setPlaceholderText("Search text...")
         # MCCC: Force visible size and style to prevent red-box/rendering artifacts
         self.search_edit.setMinimumWidth(150)
-        self.search_edit.setStyleSheet("QLineEdit { color: white; border: 1px solid #555; padding: 2px; }") 
+        self.search_edit.setProperty("class", "search-box")
         self.search_edit.returnPressed.connect(self._search)
         s_layout.addWidget(self.search_edit)
         
@@ -92,24 +92,22 @@ class ControlsView(QWidget):
     def _setup_editing(self, group):
         layout = QGridLayout()
         
-        button_style = "QPushButton { padding: 4px; margin: 1px; font-size: 11px; }"
-        
         # Row 0: Editing & Insertions
         btn_edit = QPushButton("✎ Edit"); btn_edit.clicked.connect(self._edit_text)
-        btn_edit.setStyleSheet(button_style)
+        btn_edit.setProperty("class", "action")
 
         btn_ins_txt = QPushButton("➕ Text"); btn_ins_txt.clicked.connect(self._insert_text)
-        btn_ins_txt.setStyleSheet(button_style)
+        btn_ins_txt.setProperty("class", "action")
 
         btn_ins_pause = QPushButton("⏸ Pause"); btn_ins_pause.clicked.connect(self._insert_pause)
-        btn_ins_pause.setStyleSheet(button_style)
+        btn_ins_pause.setProperty("class", "action")
         
         btn_ins_chap = QPushButton("📑 New Chap"); btn_ins_chap.clicked.connect(self._insert_chapter)
-        btn_ins_chap.setStyleSheet(button_style)
+        btn_ins_chap.setProperty("class", "action")
 
         btn_conv_chap = QPushButton("➡️ Conv Chap"); btn_conv_chap.setToolTip("Convert Selection to Chapter")
         btn_conv_chap.clicked.connect(self._convert_to_chapter)
-        btn_conv_chap.setStyleSheet(button_style)
+        btn_conv_chap.setProperty("class", "action")
         
         layout.addWidget(btn_edit, 0, 0)
         layout.addWidget(btn_ins_txt, 0, 1)
@@ -119,20 +117,20 @@ class ControlsView(QWidget):
         
         # Row 1: Markers, Status & Split
         btn_mark = QPushButton("M Mark"); btn_mark.clicked.connect(self._mark_current)
-        btn_mark.setStyleSheet(button_style)
+        btn_mark.setProperty("class", "action")
 
         # Moved Split Here per User Request
         btn_split = QPushButton("➗ Split"); btn_split.clicked.connect(self._split_chunk)
-        btn_split.setStyleSheet(button_style)
+        btn_split.setProperty("class", "action")
         
         btn_pass = QPushButton("✓ Passed"); btn_pass.clicked.connect(self._mark_passed)
-        btn_pass.setStyleSheet(button_style + "background-color: #2ECC71; color: white;")
+        btn_pass.setProperty("class", "success")
         
         btn_reset = QPushButton("🔄 Reset"); btn_reset.clicked.connect(self._reset_gen)
-        btn_reset.setStyleSheet(button_style + "background-color: #C0392B; color: white;")
+        btn_reset.setProperty("class", "warning")
         
         btn_del = QPushButton("❌ Delete"); btn_del.clicked.connect(self._delete_items)
-        btn_del.setStyleSheet(button_style + "background-color: #A93226; color: white; font-weight: bold;")
+        btn_del.setProperty("class", "danger")
         
         layout.addWidget(btn_mark, 1, 0)
         layout.addWidget(btn_split, 1, 1)

@@ -37,6 +37,25 @@ class ThemeManager:
                     apply_stylesheet(app, theme=theme_name, **extra)
                     ThemeManager._sync_palette(app, theme_name, extra)
                     
+            # MCCC: Apply Custom Overrides (The Classy Way)
+            # This loads our defined classes (.success, .danger) so we don't hardcode CSS.
+            try:
+                import os
+                # Locate styles relative to this file (ui/theme_manager.py -> ui/styles/chatterbox.qss)
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                qss_path = os.path.join(base_dir, "styles", "chatterbox.qss")
+                
+                if os.path.exists(qss_path):
+                    with open(qss_path, "r") as f:
+                        custom_qss = f.read()
+                        # Append to existing stylesheet (overriding specific classes)
+                        app.setStyleSheet(app.styleSheet() + "\n" + custom_qss)
+                        print(f"[ThemeManager] Loaded custom styles from: {qss_path}")
+                else:
+                    logging.warning(f"[ThemeManager] Custom stylesheet not found at: {qss_path}")
+            except Exception as qss_e:
+                logging.error(f"[ThemeManager] Failed to load custom QSS: {qss_e}")
+
             print(f"[ThemeManager] Applied theme: {theme_name}")
                 
         except Exception as e:
