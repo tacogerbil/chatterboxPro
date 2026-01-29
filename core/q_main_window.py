@@ -109,7 +109,8 @@ class ChatterboxProQt(QMainWindow):
         # ControlsView needs services map
         services: Dict[str, Any] = {
             'playlist': self.playlist_service,
-            'generation': self.gen_service
+            'generation': self.gen_service,
+            'audio': self.audio_service  # MCCC: Inject AudioService
         }
         
         self.playlist_view = PlaylistView(self.app_state)
