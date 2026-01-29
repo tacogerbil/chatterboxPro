@@ -546,16 +546,18 @@ class ControlsView(QWidget):
     def _auto_pause_action(self):
         """Wraps all chapters with configured buffer pause."""
         s = self.playlist_service.state.settings
-        buffer_ms = s.chapter_buffer_ms
+        before_ms = s.chapter_buffer_before_ms
+        after_ms = s.chapter_buffer_after_ms
         
-        stats = self.playlist_service.apply_auto_pause_buffers(buffer_ms)
+        stats = self.playlist_service.apply_auto_pause_buffers(before_ms, after_ms)
         self._refresh()
         self.structure_changed.emit()
         
         # Show Log/Results properly
         logging.info(f"Auto-Pause Complete: Processed {stats['processed']} chapters. Added {stats['added']} pauses. Skipped {stats['skipped']}.")
         QMessageBox.information(self, "Auto-Pause Complete", 
-                                f"Wrapped {stats['processed']} chapters with {buffer_ms}ms buffer.\n\n"
+                                f"Wrapped {stats['processed']} chapters.\n"
+                                f"Buffers: Before={before_ms}ms, After={after_ms}ms.\n\n"
                                 f"Added: {stats['added']} pauses.\n"
                                 f"Skipped: {stats['skipped']} (already present).")
 

@@ -62,14 +62,22 @@ class ConfigView(QWidget):
         gen_group = QGroupBox("Generation Defaults")
         g_layout = QFormLayout(gen_group)
         
-        self.spin_chap_buf = QSpinBox()
-        self.spin_chap_buf.setRange(0, 10000)
-        self.spin_chap_buf.setSingleStep(100)
-        self.spin_chap_buf.setSuffix(" ms")
-        self.spin_chap_buf.setValue(self.state.settings.chapter_buffer_ms)
-        self.spin_chap_buf.valueChanged.connect(self.on_buffer_changed)
+        self.spin_buf_before = QSpinBox()
+        self.spin_buf_before.setRange(0, 10000)
+        self.spin_buf_before.setSingleStep(100)
+        self.spin_buf_before.setSuffix(" ms")
+        self.spin_buf_before.setValue(self.state.settings.chapter_buffer_before_ms)
+        self.spin_buf_before.valueChanged.connect(lambda v: self.update_setting('chapter_buffer_before_ms', v))
         
-        g_layout.addRow("Chapter Auto-Pause Buffer:", self.spin_chap_buf)
+        self.spin_buf_after = QSpinBox()
+        self.spin_buf_after.setRange(0, 10000)
+        self.spin_buf_after.setSingleStep(100)
+        self.spin_buf_after.setSuffix(" ms")
+        self.spin_buf_after.setValue(self.state.settings.chapter_buffer_after_ms)
+        self.spin_buf_after.valueChanged.connect(lambda v: self.update_setting('chapter_buffer_after_ms', v))
+        
+        g_layout.addRow("Buffer BEFORE Chapter:", self.spin_buf_before)
+        g_layout.addRow("Buffer AFTER Chapter:", self.spin_buf_after)
         
         layout.addWidget(gen_group)
         layout.addStretch()
@@ -89,9 +97,10 @@ class ConfigView(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Could not apply theme: {e}")
 
-    def on_buffer_changed(self, value: int) -> None:
-        """Update buffer setting in state."""
-        self.state.settings.chapter_buffer_ms = value
+    def update_setting(self, key: str, value: int) -> None:
+        """Generic update for integer settings."""
+        if hasattr(self.state.settings, key):
+            setattr(self.state.settings, key, value)
             
     def import_theme(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
