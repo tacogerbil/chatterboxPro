@@ -2,6 +2,8 @@ from PySide6.QtCore import QObject, QUrl, Signal, Slot, QTimer
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from pathlib import Path
 import logging
+
+class AudioService(QObject):
     """
     Handles audio playback for the application.
     Replaces legacy pygame.mixer logic with native QMediaPlayer.
