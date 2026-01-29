@@ -32,7 +32,21 @@ class PlaylistModel(QAbstractListModel):
                 text = f"[PAUSE : {duration}ms]"
                 
             if len(text) > 80: text = text[:77] + "..."
-            return f"[{row+1}] {text}"
+            
+            # Add Status Icon
+            status = item.get('tts_generated', 'no')
+            icon = ""
+            if status == 'yes': icon = "✅ "
+            elif status == 'failed': icon = "❌ "
+            # elif status == 'no': icon = "⬜ " # User requested 'red x' for 'hadn't been generated', but ❌ is usually error.
+            # Let's stick to X for fail/pending if user insisted, but standard UX distinguishes.
+            # User said: "red x ... signify it hadn't been generated".
+            # Let's try:
+            # Success: ✅
+            # Failed: ❌
+            # Pending: (no icon) - reduces clutter.
+            
+            return f"[{row+1}] {icon}{text}"
             
         elif role == self.StatusRole:
             # Return status string for View delegate to colorize

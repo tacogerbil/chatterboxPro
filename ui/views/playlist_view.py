@@ -18,11 +18,13 @@ class PlaylistDelegate(QStyledItemDelegate):
         status = index.data(PlaylistModel.StatusRole)
         
         # Apply Status Colors (Modify background brush)
-        if not (option.state & QStyle.State_Selected):
-            if status == "failed":
-                option.backgroundBrush = QBrush(QColor("#543030")) # Darker Red
-            elif status == "success":
-                option.backgroundBrush = QBrush(QColor("#2E4B2E")) # Darker Green
+        # User requested NO HUES. Comments below preserved for legacy ref.
+        # if not (option.state & QStyle.State_Selected):
+        #     if status == "failed":
+        #         option.backgroundBrush = QBrush(QColor("#543030")) # Darker Red
+        #     elif status == "success":
+        #         option.backgroundBrush = QBrush(QColor("#2E4B2E")) # Darker Green
+        pass
 
 
 class PlaylistView(QWidget):

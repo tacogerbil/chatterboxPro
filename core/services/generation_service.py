@@ -283,7 +283,11 @@ class GenerationService(QObject):
         # 1. Determine Scope
         if indices_to_process is not None:
              # Explicit list (e.g. retry or selected chapters)
-             process_indices = indices_to_process
+             # MCCC: Must filter out pauses here too!
+             process_indices = [
+                 i for i in indices_to_process 
+                 if not self.state.sentences[i].get('is_pause')
+             ]
         else:
              # Full run (filter not-done items)
              # Logic: Iterate ranges, collect all valid items
@@ -299,7 +303,7 @@ class GenerationService(QObject):
                  process_indices.extend(valid)
 
         if not process_indices:
-            logging.info("No chunks need generation.")
+            logging.info("No chunks need generation (or all were pauses).")
             self.finished.emit()
             return
 
