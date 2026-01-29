@@ -8,6 +8,7 @@ import os
 import shutil
 import dataclasses
 import torch
+import logging
 
 from core.state import AppState
 from utils.text_processor import TextPreprocessor
@@ -370,6 +371,15 @@ class SetupView(QWidget):
             QMessageBox.warning(self, "Error", "No active session to save.")
             return
             
+        if not self.state.is_session_loaded and not self.state.sentences:
+            # If not loaded and empty, warn user
+            reply = QMessageBox.question(self, "Safety Warning", 
+                                       "Session data has not been fully loaded. Saving now might overwrite your file with empty data.\n\n"
+                                       "Are you SURE you want to save?",
+                                       QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+
         if self.project_service.save_current_session(self.state):
             self.state.is_session_loaded = True # Mark safe
             QMessageBox.information(self, "Saved", f"Session '{self.state.session_name}' saved successfully.")
