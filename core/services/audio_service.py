@@ -51,20 +51,61 @@ class AudioService(QObject):
             logging.error(msg)
             self.playback_error.emit(msg)
 
-    def stop(self):
-        """Stops playback."""
-        if self.player.playbackState() != QMediaPlayer.StoppedState:
-            self.player.stop()
-            self.playback_stopped.emit()
-
     @Slot(QMediaPlayer.PlaybackState)
     def _on_state_changed(self, state):
         if state == QMediaPlayer.StoppedState:
-            self.playback_stopped.emit()
+            # Check queue first
+            if hasattr(self, 'is_queue_active') and self.is_queue_active:
+                # Use a timer or direct call? Direct call might stack overflow if 0-length media?
+                # Safer to let the event loop process.
+                # However, for simplicity here:
+                if self.player.mediaStatus() == QMediaPlayer.EndOfMedia:
+                     self._play_next_in_queue()
+                else:
+                     # Stopped manually?
+                     self.playback_stopped.emit()
+            else:
+                self.playback_stopped.emit()
 
     @Slot(QMediaPlayer.Error, str)
     def _on_error(self, error, error_string):
         self.playback_error.emit(f"QMediaPlayer Error: {error_string}")
+        # If in queue, try next?
+        if hasattr(self, 'is_queue_active') and self.is_queue_active:
+             self._play_next_in_queue()
+
+    def play_queue(self, files: list[str]):
+        """Starts playing a list of files sequentially."""
+        if not files: return
+        self.output_queue = files
+        self.queue_index = 0
+        self.is_queue_active = True
+        self._play_next_in_queue()
+
+    def _play_next_in_queue(self):
+        if not hasattr(self, 'output_queue') or self.queue_index >= len(self.output_queue):
+            self.is_queue_active = False
+            self.playback_stopped.emit()
+            logging.info("AudioService: Queue finished.")
+            return
+
+        next_file = self.output_queue[self.queue_index]
+        self.queue_index += 1
+        
+        # Validate existence here to skip missing files
+        if Path(next_file).exists():
+            self.play_file(next_file) # This calls player.play()
+        else:
+            logging.warning(f"AudioService: Queue skipping missing file: {next_file}")
+            self._play_next_in_queue() # Recurse/Next
+
+    def stop(self):
+        """Stops playback and clears queue."""
+        self.is_queue_active = False
+        self.output_queue = []
+        if self.player.playbackState() != QMediaPlayer.StoppedState:
+            self.player.stop()
+            self.playback_stopped.emit()
 
     def assemble_audiobook(self, output_path, is_for_acx=False, metadata=None):
         """

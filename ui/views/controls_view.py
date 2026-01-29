@@ -292,7 +292,46 @@ class ControlsView(QWidget):
             self.audio_service.stop()
 
     def _play_from(self):
-        pass # To be wired
+        idx = self._get_selected_index()
+        if idx == -1: 
+            QMessageBox.information(self, "Info", "Select a starting point.")
+            return
+
+        # Build Queue
+        queue = []
+        sentences = self.playlist_service.state.sentences
+        
+        # Iterate from selected index to end
+        for i in range(idx, len(sentences)):
+            item = sentences[i]
+            path = item.get('audio_path')
+            
+            # If path missing, try fallback reconstruction (same logic as _play_selected)
+            if not path:
+                uuid_str = item.get('uuid')
+                base_dir = os.path.join(os.getcwd(), "output", "wavs")
+                candidates = [
+                    os.path.join(base_dir, f"audio_{uuid_str}.wav"), 
+                    os.path.join(base_dir, f"sentence_{uuid_str}.wav")
+                ]
+                for c in candidates:
+                    if os.path.exists(c):
+                        path = c
+                        break
+            
+            if path and os.path.exists(path):
+                # Ensure absolute path
+                queue.append(os.path.abspath(path))
+        
+        if not queue:
+            QMessageBox.warning(self, "Playback", "No audio files found starting from selection.")
+            return
+            
+        logging.info(f"Controls: Play Queue with {len(queue)} items.")
+        if self.audio_service:
+            self.audio_service.play_queue(queue)
+        else:
+             QMessageBox.warning(self, "Error", "Audio Service disconnected.")
 
     def _get_selected_index(self):
         indices = self.playlist.get_selected_indices()
