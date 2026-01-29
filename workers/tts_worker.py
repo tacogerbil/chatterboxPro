@@ -432,7 +432,51 @@ def worker_process_chunk(task: WorkerTask):
                 if Path(temp_path_str).exists(): os.remove(temp_path_str)
                 continue
             
-            # 3. Standard Text Similarity Check
+            # 3. Strict Length Validation (Hallucination Check)
+            # The User reported a "93% match" containing "why?" at the end.
+            # Rationale: Hallucinations usually ADD text. 
+            # If transcription is significantly longer than source, reject it, even if Levenshtein is high.
+            
+            # Normalize first to account for "1" vs "one"
+            n_trans = normalize_numbers(transcribed).lower().strip()
+            n_source = normalize_numbers(text_chunk).lower().strip()
+            
+            # Remove punctuation for length check
+            n_trans_clean = re.sub(r'[\W_]+', '', n_trans)
+            n_source_clean = re.sub(r'[\W_]+', '', n_source)
+            
+            len_t = len(n_trans_clean)
+            len_s = len(n_source_clean)
+            
+            # Allow 10% slack + 5 chars (for minor variations/spelling)
+            # Example: "Power" (5) -> "Power why" (8). 8 > 5*1.1+5 = 10.5? No. 
+            # "The secrets of power trilogy book one" (31 chars)
+            # "The secrets of power trilogy book one why" (34 chars)
+            # 34 > 31*1.1 (34.1) + 5 = 39. False. This rule is too loose for short words.
+            
+            # Tighter Rule for High Similarity:
+            # If we are basically matching, we shouldn't have trailing garbage.
+            # Let's use Word Count.
+            wc_t = len(n_trans.split())
+            wc_s = len(n_source.split())
+            diff = wc_t - wc_s
+            
+            # Dynamic Tolerance based on length
+            # Short sentences (< 10 words) -> Zero Tolerance for extra words.
+            # Long sentences (>= 10 words) -> Allow +1 (accidental split like "can not")
+            
+            if wc_s < 10:
+                if diff >= 1:
+                     logging.warning(f"ASR REJECTED: Extra Word in Short Sentence ({wc_t} vs {wc_s}). Hallucination?")
+                     if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                     continue
+            else:
+                if diff >= 2:
+                     logging.warning(f"ASR REJECTED: Word Count Mismatch ({wc_t} vs {wc_s}) - Suspected Hallucination/Repetition.")
+                     if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                     continue
+
+            # 4. Standard Text Similarity Check
             ratio = get_similarity_ratio(text_chunk, transcribed)
             
             # Log transcription for debugging (using WARNING level to ensure visibility)
