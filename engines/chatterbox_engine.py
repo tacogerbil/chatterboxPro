@@ -138,6 +138,7 @@ class ChatterboxEngine(BaseTTSEngine):
         # Generate audio
         # Upstream ChatterboxTTS.generate signature:
         # text, repetition_penalty, min_p, top_p, audio_prompt_path, exaggeration, cfg_weight, temperature
+        wav_tensor = self.model.generate(
             text,
             audio_prompt_path=None,  # Already prepared via prepare_conditionals
             exaggeration=exaggeration,
