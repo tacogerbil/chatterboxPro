@@ -64,3 +64,9 @@ class PlaylistModel(QAbstractListModel):
         """Force full refresh."""
         self.beginResetModel()
         self.endResetModel()
+
+    def update_row(self, row_index: int):
+        """MCCC: granular update to avoid list reset."""
+        idx = self.index(row_index, 0)
+        if idx.isValid():
+            self.dataChanged.emit(idx, idx, [Qt.DisplayRole, self.StatusRole])

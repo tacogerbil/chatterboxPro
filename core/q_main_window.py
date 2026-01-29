@@ -158,6 +158,9 @@ class ChatterboxProQt(QMainWindow):
         # Wire Generation Finished (MCCC: Fixed Regression)
         self.gen_service.finished.connect(self.on_generation_finished)
         
+        # MCCC: Wire Item Update for Real-Time Stats
+        self.gen_service.item_updated.connect(lambda idx: self.playlist_view.model.update_row(idx))
+        
         # Wire Dynamic Theme Updates (List Colors)
         self.config_view.theme_combo.currentTextChanged.connect(self.chapters_view.update_theme)
         self.config_view.theme_combo.currentTextChanged.connect(self.playlist_view.update_theme)
