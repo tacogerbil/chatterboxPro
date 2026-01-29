@@ -164,27 +164,51 @@ class ControlsView(QWidget):
         
         # Row 0
         self.chk_fix_all = QCheckBox("Apply Batch Fix to ALL Failed Chunks")
-        layout.addWidget(self.chk_fix_all, 0, 0, 1, 3)
+        self.chk_fix_all.setToolTip("If checked, fixes apply to all failed chunks globally.")
+        layout.addWidget(self.chk_fix_all, 0, 0, 1, 4)
         
-        # Row 1
+        # Row 1: Merges & Cleaning
+        # [Reflow Marked] [Merge Failed] [Clean] [Filter]
+        
+        btn_reflow = QPushButton("Merge Marked (Smart)"); btn_reflow.clicked.connect(self._reflow_marked)
+        btn_reflow.setToolTip("Smart Merge: Combines marked items and re-chunks them to fit size limits.")
+        
         btn_merge = QPushButton("Merge Failed Down"); btn_merge.clicked.connect(self._merge_failed)
+        btn_merge.setToolTip("Merges failed chunks into the chunk below them.")
+        
         btn_clean = QPushButton("Clean Special Chars"); btn_clean.clicked.connect(self._clean_chars)
+        btn_clean.setToolTip("Removes aggressive special characters from selection.")
+        
         btn_filter = QPushButton("Filter Non-English"); btn_filter.clicked.connect(self._filter_english)
+        btn_filter.setToolTip("Removes non-English words from selection.")
         
-        layout.addWidget(btn_merge, 1, 0)
-        layout.addWidget(btn_clean, 1, 1)
-        layout.addWidget(btn_filter, 1, 2)
+        layout.addWidget(btn_reflow, 1, 0)
+        layout.addWidget(btn_merge, 1, 1)
+        layout.addWidget(btn_clean, 1, 2)
+        layout.addWidget(btn_filter, 1, 3)
         
-        # Row 2
-        btn_split_all = QPushButton("Split All Failed"); btn_split_all.clicked.connect(self._split_all_failed)
-        layout.addWidget(btn_split_all, 2, 0, 1, 3)
+        # Row 2: Splits
+        # [Split Marked] [Split Failed]
         
-        # Row 3
+        btn_split_marked = QPushButton("Split Marked"); btn_split_marked.clicked.connect(self._split_marked)
+        btn_split_marked.setToolTip("Splits all marked chunks using the sentence splitter.")
+        
+        btn_split_all = QPushButton("Split Failed"); btn_split_all.clicked.connect(self._split_all_failed)
+        btn_split_all.setToolTip("Splits all failed chunks using the sentence splitter.")
+        
+        layout.addWidget(btn_split_marked, 2, 0, 1, 2)
+        layout.addWidget(btn_split_all, 2, 2, 1, 2)
+        
+        # Row 3: Regen & Loops
         btn_regen = QPushButton("↻ Regenerate Marked"); btn_regen.clicked.connect(self._regen_marked)
         btn_regen.setStyleSheet("background-color: #A40000; color: white;")
+        btn_regen.setToolTip("Start generation for all items marked for regeneration.")
         
         self.chk_auto_loop = QCheckBox("Auto-loop")
+        self.chk_auto_loop.setToolTip("Continue regenerating failed chunks until all pass.")
+        
         self.chk_reassemble = QCheckBox("Re-Assemble after")
+        self.chk_reassemble.setToolTip("Automatically assemble audiobook after generation completes.")
         
         layout.addWidget(btn_regen, 3, 0, 1, 2)
         layout.addWidget(self.chk_auto_loop, 3, 2)
@@ -495,3 +519,23 @@ class ControlsView(QWidget):
                                 f"Wrapped {stats['processed']} chapters with {buffer_ms}ms buffer.\n\n"
                                 f"Added: {stats['added']} pauses.\n"
                                 f"Skipped: {stats['skipped']} (already present).")
+
+    def _reflow_marked(self):
+        """Smart Reflow of Marked Items."""
+        count = self.playlist_service.reflow_marked_items()
+        if count:
+            self._refresh()
+            self.structure_changed.emit()
+            QMessageBox.information(self, "Reflow Complete", f"Reflowed {count} marked items into optimized chunks.")
+        else:
+             QMessageBox.information(self, "Info", "No marked items found to reflow.")
+
+    def _split_marked(self):
+        """Split All Marked Items."""
+        count = self.playlist_service.split_all_marked()
+        if count:
+            self._refresh()
+            self.structure_changed.emit()
+            QMessageBox.information(self, "Split Complete", f"Split {count} marked items.")
+        else:
+             QMessageBox.information(self, "Info", "No marked items found or no split needed.")

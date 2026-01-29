@@ -1,6 +1,8 @@
 import uuid
 import logging
 from typing import List, Dict, Any, Optional
+from itertools import groupby
+from operator import itemgetter
 from core.state import AppState
 from utils.text_processor import TextPreprocessor
 
@@ -347,3 +349,104 @@ class PlaylistService:
             
         self._renumber()
         return stats
+
+    def reflow_marked_items(self) -> int:
+        """
+        Smart Merge: Finds contiguous blocks of marked items, concatenates their text,
+        and re-chunks them respecting the max_chunk_chars setting.
+        """
+        if not self.state.sentences: return 0
+        
+        # 1. Identify contiguous blocks of marked indices
+        marked_indices = [i for i, s in enumerate(self.state.sentences) if s.get('marked')]
+        if not marked_indices: return 0
+        
+        marked_indices = [i for i, s in enumerate(self.state.sentences) if s.get('marked')]
+        if not marked_indices: return 0
+        
+        groups = []
+        for k, g in groupby(enumerate(marked_indices), lambda ix: ix[0] - ix[1]):
+            groups.append(list(map(itemgetter(1), g)))
+            
+        # Process groups in reverse order to keep indices valid
+        processed_count = 0
+        max_chars = self.state.settings.max_chunk_chars
+        
+        for group in reversed(groups):
+            if not group: continue
+            
+            start_idx = group[0]
+            # Collect text from all items in this group
+            full_text = ""
+            for idx in group:
+                full_text += " " + self.state.sentences[idx].get('original_sentence', '')
+            
+            full_text = full_text.strip()
+            
+            # Re-split into sentences first (to get granular units)
+            # Create a localized list of dicts for group_sentences_into_chunks
+            # We use preprocess_text logic but just need raw sentences first
+            raw_sentences = self.processor.splitter.split(full_text) if self.processor.splitter else self.processor.simple_split_re.split(full_text)
+            
+            # Wrap as dicts for the grouper
+            sentence_dicts = []
+            for s in raw_sentences:
+                s_clean = s.strip()
+                if not s_clean: continue
+                sentence_dicts.append({
+                    "original_sentence": s_clean,
+                    "is_chapter_heading": bool(self.processor.chapter_regex.match(s_clean))
+                })
+                
+            # Now Group them
+            new_chunks = self.processor.group_sentences_into_chunks(sentence_dicts, max_chars=max_chars)
+            
+            # Ensure new chunks have correct status
+            for chunk in new_chunks:
+                chunk['tts_generated'] = 'no'
+                chunk['marked'] = True # Keep them marked so user can review? Or unmark?
+                # User said "perform their tasks only on MARKED items". Usually resulting items are ready to gen.
+                # Let's keep them marked so they can be generated immediately with "Regen Marked".
+                
+            # Replace the old slice with new chunks
+            # Slice range: start_idx to start_idx + len(group)
+            self.state.sentences[start_idx : start_idx + len(group)] = new_chunks
+            processed_count += len(group)
+            
+        if processed_count > 0:
+            self._renumber()
+            
+        return processed_count
+
+    def split_all_marked(self) -> int:
+        """Splits all marked chunks using the sentence splitter."""
+        split_count = 0
+        i = 0
+        while i < len(self.state.sentences):
+            item = self.state.sentences[i]
+            if item.get('marked'):
+                text = item.get('original_sentence', '')
+                split_sentences = self.processor.splitter.split(text)
+                
+                if len(split_sentences) > 1:
+                     new_items = []
+                     for s in split_sentences:
+                        if not s.strip(): continue
+                        new_items.append({
+                            "uuid": uuid.uuid4().hex,
+                            "original_sentence": s.strip(),
+                            "paragraph": "no",
+                            "tts_generated": "no",
+                            "marked": True,
+                            "is_chapter_heading": bool(self.processor.chapter_regex.match(s.strip()))
+                        })
+                     
+                     self.state.sentences[i:i+1] = new_items
+                     split_count += 1
+                     i += len(new_items) # Skip over new items
+                     continue
+            i += 1
+            
+        if split_count > 0:
+            self._renumber()
+        return split_count
