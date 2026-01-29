@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QGridLayout, 
                                QLineEdit, QLabel, QMessageBox, QInputDialog, QCheckBox)
 from PySide6.QtCore import Qt, Signal
+import logging
 from ui.components.collapsible_frame import CollapsibleFrame
 from core.services.playlist_service import PlaylistService
 from core.services.generation_service import GenerationService
