@@ -17,8 +17,14 @@ import time
 import uuid 
 
 from ui.playlist import PlaylistFrame
-from ui.controls_frame import ControlsFrame
+# from ui.controls_frame import ControlsFrame # Legacy
+from ui.views.controls_view import ControlsView # New MCCC View
 from ui.tabs.setup_tab import SetupTab
+
+# MCCC: Import Core Services for Injection
+from core.services.audio_service import AudioService
+from core.services.playlist_service import PlaylistService
+from core.services.generation_service import GenerationService
 from ui.tabs.generation_tab import GenerationTab
 from ui.tabs.finalize_tab import FinalizeTab
 from ui.tabs.advanced_tab import AdvancedTab
@@ -1266,13 +1272,28 @@ class ChatterboxProGUI(ctk.CTk):
         self.finalize_tab = FinalizeTab(self.tabview.add("4. Finalize"), self); self.finalize_tab.pack(fill="both", expand=True)
         self.advanced_tab = AdvancedTab(self.tabview.add("5. Advanced"), self); self.advanced_tab.pack(fill="both", expand=True)
 
+        # MCCC: Initialize Core Services Sharing AppState
+        self.audio_service = AudioService()
+        self.playlist_service = PlaylistService(self.app_state)
+        self.generation_service = GenerationService(self.app_state)
+        
+        # MCCC: Wire Signals
+        # When generation updates an item (stats/path), refresh the UI row
+        self.generation_service.item_updated.connect(lambda idx: self.playlist_frame.update_item(idx))
+
         right_frame = ctk.CTkFrame(self, fg_color=self.colors["frame_bg"])
         right_frame.grid(row=0, column=1, padx=(0, 10), pady=10, sticky="nsew")
         right_frame.grid_rowconfigure(0, weight=1); right_frame.grid_columnconfigure(0, weight=1)
         self.playlist_frame = PlaylistFrame(master=right_frame, app_instance=self, fg_color=self.colors["tab_bg"])
         self.playlist_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=(0,5))
         
-        self.controls = ControlsFrame(master=right_frame, app_instance=self, fg_color="transparent")
+        # MCCC: Deploy ControlsView (The Classy Way)
+        services_dict = {
+            'audio': self.audio_service,
+            'playlist': self.playlist_service,
+            'generation': self.generation_service
+        }
+        self.controls = ControlsView(services=services_dict, playlist_view=self.playlist_frame, parent=right_frame)
         self.controls.grid(row=1, column=0, pady=(5, 10), sticky="ew")
         
         self.bind("<m>", self.mark_current_sentence)
