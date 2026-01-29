@@ -70,3 +70,9 @@ class PlaylistModel(QAbstractListModel):
         idx = self.index(row_index, 0)
         if idx.isValid():
             self.dataChanged.emit(idx, idx, [Qt.DisplayRole, self.StatusRole])
+
+    def get_item(self, row_index: int):
+        """Returns the raw data dict for a given row index."""
+        if 0 <= row_index < len(self.app_state.sentences):
+            return self.app_state.sentences[row_index]
+        return None
