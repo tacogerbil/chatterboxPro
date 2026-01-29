@@ -222,7 +222,10 @@ class ControlsView(QWidget):
         self.playlist.refresh()
 
     def _edit_text(self):
+        print("DEBUG: Edit Button Clicked!", flush=True)
         idx = self._get_selected_index()
+        print(f"DEBUG: Selected Index: {idx}", flush=True)
+        
         if idx == -1: 
             logging.warning("Edit: No index selected.")
             return
