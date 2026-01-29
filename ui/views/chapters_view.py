@@ -71,6 +71,14 @@ class ChapterModel(QAbstractListModel):
 class ChapterDelegate(QStyledItemDelegate):
     jump_clicked = Signal(int)
 
+    def _get_check_rect(self, option, widget):
+        style = widget.style() if widget else QApplication.style()
+        check_rect = style.subElementRect(QStyle.SE_ItemViewItemCheckIndicator, option, widget)
+        # Fallback if style returns empty rect or too small
+        if check_rect.width() <= 0 or check_rect.height() <= 0:
+             check_rect = QRect(option.rect.left() + 5, option.rect.top() + (option.rect.height() - 20)//2, 20, 20)
+        return check_rect
+
     def paint(self, painter, option, index):
         # 1. Init Style
         self.initStyleOption(option, index)
@@ -88,10 +96,7 @@ class ChapterDelegate(QStyledItemDelegate):
         button_rect = QRect(rect.right() - button_width - 5, rect.top() + 2, button_width, rect.height() - 4)
         
         # Checkbox Rect (Left aligned Standard)
-        check_rect = style.subElementRect(QStyle.SE_ItemViewItemCheckIndicator, option, option.widget)
-        # Fallback if style returns empty rect (Common in some custom styles if they don't see the flag)
-        if check_rect.width() <= 0 or check_rect.height() <= 0:
-             check_rect = QRect(rect.left() + 5, rect.top() + (rect.height() - 20)//2, 20, 20)
+        check_rect = self._get_check_rect(option, option.widget)
 
         # Text Rect (Between Check and Button)
         text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, option, option.widget)
@@ -143,14 +148,25 @@ class ChapterDelegate(QStyledItemDelegate):
     def editorEvent(self, event, model, option, index):
         # Handle Clicks
         if event.type() == QEvent.MouseButtonRelease:
-            # Check if click was in button rect
-            rect = option.rect
+            pos = event.pos()
+            
+            # Check for SELECT Button
             button_width = 80
+            rect = option.rect
             button_rect = QRect(rect.right() - button_width - 5, rect.top() + 2, button_width, rect.height() - 4)
             
-            if button_rect.contains(event.pos()):
+            if button_rect.contains(pos):
                 real_idx = model.get_chapter_index(index.row())
                 self.jump_clicked.emit(real_idx)
+                return True
+                
+            # Check for Checkbox
+            check_rect = self._get_check_rect(option, option.widget)
+            if check_rect.contains(pos):
+                # Toggle Check State
+                current_state = model.data(index, Qt.CheckStateRole)
+                new_state = Qt.Checked if current_state == Qt.Unchecked else Qt.Unchecked
+                model.setData(index, new_state, Qt.CheckStateRole)
                 return True
                 
         return super().editorEvent(event, model, option, index)

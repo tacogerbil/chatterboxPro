@@ -70,15 +70,22 @@ class ChapterService:
             if ch_idx >= len(chapter_indices):
                 continue
                 
-            # Start is the index of the chapter heading
-            start_real_index = chapter_indices[ch_idx][0]
+            chapter = chapter_indices[ch_idx]
             
-            # End is the index of the next chapter heading, or the end of the list
-            if ch_idx + 1 < len(chapter_indices):
-                end_real_index = chapter_indices[ch_idx + 1][0]
+            # 1. Start Index
+            # Handle if it's the tuple (legacy logic) or dict (new logic)
+            # The calling code passes self.model._chapters which is a LIST OF DICTS
+            if isinstance(chapter, dict):
+                start_real_index = chapter.get('start_idx', 0)
+                end_real_index = chapter.get('end_idx', len(all_sentences)-1) + 1 # +1 for range exclusive
             else:
-                end_real_index = len(all_sentences)
-                
+                 # Fallback for tuple (idx, item) - shouldn't happen with current model
+                 start_real_index = chapter[0]
+                 if ch_idx + 1 < len(chapter_indices):
+                     end_real_index = chapter_indices[ch_idx+1][0]
+                 else:
+                     end_real_index = len(all_sentences)
+
             # Collect all indices in [start, end)
             indices_to_process.extend(range(start_real_index, end_real_index))
             
