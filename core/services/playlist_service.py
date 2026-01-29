@@ -298,3 +298,52 @@ class PlaylistService:
                     item['marked'] = True
                     count += 1
         return count
+
+    def apply_auto_pause_buffers(self, buffer_ms: int) -> Dict[str, int]:
+        """
+        Wraps chapters with pauses.
+        Logic: Reverse iteration to safely insert items without index shifting issues.
+        Checks for existing pauses before/after chapters to avoid double-pausing.
+        """
+        stats = {'processed': 0, 'added': 0, 'skipped': 0}
+        
+        # Identify chapter indices first
+        # We iterate backwards to handle insertions safely
+        i = len(self.state.sentences) - 1
+        while i >= 0:
+            item = self.state.sentences[i]
+            if item.get('is_chapter_heading'):
+                stats['processed'] += 1
+                
+                # Check AFTER (i+1)
+                # If N is chapter, N+1 needs buffer
+                if i + 1 < len(self.state.sentences):
+                    next_item = self.state.sentences[i+1]
+                    if not next_item.get('is_pause'):
+                        self.insert_item(i + 1, "[PAUSE]", is_pause=True, duration=buffer_ms)
+                        stats['added'] += 1
+                    else:
+                        stats['skipped'] += 1
+                else:
+                    self.insert_item(i + 1, "[PAUSE]", is_pause=True, duration=buffer_ms)
+                    stats['added'] += 1
+
+                # Check BEFORE (i)
+                # If we inserted after, the current item is still at 'i'.
+                # Check previous item (i-1)
+                if i > 0:
+                    prev_item = self.state.sentences[i-1]
+                    if not prev_item.get('is_pause'):
+                         self.insert_item(i, "[PAUSE]", is_pause=True, duration=buffer_ms)
+                         stats['added'] += 1
+                    else:
+                         stats['skipped'] += 1
+                else:
+                     # Start of list, usually buffer too? Yes.
+                     self.insert_item(i, "[PAUSE]", is_pause=True, duration=buffer_ms)
+                     stats['added'] += 1
+            
+            i -= 1
+            
+        self._renumber()
+        return stats

@@ -25,6 +25,7 @@ class GenerationSettings:
     chunking_enabled: bool = True
     max_chunk_chars: int = 290
     silence_duration: int = 250
+    chapter_buffer_ms: int = 2000 # Default auto-pause buffer
     norm_enabled: bool = False
     silence_removal_enabled: bool = False
     norm_level: float = -23.0

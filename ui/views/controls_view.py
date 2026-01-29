@@ -94,50 +94,68 @@ class ControlsView(QWidget):
         layout = QGridLayout()
         
         # Row 0: Editing & Insertions
+        # Buttons: Edit, +Text, Pause, AutoPause, +Chap, Conv
+        
         btn_edit = QPushButton("✎ Edit"); btn_edit.clicked.connect(self._edit_text)
         btn_edit.setProperty("class", "action")
+        btn_edit.setToolTip("Edit the text or properties of the selected item.")
 
         btn_ins_txt = QPushButton("➕ Text"); btn_ins_txt.clicked.connect(self._insert_text)
         btn_ins_txt.setProperty("class", "action")
+        btn_ins_txt.setToolTip("Insert a new text chunk below the selection.")
 
         btn_ins_pause = QPushButton("⏸ Pause"); btn_ins_pause.clicked.connect(self._insert_pause)
         btn_ins_pause.setProperty("class", "action")
+        btn_ins_pause.setToolTip("Insert a silent pause block below the selection.")
+        
+        # NEW: Auto Pause
+        btn_auto_pause = QPushButton("🤖 Auto Pause"); btn_auto_pause.clicked.connect(self._auto_pause_action)
+        btn_auto_pause.setProperty("class", "action")
+        btn_auto_pause.setToolTip("Automatically wrap all chapters with pauses.")
         
         btn_ins_chap = QPushButton("📑 New Chap"); btn_ins_chap.clicked.connect(self._insert_chapter)
         btn_ins_chap.setProperty("class", "action")
+        btn_ins_chap.setToolTip("Insert a new Chapter Heading below the selection.")
 
-        btn_conv_chap = QPushButton("➡️ Conv Chap"); btn_conv_chap.setToolTip("Convert Selection to Chapter")
-        btn_conv_chap.clicked.connect(self._convert_to_chapter)
+        btn_conv_chap = QPushButton("➡️ Conv Chap"); btn_conv_chap.clicked.connect(self._convert_to_chapter)
         btn_conv_chap.setProperty("class", "action")
+        btn_conv_chap.setToolTip("Convert the selected item into a Chapter Heading.")
         
+        # Layout 6 columns
         layout.addWidget(btn_edit, 0, 0)
         layout.addWidget(btn_ins_txt, 0, 1)
         layout.addWidget(btn_ins_pause, 0, 2)
-        layout.addWidget(btn_ins_chap, 0, 3)
-        layout.addWidget(btn_conv_chap, 0, 4)
+        layout.addWidget(btn_auto_pause, 0, 3)
+        layout.addWidget(btn_ins_chap, 0, 4)
+        layout.addWidget(btn_conv_chap, 0, 5)
         
         # Row 1: Markers, Status & Split
         btn_mark = QPushButton("M Mark"); btn_mark.clicked.connect(self._mark_current)
         btn_mark.setProperty("class", "action")
-
-        # Moved Split Here per User Request
+        btn_mark.setToolTip("Mark current item for regeneration.")
+        
         btn_split = QPushButton("➗ Split"); btn_split.clicked.connect(self._split_chunk)
         btn_split.setProperty("class", "action")
+        btn_split.setToolTip("Split the current text chunk into smaller sentences.")
         
         btn_pass = QPushButton("✓ Passed"); btn_pass.clicked.connect(self._mark_passed)
         btn_pass.setProperty("class", "success")
+        btn_pass.setToolTip("Manually mark item as Passed (Green).")
         
         btn_reset = QPushButton("🔄 Reset"); btn_reset.clicked.connect(self._reset_gen)
         btn_reset.setProperty("class", "warning")
+        btn_reset.setToolTip("Reset generation status and clear all audio/stats.")
         
         btn_del = QPushButton("❌ Delete"); btn_del.clicked.connect(self._delete_items)
         btn_del.setProperty("class", "danger")
+        btn_del.setToolTip("Delete selected items.")
         
+        # Span Delete across last 2 cols to balance
         layout.addWidget(btn_mark, 1, 0)
         layout.addWidget(btn_split, 1, 1)
         layout.addWidget(btn_pass, 1, 2)
         layout.addWidget(btn_reset, 1, 3)
-        layout.addWidget(btn_del, 1, 4)
+        layout.addWidget(btn_del, 1, 4, 1, 2)
         
         group.add_layout(layout)
 
@@ -461,3 +479,19 @@ class ControlsView(QWidget):
         
         if self.generation_service:
             self.generation_service.start_generation(indices)
+
+    def _auto_pause_action(self):
+        """Wraps all chapters with configured buffer pause."""
+        s = self.playlist_service.state.settings
+        buffer_ms = s.chapter_buffer_ms
+        
+        stats = self.playlist_service.apply_auto_pause_buffers(buffer_ms)
+        self._refresh()
+        self.structure_changed.emit()
+        
+        # Show Log/Results properly
+        logging.info(f"Auto-Pause Complete: Processed {stats['processed']} chapters. Added {stats['added']} pauses. Skipped {stats['skipped']}.")
+        QMessageBox.information(self, "Auto-Pause Complete", 
+                                f"Wrapped {stats['processed']} chapters with {buffer_ms}ms buffer.\n\n"
+                                f"Added: {stats['added']} pauses.\n"
+                                f"Skipped: {stats['skipped']} (already present).")

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QComboBox, QPushButton, 
-    QGroupBox, QFormLayout, QFileDialog, QMessageBox, QApplication
+    QGroupBox, QFormLayout, QFileDialog, QMessageBox, QApplication, QSpinBox
 )
 from PySide6.QtCore import QSettings, Qt
 import logging
@@ -54,7 +54,24 @@ class ConfigView(QWidget):
         
         t_layout.addRow("Custom Theme:", btn_layout)
         
+        t_layout.addRow("Custom Theme:", btn_layout)
+        
         layout.addWidget(theme_group)
+        
+        # --- Group 2: Generation Defaults ---
+        gen_group = QGroupBox("Generation Defaults")
+        g_layout = QFormLayout(gen_group)
+        
+        self.spin_chap_buf = QSpinBox()
+        self.spin_chap_buf.setRange(0, 10000)
+        self.spin_chap_buf.setSingleStep(100)
+        self.spin_chap_buf.setSuffix(" ms")
+        self.spin_chap_buf.setValue(self.state.settings.chapter_buffer_ms)
+        self.spin_chap_buf.valueChanged.connect(self.on_buffer_changed)
+        
+        g_layout.addRow("Chapter Auto-Pause Buffer:", self.spin_chap_buf)
+        
+        layout.addWidget(gen_group)
         layout.addStretch()
         
     def on_theme_changed(self, theme_name: str) -> None:
@@ -71,6 +88,10 @@ class ConfigView(QWidget):
                 ThemeManager.apply_theme(app, theme_name)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Could not apply theme: {e}")
+
+    def on_buffer_changed(self, value: int) -> None:
+        """Update buffer setting in state."""
+        self.state.settings.chapter_buffer_ms = value
             
     def import_theme(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
