@@ -193,8 +193,11 @@ class ChatterboxProQt(QMainWindow):
         
         # 2. Save Session Data (Sentences, Splits, Pauses)
         if self.app_state.session_name:
-             print(f"Saving active session: {self.app_state.session_name}")
-             self.project_service.save_current_session(self.app_state)
+             if self.app_state.is_session_loaded:
+                 print(f"Saving active session: {self.app_state.session_name}")
+                 self.project_service.save_current_session(self.app_state)
+             else:
+                 print(f"Skipping auto-save for session '{self.app_state.session_name}': Data not loaded (Safety Guard).")
              
         event.accept()
 

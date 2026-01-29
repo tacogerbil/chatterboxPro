@@ -306,6 +306,7 @@ class SetupView(QWidget):
             )
         
         self.state.sentences = sentences
+        self.state.is_session_loaded = True # New data created, safe to save.
         # Signal Global Update (Fixes Playlist not showing items)
         self.session_updated.emit()
         
@@ -322,6 +323,7 @@ class SetupView(QWidget):
         self.session_name_edit.clear()
         self.file_path_edit.clear()
         self.state.sentences = []
+        self.state.is_session_loaded = False
         
     def load_session_dialog(self) -> None:
         dir_path = QFileDialog.getExistingDirectory(self, "Select Session Folder", "Outputs_Pro")
@@ -337,8 +339,8 @@ class SetupView(QWidget):
                 self.state.session_name = data.get('session_name', '')
                 self.session_name_edit.setText(self.state.session_name)
                 
-                loaded_sentences = data.get('sentences', [])
                 self.state.sentences = loaded_sentences
+                self.state.is_session_loaded = True # Safety Flag
                 
                 src_path = data.get('source_file_path', '')
                 self.state.source_file_path = src_path # FIX: Sync state
@@ -369,6 +371,7 @@ class SetupView(QWidget):
             return
             
         if self.project_service.save_current_session(self.state):
+            self.state.is_session_loaded = True # Mark safe
             QMessageBox.information(self, "Saved", f"Session '{self.state.session_name}' saved successfully.")
         else:
             QMessageBox.critical(self, "Error", "Failed to save session.")

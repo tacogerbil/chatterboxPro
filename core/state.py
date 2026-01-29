@@ -63,6 +63,7 @@ class AppState:
     voice_name: str = "Custom / Unsaved" # Track loaded voice name
     source_file_path: str = ""
     sentences: List[Dict[str, Any]] = field(default_factory=list)
+    is_session_loaded: bool = False # Safety flag to prevent overwriting during auto-save
     
     # Reference Audio
     ref_audio_path: str = ""
