@@ -340,6 +340,7 @@ class SetupView(QWidget):
                 self.state.session_name = data.get('session_name', '')
                 self.session_name_edit.setText(self.state.session_name)
                 
+                loaded_sentences = data.get('sentences', [])
                 self.state.sentences = loaded_sentences
                 self.state.is_session_loaded = True # Safety Flag
                 
