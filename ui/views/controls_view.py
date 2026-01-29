@@ -222,42 +222,53 @@ class ControlsView(QWidget):
         self.playlist.refresh()
 
     def _edit_text(self):
-        print("DEBUG: Edit Button Clicked!", flush=True)
-        idx = self._get_selected_index()
-        print(f"DEBUG: Selected Index: {idx}", flush=True)
-        
-        if idx == -1: 
-            logging.warning("Edit: No index selected.")
-            return
-        
-        item = self.playlist_service.get_selected_item(idx)
-        if not item:
-            logging.warning(f"Edit: Item at {idx} is None.")
-            return
+        try:
+            print("DEBUG: Edit Button Clicked!", flush=True)
+            idx = self._get_selected_index()
+            print(f"DEBUG: Selected Index: {idx}", flush=True)
+            
+            if idx == -1: 
+                logging.warning("Edit: No index selected.")
+                print("DEBUG: Index is -1", flush=True)
+                return
+            
+            item = self.playlist_service.get_selected_item(idx)
+            if not item:
+                logging.warning(f"Edit: Item at {idx} is None.")
+                print("DEBUG: Item is None", flush=True)
+                return
 
-        logging.info(f"Editing Item {idx}: Pause={item.get('is_pause')}")
-        
-        # Check if Pause - Use Duration Editor
-        if item.get('is_pause'):
-            old_dur = item.get('duration', 500)
-            new_dur, ok = QInputDialog.getInt(self, "Edit Pause", "Duration (ms):", value=old_dur, min=100, max=10000)
-            if ok and new_dur != old_dur:
-                logging.info(f"Updating pause duration to {new_dur}")
-                self.playlist_service.edit_pause(idx, new_dur)
-                self._refresh()
-            return
+            print(f"DEBUG: Item Found. is_pause={item.get('is_pause')}", flush=True)
+            
+            # Check if Pause - Use Duration Editor
+            if item.get('is_pause'):
+                print("DEBUG: Attempting QInputDialog for Pause...", flush=True)
+                old_dur = item.get('duration', 500)
+                new_dur, ok = QInputDialog.getInt(self, "Edit Pause", "Duration (ms):", value=old_dur, min=100, max=10000)
+                print(f"DEBUG: QInputDialog returned: ok={ok}, val={new_dur}", flush=True)
+                if ok and new_dur != old_dur:
+                    logging.info(f"Updating pause duration to {new_dur}")
+                    self.playlist_service.edit_pause(idx, new_dur)
+                    self._refresh()
+                return
 
-        # Normal Text Editing
-        old_text = item.get('original_sentence', '')
-        
-        from ui.dialogs.editor_dialog import EditorDialog
-        dlg = EditorDialog(old_text, self)
-        
-        if dlg.exec():
-            new_text = dlg.result_text
-            if new_text != old_text:
-                self.playlist_service.edit_text(idx, new_text)
-                self._refresh()
+            # Normal Text Editing
+            print("DEBUG: Attempting EditorDialog for Text...", flush=True)
+            old_text = item.get('original_sentence', '')
+            
+            from ui.dialogs.editor_dialog import EditorDialog
+            dlg = EditorDialog(old_text, self)
+            
+            if dlg.exec():
+                new_text = dlg.result_text
+                if new_text != old_text:
+                    self.playlist_service.edit_text(idx, new_text)
+                    self._refresh()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"DEBUG CRITICAL ERROR: {e}", flush=True)
+            QMessageBox.critical(self, "Edit Error", f"An error occurred:\n{e}")
 
     def _split_chunk(self):
         idx = self._get_selected_index()
