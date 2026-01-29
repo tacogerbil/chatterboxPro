@@ -409,6 +409,7 @@ class ChatterboxProGUI(ctk.CTk):
             session_path.mkdir(parents=True)
             self.session_name.set(name)
             self.source_file_path, self.sentences = "", []
+            self.app_state.sentences = self.sentences # MCCC: Sync State
             self.source_file_label.configure(text="No file selected.")
             self.playlist_frame.load_data(self.sentences)
             self.update_progress_display(0,0,0)
@@ -428,6 +429,7 @@ class ChatterboxProGUI(ctk.CTk):
             self.source_file_path = data.get("source_file_path", "")
             self.source_file_label.configure(text=os.path.basename(self.source_file_path) or "No file selected.")
             self.sentences = data.get("sentences", [])
+            self.app_state.sentences = self.sentences # MCCC: Sync State
             
             if any('uuid' not in s for s in self.sentences):
                 for s in self.sentences: s.setdefault('uuid', uuid.uuid4().hex)
@@ -530,6 +532,8 @@ class ChatterboxProGUI(ctk.CTk):
                 self.sentences = self.text_processor.group_sentences_into_chunks(processed_sentences, self.get_validated_int(self.max_chunk_chars_str, 290))
             else:
                 self.sentences = processed_sentences
+            
+            self.app_state.sentences = self.sentences # MCCC: Sync State
             
             for item in self.sentences:
                 item.setdefault('uuid', uuid.uuid4().hex)

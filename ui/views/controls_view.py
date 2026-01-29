@@ -212,10 +212,28 @@ class ControlsView(QWidget):
                   print(f"DEBUG: Fallback search failed. Checked: {candidates}", flush=True)
 
         if not path or not os.path.exists(path):
-            logging.warning(f"Audio file not found: {path}")
-            print(f"DEBUG: File NOT FOUND at {path}", flush=True) # Debug
-            QMessageBox.warning(self, "Playback Error", f"File not found:\n{path}")
-            return
+            # MCCC: Path Resolution Fallback
+            # The app might be running from a subdir (e.g. execution/chatterboxPro), 
+            # while the path is relative to Project Root (Outputs_Pro).
+            # We search up to 3 levels up.
+            found = False
+            cwd = os.getcwd()
+            print(f"DEBUG: Path Direct Check Failed. CWD: {cwd}", flush=True)
+            
+            for i in range(4): # Check ., .., ../.., ../../..
+                prefix = "../" * i
+                candidate = os.path.abspath(os.path.join(cwd, prefix, path))
+                if os.path.exists(candidate):
+                    path = candidate
+                    found = True
+                    print(f"DEBUG: Found file at parent level {i}: {path}", flush=True)
+                    break
+            
+            if not found:
+                logging.warning(f"Audio file not found: {path}")
+                print(f"DEBUG: File NOT FOUND at {path} (Checked parents)", flush=True) # Debug
+                QMessageBox.warning(self, "Playback Error", f"File not found:\n{path}\n\nCWD: {cwd}")
+                return
             
         # Ensure absolute path for QUrl compatibility (MCCC: Explicit Resolution)
         abs_path = os.path.abspath(path)
