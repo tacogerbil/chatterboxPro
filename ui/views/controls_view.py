@@ -218,9 +218,15 @@ class ControlsView(QWidget):
             print(f"DEBUG: File NOT FOUND at {path}", flush=True) # Debug
             QMessageBox.warning(self, "Playback Error", f"File not found:\n{path}")
             return
-            self.audio_service.play_file(str(candidate_1))
+            
+        # Ensure absolute path for QUrl compatibility (MCCC: Explicit Resolution)
+        abs_path = os.path.abspath(path)
+        print(f"DEBUG: Playing file (Absolute): {abs_path}", flush=True) # Debug
+        
+        if self.audio_service:
+            self.audio_service.play_file(abs_path)
         else:
-            QMessageBox.warning(self, "Not Found", f"Audio file not found for item.\n(Path: {audio_path})")
+            QMessageBox.warning(self, "Error", "Audio Service not connected.")
 
     def _stop_playback(self):
         if self.audio_service:

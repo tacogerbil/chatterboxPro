@@ -138,13 +138,12 @@ class ChatterboxEngine(BaseTTSEngine):
         # Generate audio
         # Upstream ChatterboxTTS.generate signature:
         # text, repetition_penalty, min_p, top_p, audio_prompt_path, exaggeration, cfg_weight, temperature
-        wav_tensor = self.model.generate(
             text,
             audio_prompt_path=None,  # Already prepared via prepare_conditionals
             exaggeration=exaggeration,
             cfg_weight=cfg_weight,
-            temperature=temperature
-            # apply_watermark and use_cond_cache are NOT supported in official upstream
+            temperature=temperature,
+            apply_watermark=apply_watermark
         )
         
         return wav_tensor
