@@ -200,6 +200,11 @@ class ChatterboxProQt(QMainWindow):
         # Save Geometry
         self.app_state.window_geometry_hex = self.saveGeometry().toHex().data().decode()
         
+        # STOP GENERATION if running
+        if hasattr(self, 'gen_service'):
+            print("Stopping generation service...", flush=True)
+            self.gen_service.request_stop()
+
         # 1. Save App Config
         self.config_service.save_state(self.app_state)
         
