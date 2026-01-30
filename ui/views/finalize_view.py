@@ -208,7 +208,7 @@ class FinalizeView(QWidget):
         self.btn_assemble.setEnabled(False)
         self.btn_export.setEnabled(False); self.btn_export.setText("Exporting...")
 
-        self.assembly_service.export_chapters(path)
+        self.assembly_service.export_by_chapter(path)
 
     def auto_assemble(self):
         """MCCC: Non-interactive assembly for 'Auto-Assemble' feature."""
