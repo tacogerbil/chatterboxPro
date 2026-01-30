@@ -40,26 +40,46 @@ class GenerationThread(QThread):
         self.executor: Optional[ProcessPoolExecutor] = None
 
     def request_stop(self) -> None:
-        """Stops the loop and aggressively terminates worker processes."""
+        """Stops the loop and NUKES worker processes with extreme prejudice."""
         self.stop_requested.set()
         
         if self.executor:
-            logging.warning("🛑 HARD STOP: Terminating worker processes...")
+            logging.warning("🛑 NUCLEAR STOP: Killing worker processes...")
             try:
                 # 1. Cancel pending futures
                 self.executor.shutdown(wait=False, cancel_futures=True)
                 
-                # 2. Kill running processes (Accessing internal _processes)
-                # This is necessary because shutdown(wait=False) leaves current tasks running.
+                # 2. KILL running processes (not terminate - KILL)
+                # MCCC: Explicit Intent - terminate() sends SIGTERM which CUDA can ignore
+                # kill() sends SIGKILL which is instant death, no cleanup
                 if hasattr(self.executor, '_processes'):
                     for pid, process in list(self.executor._processes.items()):
                         try:
-                            process.terminate() # SIGTERM
-                            logging.warning(f"Terminated worker process {pid}")
+                            process.kill()  # SIGKILL (was terminate/SIGTERM)
+                            logging.warning(f"KILLED worker process {pid}")
                         except Exception as e:
-                            logging.error(f"Failed to terminate process {pid}: {e}")
+                            logging.error(f"Failed to kill process {pid}: {e}")
+                            
+                # 3. Delayed Cleanup (Fallback)
+                # If processes are STILL alive after 1 second, force kill again
+                import threading
+                def delayed_cleanup():
+                    import time
+                    time.sleep(1.0)
+                    if hasattr(self.executor, '_processes'):
+                        for pid, process in list(self.executor._processes.items()):
+                            if process.is_alive():
+                                try:
+                                    process.kill()
+                                    logging.warning(f"Delayed KILL on zombie process {pid}")
+                                except:
+                                    pass
+                                    
+                cleanup_thread = threading.Thread(target=delayed_cleanup, daemon=True)
+                cleanup_thread.start()
+                
             except Exception as e:
-                logging.error(f"Error during hard stop: {e}")
+                logging.error(f"Error during nuclear stop: {e}")
 
     def _cleanup_memory(self) -> None:
         import gc
