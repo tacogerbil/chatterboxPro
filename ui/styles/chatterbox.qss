@@ -1,5 +1,16 @@
 /* chatterbox.qss - Custom Overrides and Classes */
 
+/* --- GLOBAL FIX: Ensure text is visible in dark themes --- */
+/* Qt-material sometimes doesn't properly set text colors for input widgets */
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit, QPlainTextEdit {
+    color: palette(text);
+}
+
+QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabled {
+    color: palette(disabled, text);
+}
+
+
 /* --- Classes for Semantic Buttons --- */
 /* Usage: button.setProperty("class", "success") */
 
