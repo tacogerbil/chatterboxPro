@@ -272,7 +272,7 @@ class ChaptersView(QWidget):
         # Stop Button
         self.stop_btn = QPushButton("🛑 Stop")
         self.stop_btn.setToolTip("Stop Generation")
-        self.stop_btn.setFixedSize(80, 30) # Wider to fit text
+        self.stop_btn.setFixedSize(110, 30) # Increased width to prevent cutoff
         self.stop_btn.setStyleSheet("background-color: #A93226; color: white; font-weight: bold; border-radius: 4px;")
         self.stop_btn.clicked.connect(self.stop_generation)
         footer_layout.addWidget(self.stop_btn)
