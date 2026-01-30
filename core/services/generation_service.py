@@ -40,7 +40,26 @@ class GenerationThread(QThread):
         self.executor: Optional[ProcessPoolExecutor] = None
 
     def request_stop(self) -> None:
+        """Stops the loop and aggressively terminates worker processes."""
         self.stop_requested.set()
+        
+        if self.executor:
+            logging.warning("🛑 HARD STOP: Terminating worker processes...")
+            try:
+                # 1. Cancel pending futures
+                self.executor.shutdown(wait=False, cancel_futures=True)
+                
+                # 2. Kill running processes (Accessing internal _processes)
+                # This is necessary because shutdown(wait=False) leaves current tasks running.
+                if hasattr(self.executor, '_processes'):
+                    for pid, process in list(self.executor._processes.items()):
+                        try:
+                            process.terminate() # SIGTERM
+                            logging.warning(f"Terminated worker process {pid}")
+                        except Exception as e:
+                            logging.error(f"Failed to terminate process {pid}: {e}")
+            except Exception as e:
+                logging.error(f"Error during hard stop: {e}")
 
     def _cleanup_memory(self) -> None:
         import gc
