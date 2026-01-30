@@ -132,9 +132,11 @@ def _build_grit_chain(
     # This eliminates low-frequency rumble that distortion would amplify into noise
     board_effects.append(HighpassFilter(cutoff_frequency_hz=40.0))
     
-    # 2. Octave Down (The Beast)
-    # MCCC: Clear Purpose - Shifts voice down 12 semitones for deep undertone
-    board_effects.append(PitchShift(semitones=-12.0))
+    # 2. Octave Down (The Beast) - REFINED
+    # MCCC: Clear Purpose - Shifts voice down 18 semitones (1.5 octaves)
+    # Pushed lower to remove intelligibility, creating pure sub-bass rumble
+    # This prevents the "parallel voice" effect where grit sounds like a duplicate
+    board_effects.append(PitchShift(semitones=-18.0))
     
     # 3. Heavy Distortion (REFINED - Capped Drive)
     # MCCC: Explicit Range - Scale drive with gruffness: 20dB to 35dB
@@ -143,10 +145,11 @@ def _build_grit_chain(
     drive = 20.0 + (gruffness * 15.0)  # Max 35dB (was 50dB)
     board_effects.append(Distortion(drive_db=drive))
     
-    # 4. Lowpass Filter (Fizz Removal)
-    # MCCC: Explicit Intent - Confine grit to sub-bass/chest range (250-350Hz)
-    # Prevents phase issues and "echo" feeling from mid-range gravel
-    cutoff = 250.0 + (gruffness * 100.0)  # 250Hz - 350Hz range
+    # 4. Lowpass Filter (Intelligibility Removal) - REFINED
+    # MCCC: Explicit Intent - Confine grit to pure sub-bass (150-200Hz)
+    # Previous range (250-350Hz) allowed consonants through → "parallel voice" effect
+    # New range removes all intelligibility, leaving only chest rumble
+    cutoff = 150.0 + (gruffness * 50.0)  # 150Hz - 200Hz range
     board_effects.append(LowpassFilter(cutoff_frequency_hz=get_safe_nyquist_clamp(cutoff, sample_rate)))
     
     # 5. Smashed Compression (Rumble Leveling)
@@ -249,9 +252,10 @@ def apply_pedalboard_effects(
             grit_board = _build_grit_chain(sr, gruffness)
             audio_grit = grit_board(audio, sr)
             
-            # Blend Logic
-            # max mix = 40% grit at 1.0 gruffness
-            grit_mix = min(gruffness * 0.40, 0.40) 
+            # Blend Logic - REFINED
+            # MCCC: Explicit Range - Reduced from 40% to 30% max
+            # Lower mix prevents "parallel voice" effect, integrates gravel into main signal
+            grit_mix = min(gruffness * 0.30, 0.30) 
             
             # Ensure shapes match (PitchShift might alter length minutely?)
             # Usually safe, but robust coding requires checking.
