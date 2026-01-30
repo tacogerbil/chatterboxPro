@@ -266,96 +266,8 @@ class GenerationView(QWidget):
         
         layout.addWidget(fx_group)
 
-    def setup_advanced(self, layout: QVBoxLayout) -> None:
-        self.adv_btn = QPushButton("▶ Advanced Settings")
-        self.adv_btn.setCheckable(True)
-        self.adv_btn.setStyleSheet("text-align: left; font-weight: bold; color: #27AE60;") 
-        
-        self.adv_container = QWidget()
-        a_layout = QFormLayout(self.adv_container)
-        
-        self.gpu_edit = QLineEdit(self.state.settings.target_gpus)
-        self.gpu_edit.textChanged.connect(
-            lambda t: setattr(self.state.settings, 'target_gpus', t)
-        )
-        a_layout.addRow("Target Devices:", self.gpu_edit)
-        
-        self.order_combo = QComboBox()
-        self.order_combo.addItems(["fastest", "sequential"])
-        self.order_combo.setCurrentText(self.state.settings.generation_order)
-        self.order_combo.currentTextChanged.connect(
-            lambda t: setattr(self.state.settings, 'generation_order', t)
-        )
-        a_layout.addRow("Generation Order:", self.order_combo)
-        
-        self.seed_spin = QSpinBox()
-        self.seed_spin.setRange(0, 9999999)
-        self.seed_spin.setValue(self.state.settings.master_seed)
-        self.seed_spin.valueChanged.connect(
-            lambda v: setattr(self.state.settings, 'master_seed', v)
-        )
-        a_layout.addRow("Master Seed:", self.seed_spin)
-
-        self.cand_spin = QSpinBox()
-        self.cand_spin.setRange(1, 10)
-        self.cand_spin.setValue(self.state.settings.num_candidates)
-        self.cand_spin.valueChanged.connect(
-            lambda v: setattr(self.state.settings, 'num_candidates', v)
-        )
-        a_layout.addRow("Candidates Per Chunk:", self.cand_spin)
-
-        # MCCC Audit Restoration:
-        self.outputs_spin = QSpinBox()
-        self.outputs_spin.setRange(1, 100)
-        self.outputs_spin.setValue(self.state.settings.num_full_outputs)
-        self.outputs_spin.valueChanged.connect(
-            lambda v: setattr(self.state.settings, 'num_full_outputs', v)
-        )
-        a_layout.addRow("Full Outputs:", self.outputs_spin)
-        
-        self.retries_spin = QSpinBox()
-        self.retries_spin.setRange(0, 50)
-        self.retries_spin.setValue(self.state.settings.max_attempts)
-        self.retries_spin.valueChanged.connect(
-            lambda v: setattr(self.state.settings, 'max_attempts', v)
-        )
-        a_layout.addRow("ASR Max Retries:", self.retries_spin)
-
-        # Checkboxes/Switches
-        chk_layout = QVBoxLayout()
-        
-        self.chk_asr = QGroupBox("ASR Validation")
-        self.chk_asr.setCheckable(True)
-        self.chk_asr.setChecked(self.state.settings.asr_validation_enabled)
-        self.chk_asr.toggled.connect(
-            lambda c: setattr(self.state.settings, 'asr_validation_enabled', c)
-        )
-        # ASR Threshold inside logic
-        asr_l = QFormLayout(self.chk_asr)
-        self.asr_thresh = QLabeledSlider("Acceptance Threshold", 0.1, 1.0, self.state.settings.asr_threshold)
-        self.asr_thresh.value_changed.connect(
-             lambda v: setattr(self.state.settings, 'asr_threshold', v)
-        )
-        asr_l.addRow(self.asr_thresh)
-        chk_layout.addWidget(self.chk_asr)
-        
-        self.chk_watermark = QCheckBox("Disable Perth Watermark")
-        self.chk_watermark.setChecked(self.state.settings.disable_watermark)
-        self.chk_watermark.stateChanged.connect(
-             lambda s: setattr(self.state.settings, 'disable_watermark', s == Qt.Checked or s == 2)
-        )
-        chk_layout.addWidget(self.chk_watermark)
-        
-        a_layout.addRow(chk_layout)
-
-        self.adv_container.hide()
-        self.adv_btn.toggled.connect(self.adv_container.setVisible)
-        self.adv_btn.toggled.connect(
-            lambda c: self.adv_btn.setText("▼ Advanced Settings" if c else "▶ Advanced Settings")
-        )
-        
-        layout.addWidget(self.adv_btn)
-        layout.addWidget(self.adv_container)
+        # Advanced Settings Moved to Config Tab (MCCC Architecture)
+        layout.addStretch()
         
         # --- Voice Save Section (New) ---
         save_group = QGroupBox("Voice Save")
@@ -438,9 +350,20 @@ class GenerationView(QWidget):
                 return
 
         import dataclasses
-        data = dataclasses.asdict(self.state.settings)
+        all_settings = dataclasses.asdict(self.state.settings)
         
-        # Inject global state items that belong to a "Voice Profile"
+        # MCCC Logic: Separation of Concerns
+        # Voice Template should ONLY contain Voice Design params.
+        # It should NOT contain Session Config (GPU, Retries, ASR thresholds).
+        voice_keys = [
+            'exaggeration', 'speed', 'temperature', 'pitch_shift', 
+            'timbre_shift', 'gruffness', 'bass_boost', 'treble_boost',
+            'cfg_weight', 'tts_engine', 'model_path'
+        ]
+        
+        data = {k: all_settings[k] for k in voice_keys if k in all_settings}
+        
+        # Inject ref audio (Crucial for voice identity)
         data['ref_audio_path'] = self.state.ref_audio_path
         
         if self.template_service.save_template(name, data):

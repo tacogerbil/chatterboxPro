@@ -1,8 +1,11 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QComboBox, QPushButton, 
-    QGroupBox, QFormLayout, QFileDialog, QMessageBox, QApplication, QSpinBox
+    QWidget, QVBoxLayout, QLabel, QComboBox, QPushButton, 
+    QGroupBox, QFormLayout, QFileDialog, QMessageBox, QApplication, QSpinBox,
+    QLineEdit, QCheckBox
 )
 from PySide6.QtCore import QSettings, Qt
+from ui.components.q_labeled_slider import QLabeledSlider # Custom Component
 import logging
 from typing import Optional
 
@@ -78,6 +81,84 @@ class ConfigView(QWidget):
         g_layout.addRow("Buffer AFTER Chapter:", self.spin_buf_after)
         
         layout.addWidget(gen_group)
+        
+        # --- Group 3: Advanced Generation Configuration (Was in Gen View) ---
+        adv_group = QGroupBox("Advanced Engine Configuration")
+        a_layout = QFormLayout(adv_group)
+
+        # GPU Device Handling
+        self.gpu_edit = QLineEdit(self.state.settings.target_gpus)
+        self.gpu_edit.setPlaceholderText("e.g. cuda:0 OR cuda:0,cuda:1")
+        self.gpu_edit.textChanged.connect(
+            lambda t: setattr(self.state.settings, 'target_gpus', t)
+        )
+        a_layout.addRow("Goal Device(s):", self.gpu_edit)
+        
+        # Gen Order
+        self.order_combo = QComboBox()
+        self.order_combo.addItems(["linear", "random", "interleaved"])
+        self.order_combo.setCurrentText(self.state.settings.generation_order)
+        self.order_combo.currentTextChanged.connect(
+            lambda t: setattr(self.state.settings, 'generation_order', t)
+        )
+        a_layout.addRow("Order:", self.order_combo)
+
+        # Seeds
+        self.seed_spin = QSpinBox()
+        self.seed_spin.setRange(-1, 2147483647)
+        self.seed_spin.setSpecialValueText("Random (-1)")
+        self.seed_spin.setValue(self.state.settings.base_seed)
+        self.seed_spin.valueChanged.connect(
+            lambda v: setattr(self.state.settings, 'base_seed', v)
+        )
+        a_layout.addRow("Base Seed:", self.seed_spin)
+
+        # Full Outputs
+        self.outputs_spin = QSpinBox()
+        self.outputs_spin.setRange(1, 100)
+        self.outputs_spin.setValue(self.state.settings.num_full_outputs)
+        self.outputs_spin.valueChanged.connect(
+            lambda v: setattr(self.state.settings, 'num_full_outputs', v)
+        )
+        a_layout.addRow("Full Outputs:", self.outputs_spin)
+        
+        # Max Retries
+        self.retries_spin = QSpinBox()
+        self.retries_spin.setRange(0, 50)
+        self.retries_spin.setValue(self.state.settings.max_attempts)
+        self.retries_spin.valueChanged.connect(
+            lambda v: setattr(self.state.settings, 'max_attempts', v)
+        )
+        a_layout.addRow("ASR Max Retries:", self.retries_spin)
+
+        # ASR/Watermark Container
+        chk_layout = QVBoxLayout()
+        
+        self.chk_asr = QGroupBox("ASR Validation")
+        self.chk_asr.setCheckable(True)
+        self.chk_asr.setChecked(self.state.settings.asr_validation_enabled)
+        self.chk_asr.toggled.connect(
+            lambda c: setattr(self.state.settings, 'asr_validation_enabled', c)
+        )
+        # ASR Threshold inside logic
+        asr_l = QFormLayout(self.chk_asr)
+        self.asr_thresh = QLabeledSlider("Acceptance Threshold", 0.1, 1.0, self.state.settings.asr_threshold)
+        self.asr_thresh.value_changed.connect(
+             lambda v: setattr(self.state.settings, 'asr_threshold', v)
+        )
+        asr_l.addRow(self.asr_thresh)
+        chk_layout.addWidget(self.chk_asr)
+        
+        self.chk_watermark = QCheckBox("Disable Perth Watermark")
+        self.chk_watermark.setChecked(self.state.settings.disable_watermark)
+        self.chk_watermark.stateChanged.connect(
+             lambda s: setattr(self.state.settings, 'disable_watermark', s == Qt.Checked or s == 2)
+        )
+        chk_layout.addWidget(self.chk_watermark)
+
+        a_layout.addRow(chk_layout)
+        
+        layout.addWidget(adv_group)
         layout.addStretch()
         
     def on_theme_changed(self, theme_name: str) -> None:
