@@ -116,6 +116,28 @@ def validate_audio_signal(wav_tensor, sr):
     if zcr > 0.45:
         return False, f"High ZCR ({zcr:.2f})"
         
+    # Check 3: Signal Energy (RMS)
+    # Rejects "ghost speech" (pure silence or very faint air noise that Whisper hallucinates on).
+    # Threshold 0.01 is approx -40dB. Real speech is usually > 0.1.
+    rms = torch.sqrt(torch.mean(wav_tensor**2)).item()
+    if rms < 0.01:
+        return False, f"Low Signal Energy (RMS: {rms:.4f})"
+
+    # Check 4: Trailing Noise (The "Woosh" Check)
+    # If the file ends with loud noise (didn't fade out), reject it.
+    # We check the last 250ms.
+    num_samples = wav_tensor.numel()
+    tail_len = int(sr * 0.25) # 250ms
+    if num_samples > tail_len * 2: # Only check if file is at least 500ms long
+        tail_tensor = wav_tensor[-tail_len:]
+        tail_rms = torch.sqrt(torch.mean(tail_tensor**2)).item()
+        
+        # Threshold 0.04 (approx -28dB). 
+        # Valid speech usually decays. 
+        # A "Woosh" or "Screech" loop stays loud > 0.05.
+        if tail_rms > 0.035:
+            return False, f"Trailing Noise Detected (Tail RMS: {tail_rms:.4f})"
+
     return True, "OK"
 
 def normalize_numbers(text):
