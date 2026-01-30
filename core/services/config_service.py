@@ -62,7 +62,7 @@ class ConfigService:
                 'model_path', # Added for custom model path persistence
                 'auto_regen_main', 'auto_regen_sub', 
                 'auto_assemble_after_run', 'aggro_clean_on_parse',
-                'theme_name', 'theme_invert'
+                'theme_name', 'theme_invert', 'window_geometry_hex'
             }
             
             for key in safe_globals:
@@ -91,7 +91,8 @@ class ConfigService:
                 'auto_assemble_after_run': app_state.auto_assemble_after_run,
                 'aggro_clean_on_parse': app_state.aggro_clean_on_parse,
                 'theme_name': app_state.theme_name,
-                'theme_invert': app_state.theme_invert
+                'theme_invert': app_state.theme_invert,
+                'window_geometry_hex': app_state.window_geometry_hex
             }
             
             # Combine

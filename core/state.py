@@ -86,6 +86,9 @@ class AppState:
     theme_name: str = "dark_teal.xml"
     theme_invert: bool = False
     
+    # Window State
+    window_geometry_hex: str = ""
+    
     # Global Engine Config
     model_path: Optional[str] = None
     

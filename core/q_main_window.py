@@ -56,8 +56,14 @@ class ChatterboxProQt(QMainWindow):
         self._inject_dependencies()
         self._connect_signals()
         
+        
         # Status Bar
         self.statusBar().showMessage("Ready")
+        
+        # Restore Geometry
+        if self.app_state.window_geometry_hex:
+             from PySide6.QtCore import QByteArray
+             self.restoreGeometry(QByteArray.fromHex(self.app_state.window_geometry_hex.encode()))
         
     def setup_ui(self) -> None:
         central = QWidget()
@@ -185,9 +191,17 @@ class ChatterboxProQt(QMainWindow):
                                   "All tasks finished.\n\n"
                                   "Go to the 'Finalize' tab to assemble your audiobook.")
 
+        if self.app_state.window_geometry_hex:
+            from PySide6.QtCore import QByteArray
+            self.restoreGeometry(QByteArray.fromHex(self.app_state.window_geometry_hex.encode()))
+
     def closeEvent(self, event) -> None:
         """Handle application closure: Save State."""
         print("Saving session state...", flush=True)
+        
+        # Save Geometry
+        self.app_state.window_geometry_hex = self.saveGeometry().toHex().data().decode()
+        
         # 1. Save App Config
         self.config_service.save_state(self.app_state)
         
