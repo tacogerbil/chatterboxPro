@@ -287,6 +287,7 @@ class GenerationService(QObject):
              process_indices = [
                  i for i in indices_to_process 
                  if not self.state.sentences[i].get('is_pause')
+                 and self.state.sentences[i].get('uuid') # MCCC: Safety check
              ]
         else:
              # Full run (filter not-done items)
