@@ -2,8 +2,7 @@
 
 <img src="images/Main.png" width="600">
 
-
-**Chatterbox Pro** is a powerful, user-friendly graphical interface for generating high-quality audiobooks using the cutting-edge **Chatterbox** text-to-speech model. This tool is designed for creators, authors, and hobbyists who want to convert long-form text into professional-sounding audio with a consistent, cloned voice.
+**Chatterbox Pro** is a powerful, user-friendly graphical interface for generating high-quality audiobooks using cutting-edge Neural TTS. This tool is designed for creators, authors, and hobbyists who want to convert long-form text into professional-sounding audio with a consistent, cloned voice.
 
 This application provides a complete end-to-end workflow: from text processing and voice cloning to multi-GPU audio generation and final audiobook assembly.
 
@@ -11,36 +10,44 @@ This application provides a complete end-to-end workflow: from text processing a
 
 ## ✨ Features
 
--   **High-Quality Voice Cloning**: Utilizes the Chatterbox model to clone a voice from a short audio sample.
--   **Intuitive GUI**: A clean, tab-based interface built with CustomTkinter for easy navigation and control.
+-   **High-Quality Voice Cloning**: Clone any voice from a short audio sample.
+-   **Multi-Engine Core**: Don't get locked in. Seamlessly switch between **Chatterbox**, **F5-TTS**, and other integrated engines to find the perfect sound for your project.
+    -   **Custom Models**: Load `.pth` files from anywhere on your system (e.g., massive external drives) without copying them into system folders.
+-   **Intuitive GUI (PySide6)**:
+    -   **Zero Lag**: Unlike the old Tkinter interface, the new Qt-based engine handles massive playlists (10,000+ items) without stuttering.
+    -   **Modern & Responsive**: Full High-DPI scaling, smooth resizing, and native OS integration.
+    -   **Theming**: Beautiful built-in Dark/Light themes that are easy on the eyes during long editing sessions.
 -   **Comprehensive Text Processing**:
     -   Supports various input formats: `.txt`, `.pdf`, `.epub`, and with Pandoc installed, `.docx` and `.mobi`.
     -   Intelligent sentence and chapter detection.
-    -   In-app text editor for reviewing and correcting source material before processing.
+    -   In-app text editor / smart splitter for reviewing and correcting source material.
+-   **🛡️ Session Safety & Recovery**:
+    -   **Triple-Layer Protection**: Prevents accidental data loss with safety gates that block saving empty sessions.
+    -   **Auto-Backup**: Automatically creates `.bak` snapshots of your session data before every save.
+    -   **Crash Recovery**: Detects load failures and offers instant recovery options.
 -   **Powerful Generation Controls**:
-    -   Adjust TTS parameters like emotional exaggeration, temperature, and speaker similarity (CFG).
-    -   Set a master seed for reproducible audio outputs across multiple generation runs.
--   **Multi-GPU & Multi-Core Processing**:
-    -   Accelerate generation by distributing the workload across multiple GPUs and CPU cores.
-    -   Smart "Fastest First" ordering prioritizes longer chunks to maximize hardware utilization.
--   **ASR-Powered Validation & Failure Handling**:
-    -   Automatically transcribe generated audio and compare it to the source text to ensure accuracy.
-    -   If a chunk fails validation, the *best-sounding failure* is used as a placeholder, eliminating silent gaps.
-    -   Failed chunks are automatically marked for easy, one-click regeneration with different seeds.
--   **Advanced Playlist Management**:
-    -   Edit, delete, split, merge, and insert new text blocks or pauses directly into the playlist.
-    -   The entire project is automatically renumbered and saved.
--   **Streamlined Project Management**:
-    -   Session-based workflow saves all your text, generated audio, and settings.
-    -   Save and load generation parameter templates for consistent results across projects.
--   **Professional Post-Processing**:
-    -   Optional audio normalization (via `ffmpeg`) and silence removal (via `auto-editor`) for a polished final product.
+    -   **Real-Time Voice Lab**: No more saving "templates" blindly. Type sample text, tweak parameters (Speed, Pitch, Style), and **hear the results instantly**. Iteration is now immediate.
+    -   **Studio Effects (Post-Processing)**: Powered by **Pedalboard**. Apply a non-destructive **FX Chain** (EQ, Compression, High-Pass) to your generated audio *after* synthesis for a broadcast-ready sound.
+    -   **Dynamic Voice Creation**: Load custom engines/models and tweak effects on-the-fly to create unique character voices instantly.
+-   **Advanced Playlist Management (The Forge)**:
+    -   **Chapter Mastery**: Select any line and **Convert to Chapter**, or insert new Chapter Markers/Breaks manually.
+    -   **Status-Based Workflow**: Target lines based on ASR status (e.g., **"Merge All Failed"** or **"Split Failed"**) to fix difficult passages in bulk.
+    -   **Mark & Merge**: Visually tag chunks with the **Gold Marker (🟨)** system. Toggle marks on/off and "Smart Merge" them into single coherent lines.
+    -   **Auto-Pause Engine**: Automatically wrap chapters with granular silence buffers (e.g., 2000ms before/after) for perfect pacing.
+    -   **Persistent Workspace**: The app remembers your Window Size, Position, and Theme preference across restarts.
+-   **ASR-Powered Validation**:
+    -   **Strict Mode**: Uses word-count validation to reject hallucinations (extra words) instantly.
+    -   **Recursive Auto-Loop**: "Set it and forget it." The system will automatically retry failed chunks, splitting them if necessary, and re-rolling seeds indefinitely (or until a limit) until your entire book passes quality standards.
+-   **Mastering Suite (Post-Processing)**:
+    -   **Audio Normalization**: Ensure consistent volume levels (-3dB) across all chapters.
+    -   **Smart Silence Removal**: Use `auto-editor` to tighten up gaps and flow.
+    -   **One-Click Assembly**: Compile thousands of chunks into a single, polished audiobook file ready for distribution.
 
 <img src="images/finalize.png" width="600">
 
 ## 🔧 Installation
 
-This project requires Python 3.9 or higher. An NVIDIA GPU with CUDA support is highly recommended for optimal performance.
+This project requires Python 3.10 or higher. An NVIDIA GPU with CUDA support is highly recommended for optimal performance.
 
 ### 1. System Dependencies
 
@@ -53,92 +60,54 @@ For full functionality, you need to install these command-line tools and ensure 
 -   **Pandoc (Optional)**: Required for processing `.docx` and `.mobi` files.
     -   Download from [pandoc.org](https://pandoc.org/installing.html).
 
-The application will still run without these, but the corresponding features will be disabled.
-
 ### 2. Clone the Repository
 
 ```bash
-git clone [https://github.com/your-username/chatterboxPro_updated.git](https://github.com/your-username/chatterboxPro_updated.git)
+git clone https://github.com/your-username/chatterboxPro_updated.git
 cd chatterboxPro_updated
-````
+```
 
-*(Replace `your-username` with your actual GitHub username)*
-
-### 3\. Create a Virtual Environment and Install Dependencies
-
-It is highly recommended to use a virtual environment to avoid conflicts with other Python projects.
+### 3. Create a Virtual Environment and Install Dependencies
 
 ```bash
 # Create a virtual environment
 python -m venv venv
 
-# Activate it
-# On Windows:
+# Activate it (Windows)
 venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
 
 # Install the required Python packages
-pip install -r requirements_pro.txt
+pip install -r requirements.txt
 ```
-
-**Note:** The `chatterbox` model code is already included in this repository, so no additional setup is needed. They may have released newer versions (And there is a 2-4x faster fork that I've struggled to get running in my environment that you might want to explore.)
 
 ## 🚀 How to Use
 
 1.  **Launch the Application**:
-
     ```bash
     python chatter_pro.py
     ```
 
 2.  **Tab 1: Setup**
-
-      - **Create a Session**: Click "New Session" and give your project a name (e.g., `my-first-book`). All files will be saved in an `Outputs_Pro/<session_name>` directory.
-      - **Select Source File**: Click "Select File..." to choose your text document (`.txt`, `.pdf`, `.epub`, etc.).
-      - **Process Text**: Click "Process Text File". An editor window will pop up. Review your text and make any corrections, then click "Confirm". Your text will be split into chunks and displayed in the playlist on the right.
+      - **Create a Session**: Click "New Session". All files are saved in `Outputs_Pro/<session_name>`.
+      - **Load Text**: Select your source file. Use the **Internal Editor** to verify sentence splitting.
 
 3.  **Tab 2: Generation**
+      - **Reference Audio**: Select a 10-30s WAV file of the voice you want to clone.
+      - **Custom Models**: You can now point the engine to your own `.pth` / `.json` model files.
 
-      - **Reference Audio**: Select a high-quality, clean WAV file (10-30 seconds is ideal) of the voice you want to clone.
-      - **Adjust Parameters**: Fine-tune settings like **Exaggeration**, **CFG Weight**, and **Temperature**. You can save your favorite settings as a template for later use.
+4.  **Tab 3: Playlist (The Forge)**
+      - **Control the Flow**: Use **M Mark** (Toggle) and **Merge Marked** to refine your text chunks.
+      - **Structure**: Insert **Chapter Headings** and use **Auto Pause** to wrap them in silence.
+      - **Generate**: Start the process. Failed chunks turn Red (❌), Success turned Green (✅).
+      - **Review**: Use **Auto-Loop** to fix red chunks automatically.
 
-4.  **Start Generation**
-
-      - Go back to the **Setup** tab and click the big **"Start Generation"** button.
-      - The progress bar will update as chunks are generated. Failed chunks (which did not pass ASR) will be marked in red but will still have placeholder audio.
-
-5.  **Review and Regenerate**
-
-      - Listen to the generated audio clips by selecting them in the playlist and clicking "▶ Play".
-      - Failed chunks are automatically marked. To retry them, you can adjust settings (e.g., change the "Master Seed") and click **"↻ Regenerate Marked"** in the playlist controls.
-
-6.  **Tab 3: Finalize**
-
-      - Once you are happy with all the generated audio, enable any desired post-processing options like normalization.
-      - Click **"Assemble as Single File"** or **"Export by Chapter..."** to create your final audiobook.
-
-\<img src="images/editor.png" width="600"\>
+5.  **Tab 4: Finalize**
+      - **Assemble**: Compile everything into a single audiobook file or export by Chapter.
 
 ## 📜 Licensing
 
-Chatterbox Pro is released under a dual-license model to support its ongoing development while providing a free and open-source version for the community.
+Chatterbox Pro is released under a dual-license model (AGPLv3 / Commercial). See `LICENSE` for details.
 
-### Open Source License (AGPLv3)
+## 🙏 Acknowledgements
 
-For personal projects, academic research, and open-source software, Chatterbox Pro is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**. A key condition of this license is that if you use this software in a network-based service, you must make the full source code of your service available to its users. For the full terms, please see the [LICENSE.md](LICENSE.md) file.
-
-**TL;DR:** If you are an author using this tool to create audiobooks for personal or commercial distribution, you are not required to open-source your work. The AGPLv3 applies to modifications of the software itself when used in a networked service.
-
-### Commercial License
-
-For businesses and commercial use cases where the obligations of the AGPLv3 are not suitable, we offer a commercial license. This allows you to integrate Chatterbox Pro into proprietary applications and services without the source-sharing requirements.
-
-To inquire about a commercial license, please **[open an issue on GitHub using our Commercial License Inquiry template](https://www.google.com/search?q=https://github.com/your-username/chatterboxPro_updated/issues/new%3Ftemplate%3Dcommercial-license-inquiry.md%26title%3DCommercial%2BLicense%2BInquiry)**.
-
-## 🙏 Acknowledgements & Attributions
-
-This project is a graphical user interface built on top of the powerful **Chatterbox TTS model** by Resemble AI and takes inspiration from several other incredible open-source projects. All credit for the underlying speech synthesis technology goes to the original creators.
-
-For a detailed list of acknowledgments and licenses, please see the attributions.md file.
-
+Built on top of the powerful **Chatterbox TTS model** by Resemble AI. All credit for the underlying speech synthesis technology goes to the original creators.
