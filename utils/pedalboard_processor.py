@@ -109,31 +109,49 @@ def _build_grit_chain(
     gruffness: float # 0.0 to 1.0
 ) -> Pedalboard:
     """
-    Constructs the parallel distorted octave layer.
+    Constructs the parallel distorted octave layer for Batman-style gravel.
+    
+    MCCC: Single Responsibility - Each effect serves one clear purpose:
+    - Highpass: Remove sub-bass rumble (wind artifact prevention)
+    - Octave Down: Create deep undertone
+    - Distortion: Add harmonic saturation (the "gravel")
+    - Lowpass: Confine texture to chest/throat range
+    - Compression: Even out the rumble dynamics
+    
+    Args:
+        sample_rate: Audio sample rate for filter calculations
+        gruffness: Intensity (0.0 = off, 1.0 = maximum Batman)
+    
+    Returns:
+        Pedalboard chain for grit processing
     """
     board_effects = []
     
-    # 1. Noise Gate (Tighten the start/stop)
-    # Prevents rumble tail from dragging behind (Echo feel)
-    from pedalboard import NoiseGate
-    board_effects.append(NoiseGate(threshold_db=-40.0, release_ms=15.0, attack_ms=1.0))
+    # 1. Highpass Filter (NEW - Wind Artifact Fix)
+    # MCCC: Explicit Intent - Remove true sub-bass (<40Hz) that causes "wind" feeling
+    # This eliminates low-frequency rumble that distortion would amplify into noise
+    board_effects.append(HighpassFilter(cutoff_frequency_hz=40.0))
     
     # 2. Octave Down (The Beast)
+    # MCCC: Clear Purpose - Shifts voice down 12 semitones for deep undertone
     board_effects.append(PitchShift(semitones=-12.0))
     
-    # 3. Heavy Distortion
-    # Scale drive with gruffness: 20dB to 50dB (More Nuclear)
-    drive = 20.0 + (gruffness * 30.0) 
+    # 3. Heavy Distortion (REFINED - Capped Drive)
+    # MCCC: Explicit Range - Scale drive with gruffness: 20dB to 35dB
+    # Previous max (50dB) amplified quantization noise → "wind" artifact
+    # 35dB provides plenty of gravel without excessive noise amplification
+    drive = 20.0 + (gruffness * 15.0)  # Max 35dB (was 50dB)
     board_effects.append(Distortion(drive_db=drive))
     
-    # 4. Lowpass (Remove Fizz/Harshness)
-    # FIX: "Side-by-side" / "Echo" complaint.
-    # Lower cutoff drastically to 300Hz. This confines the grit to Sub-Bass/Chest.
-    # 300Hz phase issues are much less audible as "echo" than 800Hz.
-    cutoff = 250.0 + (gruffness * 100.0) # 250Hz - 350Hz range
+    # 4. Lowpass Filter (Fizz Removal)
+    # MCCC: Explicit Intent - Confine grit to sub-bass/chest range (250-350Hz)
+    # Prevents phase issues and "echo" feeling from mid-range gravel
+    cutoff = 250.0 + (gruffness * 100.0)  # 250Hz - 350Hz range
     board_effects.append(LowpassFilter(cutoff_frequency_hz=get_safe_nyquist_clamp(cutoff, sample_rate)))
     
-    # 5. Smashed Compression (even out the rumble)
+    # 5. Smashed Compression (Rumble Leveling)
+    # MCCC: Clear Purpose - Even out dynamics of the distorted signal
+    # High ratio (10:1) creates consistent "wall of gravel"
     board_effects.append(Compressor(threshold_db=-24.0, ratio=10.0, attack_ms=1.0, release_ms=30.0))
     
     return Pedalboard(board_effects)
