@@ -410,7 +410,9 @@ class PlaylistService:
             # Ensure new chunks have correct status
             for chunk in new_chunks:
                 chunk['tts_generated'] = 'no'
-                chunk['marked'] = True # Keep them marked so user can review? Or unmark?
+            for chunk in new_chunks:
+                chunk['tts_generated'] = 'no'
+                chunk['marked'] = False # Unmark so user knows merge is complete
                 # User said "perform their tasks only on MARKED items". Usually resulting items are ready to gen.
                 # Let's keep them marked so they can be generated immediately with "Regen Marked".
                 

@@ -65,6 +65,8 @@ class ChatterboxProQt(QMainWindow):
              from PySide6.QtCore import QByteArray
              self.restoreGeometry(QByteArray.fromHex(self.app_state.window_geometry_hex.encode()))
         
+
+        
     def setup_ui(self) -> None:
         central = QWidget()
         self.setCentralWidget(central)
@@ -190,10 +192,6 @@ class ChatterboxProQt(QMainWindow):
             QMessageBox.information(self, "Generation Complete", 
                                   "All tasks finished.\n\n"
                                   "Go to the 'Finalize' tab to assemble your audiobook.")
-
-        if self.app_state.window_geometry_hex:
-            from PySide6.QtCore import QByteArray
-            self.restoreGeometry(QByteArray.fromHex(self.app_state.window_geometry_hex.encode()))
 
     def closeEvent(self, event) -> None:
         """Handle application closure: Save State."""
