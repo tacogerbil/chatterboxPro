@@ -21,6 +21,7 @@ This application provides a complete end-to-end workflow: from text processing a
     -   Supports various input formats: `.txt`, `.pdf`, `.epub`, and with Pandoc installed, `.docx` and `.mobi`.
     -   Intelligent sentence and chapter detection.
     -   In-app text editor / smart splitter for reviewing and correcting source material.
+    <img src="images/chapters.png" width="600">
 -   **🛡️ Session Safety & Recovery**:
     -   **Triple-Layer Protection**: Prevents accidental data loss with safety gates that block saving empty sessions.
     -   **Auto-Backup**: Automatically creates `.bak` snapshots of your session data before every save.
@@ -46,6 +47,7 @@ This application provides a complete end-to-end workflow: from text processing a
     -   **One-Click Assembly**: Compile thousands of chunks into a single, polished audiobook file ready for distribution.
 
 <img src="images/finalize.png" width="600">
+<img src="images/config.png" width="600">
 
 ## 🔧 Installation
 
