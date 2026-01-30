@@ -39,9 +39,11 @@ class PlaylistModel(QAbstractListModel):
             is_marked = item.get('marked', False)
             
             icon = ""
-            if is_marked: icon = "🟨 " # Yellow Square for Marked
-            elif status == 'yes': icon = "✅ "
-            elif status == 'failed': icon = "❌ "
+            icon = ""
+            if is_marked: icon += "🟨 "
+            
+            if status == 'yes': icon += "✅ "
+            elif status == 'failed': icon += "❌ "
             # elif status == 'no': icon = "⬜ " # User requested 'red x' for 'hadn't been generated', but ❌ is usually error.
             # Let's stick to X for fail/pending if user insisted, but standard UX distinguishes.
             # User said: "red x ... signify it hadn't been generated".

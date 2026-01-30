@@ -20,10 +20,7 @@ class PlaylistDelegate(QStyledItemDelegate):
         
         # Apply Status Colors (Modify background brush)
         if not (option.state & QStyle.State_Selected):
-            if is_marked:
-                # Highlight Marked items (Yellow/Orange Tint)
-                option.backgroundBrush = QBrush(QColor("#4A3B10")) # Dark Yellow/Gold for Dark Mode
-            elif status == "failed":
+            if status == "failed":
                 option.backgroundBrush = QBrush(QColor("#543030")) # Darker Red
             elif status == "success":
                 option.backgroundBrush = QBrush(QColor("#2E4B2E")) # Darker Green
