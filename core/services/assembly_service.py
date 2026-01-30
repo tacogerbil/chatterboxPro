@@ -77,11 +77,11 @@ class AssemblyService(QObject):
                          AudioSegment.silent(duration=pause_duration).export(silence_file, format="wav")
                          f.write(f"file '{silence_file.absolute()}'\n")
 
-                    # Chapter Heading Silence (Pre)
-                    if s_data.get("is_chapter_heading"):
-                        chapter_silence = temp_dir / f"chapter_pre_{s_data['uuid']}.wav"
-                        AudioSegment.silent(duration=1500).export(chapter_silence, format="wav")
-                        f.write(f"file '{chapter_silence.absolute()}'\n")
+                    # Chapter Heading Silence (Pre) - REMOVED per user request (handled by Auto-Pause)
+                    # if s_data.get("is_chapter_heading"):
+                    #    chapter_silence = temp_dir / f"chapter_pre_{s_data['uuid']}.wav"
+                    #    AudioSegment.silent(duration=1500).export(chapter_silence, format="wav")
+                    #    f.write(f"file '{chapter_silence.absolute()}'\n")
 
                     # Main Audio
                     f_path = session_path / "Sentence_wavs" / f"audio_{s_data['uuid']}.wav"
