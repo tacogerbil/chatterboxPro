@@ -24,7 +24,6 @@ class SetupView(QWidget):
         self.state = app_state
         self.processor = TextPreprocessor()
         self.project_service = ProjectService()
-        self.project_service = ProjectService()
         self.template_service = TemplateService()
         self.gen_service: Optional[Any] = None # Injected
         
@@ -405,7 +404,34 @@ class SetupView(QWidget):
             QMessageBox.critical(self, "Error", "Failed to save session.")
 
     def toggle_generation(self) -> None:
-        QMessageBox.information(self, "Start", "Generation started! (Wiring pending in Phase 5)")
+        """Starts or stops generation based on current state."""
+        if not self.gen_service:
+            QMessageBox.critical(self, "Error", "Generation service not initialized.")
+            return
+        
+        # Check if generation is already running
+        if hasattr(self.gen_service, 'is_running') and self.gen_service.is_running:
+            self.stop_generation()
+            return
+        
+        # Validate prerequisites
+        if not self.state.sentences:
+            QMessageBox.warning(self, "No Data", "Please load or process text first.")
+            return
+        
+        if not self.state.settings.ref_audio_path:
+            QMessageBox.warning(self, "No Reference", "Please select a reference audio file in the Generation tab.")
+            return
+        
+        # Start generation
+        try:
+            self.gen_service.start_generation()
+            self.start_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            logging.info("Generation started from Setup view")
+        except Exception as e:
+            logging.error(f"Failed to start generation: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to start generation:\n{e}")
 
     def populate_templates(self) -> None:
         templates = self.template_service.list_templates()

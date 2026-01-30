@@ -173,6 +173,10 @@ class ChatterboxProQt(QMainWindow):
         # Wire Dynamic Theme Updates (List Colors)
         self.config_view.theme_combo.currentTextChanged.connect(self.chapters_view.update_theme)
         self.config_view.theme_combo.currentTextChanged.connect(self.playlist_view.update_theme)
+        
+        # Wire Generation Start/Stop for UI Feedback
+        self.gen_service.started.connect(self._on_generation_started)
+        self.gen_service.stopped.connect(self._on_generation_stopped)
 
 
     def on_chapter_jump(self, row_idx: int) -> None:
@@ -193,6 +197,24 @@ class ChatterboxProQt(QMainWindow):
             QMessageBox.information(self, "Generation Complete", 
                                   "All tasks finished.\n\n"
                                   "Go to the 'Finalize' tab to assemble your audiobook.")
+    
+    def _on_generation_started(self) -> None:
+        """Called when generation starts."""
+        self.statusBar().showMessage("Generation started...")
+        # Update Setup view buttons
+        if hasattr(self.setup_view, 'start_btn'):
+            self.setup_view.start_btn.setEnabled(False)
+        if hasattr(self.setup_view, 'stop_btn'):
+            self.setup_view.stop_btn.setEnabled(True)
+    
+    def _on_generation_stopped(self) -> None:
+        """Called when generation is stopped by user."""
+        self.statusBar().showMessage("Generation stopped by user.")
+        # Reset Setup view buttons
+        if hasattr(self.setup_view, 'start_btn'):
+            self.setup_view.start_btn.setEnabled(True)
+        if hasattr(self.setup_view, 'stop_btn'):
+            self.setup_view.stop_btn.setEnabled(False)
 
     def closeEvent(self, event) -> None:
         """Handle application closure: Save State."""

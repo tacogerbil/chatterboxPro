@@ -492,8 +492,7 @@ class ControlsView(QWidget):
         if self.playlist_service.move_items(indices, direction):
             self._refresh()
             self.structure_changed.emit()
-            # Restore selection (tricky due to re-indexing, but service returns new indices)
-            # Todo: update selection
+            # Restore selection (tricky due to re-indexing, service would need to return new indices)
 
     def _nav_error(self, direction):
         idx = self._get_selected_index()
