@@ -6,6 +6,7 @@ class PlaylistModel(QAbstractListModel):
     Qt Model for the main Playlist (Sentences).
     """
     StatusRole = Qt.UserRole + 1
+    MarkedRole = Qt.UserRole + 2
     
     def __init__(self, app_state: AppState, parent=None):
         super().__init__(parent)
@@ -54,6 +55,9 @@ class PlaylistModel(QAbstractListModel):
             if status == 'yes': return "success"
             if status == 'failed': return "failed"
             return "pending"
+            
+        elif role == self.MarkedRole:
+            return item.get('marked', False)
             
         elif role == Qt.ToolTipRole:
             return item.get('original_sentence', '')

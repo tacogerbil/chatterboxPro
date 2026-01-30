@@ -110,6 +110,14 @@ class PlaylistService:
         self.state.sentences.insert(index, new_item)
         self._renumber()
 
+    def toggle_selection_mark(self, indices: List[int]) -> None:
+        """Toggles the 'marked' status of selected items."""
+        for idx in indices:
+            if 0 <= idx < len(self.state.sentences):
+                item = self.state.sentences[idx]
+                current = item.get('marked', False)
+                item['marked'] = not current
+                
     def convert_to_chapter(self, index: int) -> bool:
         """Converts an existing item into a Chapter Heading."""
         item = self.get_selected_item(index)

@@ -455,9 +455,7 @@ class ControlsView(QWidget):
     def _mark_current(self):
         indices = self._get_selected_indices()
         if not indices: return
-        for i in indices:
-            item = self.playlist_service.get_selected_item(i)
-            item['marked'] = True
+        self.playlist_service.toggle_selection_mark(indices)
         self._refresh()
 
     def _mark_passed(self):
