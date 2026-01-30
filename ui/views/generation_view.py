@@ -435,9 +435,9 @@ class GenerationView(QWidget):
         if hasattr(self, 'asr_thresh'): self.asr_thresh.set_value(s.asr_threshold)
         if hasattr(self, 'chk_watermark'): self.chk_watermark.setChecked(s.disable_watermark)
         
-        self.gpu_edit.setText(s.target_gpus)
-        self.seed_spin.setValue(s.master_seed)
-        self.cand_spin.setValue(s.num_candidates)
+        
+        # GPU, Seed, Candidates moved to ConfigView - no longer in GenerationView
+
 
 
 
