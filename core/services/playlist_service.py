@@ -56,7 +56,7 @@ class PlaylistService:
         if duration != item.get('duration'):
              item['duration'] = duration
              item['tts_generated'] = 'n/a' # Pauses don't 'generate' but status is usually n/a or yes
-             item['marked'] = True
+             # Pauses should not be marked for regeneration
              return True
         return False
 
@@ -115,6 +115,9 @@ class PlaylistService:
         for idx in indices:
             if 0 <= idx < len(self.state.sentences):
                 item = self.state.sentences[idx]
+                # Skip Pauses
+                if item.get('is_pause'): continue
+                
                 current = item.get('marked', False)
                 item['marked'] = not current
                 
