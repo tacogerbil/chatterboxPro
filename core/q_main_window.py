@@ -144,6 +144,7 @@ class ChatterboxProQt(QMainWindow):
         
         # Inject Project Service into SetupView (prefer shared instance)
         self.setup_view.project_service = self.project_service
+        self.setup_view.set_generation_service(self.gen_service)
 
     def _connect_signals(self) -> None:
         """Connects global signals between components."""

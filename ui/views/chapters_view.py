@@ -269,6 +269,14 @@ class ChaptersView(QWidget):
         self.gen_btn.clicked.connect(self.generate_selected)
         footer_layout.addWidget(self.gen_btn)
         
+        # Stop Button
+        self.stop_btn = QPushButton("🛑 Stop")
+        self.stop_btn.setToolTip("Stop Generation")
+        self.stop_btn.setFixedSize(80, 30) # Wider to fit text
+        self.stop_btn.setStyleSheet("background-color: #A93226; color: white; font-weight: bold; border-radius: 4px;")
+        self.stop_btn.clicked.connect(self.stop_generation)
+        footer_layout.addWidget(self.stop_btn)
+        
         layout.addLayout(footer_layout)
 
     def update_theme(self, theme_name: str) -> None:
@@ -347,6 +355,12 @@ class ChaptersView(QWidget):
             
         # Trigger generation
         self.gen_service.start_generation(full_indices)
+
+    def stop_generation(self) -> None:
+        if self.gen_service:
+            self.gen_service.request_stop()
+        else:
+            QMessageBox.warning(self, "Error", "Generation Service not connected.")
         
     def on_double_click(self, index: QModelIndex) -> None:
         """Handle double click to jump to chapter start."""

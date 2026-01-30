@@ -24,7 +24,9 @@ class SetupView(QWidget):
         self.state = app_state
         self.processor = TextPreprocessor()
         self.project_service = ProjectService()
+        self.project_service = ProjectService()
         self.template_service = TemplateService()
+        self.gen_service: Optional[Any] = None # Injected
         
         self.setup_ui()
         self.populate_templates()
@@ -194,10 +196,25 @@ class SetupView(QWidget):
             self.dual_gpu_chk.stateChanged.connect(self.toggle_dual_gpu)
             c_layout.addWidget(self.dual_gpu_chk)
 
+        # Generation Control Layout: [ Start ] [ Stop ]
+        gen_layout = QHBoxLayout()
+        
         self.start_btn = QPushButton("Start Generation")
         self.start_btn.setStyleSheet("background-color: #27AE60; color: white; font-size: 14px; font-weight: bold; padding: 10px;")
         self.start_btn.clicked.connect(self.toggle_generation)
-        c_layout.addWidget(self.start_btn)
+        gen_layout.addWidget(self.start_btn, stretch=3)
+        
+        self.stop_btn = QPushButton("🛑 Stop") 
+        self.stop_btn.setToolTip("Stop Generation")
+        # Self-sizing or minimal width
+        self.stop_btn.setFixedWidth(100) 
+        # Reddish background
+        self.stop_btn.setStyleSheet("background-color: #A93226; color: white; font-weight: bold; border-radius: 4px;")
+        self.stop_btn.clicked.connect(self.stop_generation)
+        
+        gen_layout.addWidget(self.stop_btn, stretch=0)
+        
+        c_layout.addLayout(gen_layout)
         
         layout.addWidget(ctrl_group)
 
@@ -435,3 +452,12 @@ class SetupView(QWidget):
                 self.populate_templates()
             else:
                 QMessageBox.critical(self, "Error", f"Failed to delete voice '{name}'.")
+
+    def set_generation_service(self, service: Any) -> None:
+        self.gen_service = service
+
+    def stop_generation(self) -> None:
+        if self.gen_service:
+            self.gen_service.request_stop()
+        else:
+            QMessageBox.warning(self, "Error", "Generation Service not connected.")
