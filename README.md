@@ -27,6 +27,7 @@ This application provides a complete end-to-end workflow: from text processing a
     -   **Crash Recovery**: Detects load failures and offers instant recovery options.
 -   **Powerful Generation Controls**:
     -   **Real-Time Voice Lab**: No more saving "templates" blindly. Type sample text, tweak parameters (Speed, Pitch, Style), and **hear the results instantly**. Iteration is now immediate.
+    -   **Stop Anywhere (New)**: Prominent **Red "🛑 Stop"** buttons are now available directly in the Setup and Chapter tabs to instantly abort generation tasks.
     -   **Studio Effects (Post-Processing)**: Powered by **Pedalboard**. Apply a non-destructive **FX Chain** (EQ, Compression, High-Pass) to your generated audio *after* synthesis for a broadcast-ready sound.
     -   **Dynamic Voice Creation**: Load custom engines/models and tweak effects on-the-fly to create unique character voices instantly.
 -   **Advanced Playlist Management (The Forge)**:
@@ -37,6 +38,7 @@ This application provides a complete end-to-end workflow: from text processing a
     -   **Persistent Workspace**: The app remembers your Window Size, Position, and Theme preference across restarts.
 -   **ASR-Powered Validation**:
     -   **Strict Mode**: Uses word-count validation to reject hallucinations (extra words) instantly.
+    -   **Double-Protection Signal Check**: The system now pre-screens audio for **Signal Energy (RMS)** and **Trailing Noise**. Only files with valid speech energy are sent for transcription, preventing "Ghost Hallucinations" on empty audio.
     -   **Recursive Auto-Loop**: "Set it and forget it." The system will automatically retry failed chunks, splitting them if necessary, and re-rolling seeds indefinitely (or until a limit) until your entire book passes quality standards.
 -   **Mastering Suite (Post-Processing)**:
     -   **Audio Normalization**: Ensure consistent volume levels (-3dB) across all chapters.
