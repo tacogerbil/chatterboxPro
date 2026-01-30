@@ -26,7 +26,10 @@ class PlaylistService:
         if not item: return False
         
         item['tts_generated'] = 'no'
-        item['marked'] = True
+        if not item.get('is_pause'):
+            item['marked'] = True
+        else:
+            item['marked'] = False
         
         # Clear artifacts to prevent stale UI stats
         keys_to_clear = ['audio_path', 'similarity_ratio', 'generation_seed', 'asr_match', 'ffmpeg_cmd']
@@ -115,8 +118,12 @@ class PlaylistService:
         for idx in indices:
             if 0 <= idx < len(self.state.sentences):
                 item = self.state.sentences[idx]
-                # Skip Pauses
-                if item.get('is_pause'): continue
+                
+                # Special Logic for Pauses: Can UNMARK, but cannot MARK
+                if item.get('is_pause'):
+                    if item.get('marked'):
+                        item['marked'] = False
+                    continue
                 
                 current = item.get('marked', False)
                 item['marked'] = not current
