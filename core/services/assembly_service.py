@@ -105,9 +105,71 @@ class AssemblyService(QObject):
                 .run(quiet=False, capture_stderr=True)
             )
             
+            # --- POST-PROCESSING CHAIN ---
             path_to_process = raw_combined_path
             
+            # 1. Silence Removal (Auto-Editor)
+            if app.settings.silence_removal_enabled:
+                logging.info("Step 2: Running Auto-Editor for silence removal...")
+                ae_out = getattr(app.settings, 'silence_output_path', temp_dir / "silence_removed.wav")
+                
+                # Construct command
+                # auto-editor <input> --export <output> --margin <margin>s --silent-speed <speed> --silent-threshold <thresh> --no-open
+                try:
+                    margin_sec = float(app.settings.frame_margin) / 30.0 # roughly frame margin to seconds? or uses frames if arg is frames
+                    # auto-editor uses --margin (0.2s etc)
+                    # Legacy used frame_margin (int). Let's assume passed validation.
+                    # MCCC: Use known working legacy params
+                    
+                    cmd = [
+                        "auto-editor", str(path_to_process),
+                        "--export", str(ae_out),
+                        "--margin", f"{app.settings.frame_margin}fps",
+                        "--silent-speed", str(app.settings.silent_speed),
+                        "--silent-threshold", str(app.settings.silence_threshold),
+                        "--no-open"
+                    ]
+                    
+                    logging.info(f"Command: {' '.join(cmd)}")
+                    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    
+                    if ae_out.exists():
+                        path_to_process = ae_out
+                        logging.info("Silence removal complete.")
+                    else:
+                        logging.warning("Auto-Editor finished but output file missing. Using original.")
+                except Exception as e:
+                    logging.error(f"Auto-Editor failed: {e}")
+                    # Continue with original file
+            
+            # 2. Normalization (EBU R128 / Loudnorm)
+            if app.settings.norm_enabled:
+                logging.info(f"Step 3: Normalizing to {app.settings.norm_level} LUFS...")
+                norm_out = temp_dir / "normalized.wav"
+                
+                try:
+                    # Two-pass loudnorm is better but one-pass is simpler for now.
+                    # ffmpeg -i input -af loudnorm=I=-23:TP=-1.5:LRA=11 -ar 44100 output
+                    target_i = app.settings.norm_level
+                    
+                    (
+                        ffmpeg.input(str(path_to_process))
+                        .filter('loudnorm', I=target_i, TP=-1.5, LRA=11)
+                        .output(str(norm_out), ar=44100)
+                        .overwrite_output()
+                        .run(quiet=False, capture_stderr=True)
+                    )
+                    
+                    if norm_out.exists():
+                        path_to_process = norm_out
+                        logging.info("Normalization complete.")
+                    else:
+                        logging.warning("Normalization output missing. Using previous.")
+                except ffmpeg.Error as e:
+                    logging.error(f"Normalization failed: {e.stderr.decode() if e.stderr else str(e)}")
+            
             # Export Final
+            logging.info(f"Step 4: Final Export to {output_path}...")
             file_format = output_path.suffix.lstrip('.').lower()
             if file_format == 'mp3':
                  output_options = {
@@ -126,7 +188,12 @@ class AssemblyService(QObject):
                     .overwrite_output().run(quiet=False, capture_stderr=True)
                  )
             else:
-                 AudioSegment.from_wav(path_to_process).export(output_path, format=file_format)
+                 # Copy or Convert if not MP3
+                 if str(path_to_process) != str(output_path):
+                    if file_format == 'wav':
+                        shutil.copy2(path_to_process, output_path)
+                    else:
+                        AudioSegment.from_wav(path_to_process).export(output_path, format=file_format)
 
             self.assembly_finished.emit(str(output_path))
             
