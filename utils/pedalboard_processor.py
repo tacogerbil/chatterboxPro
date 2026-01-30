@@ -114,7 +114,7 @@ def _build_grit_chain(
     MCCC: Single Responsibility - Each effect serves one clear purpose:
     - Highpass: Remove sub-bass rumble (wind artifact prevention)
     - Octave Down: Create deep undertone
-    - Distortion: Add harmonic saturation (the "gravel")
+    - Soft Saturation: Add harmonic richness without harsh static
     - Lowpass: Confine texture to chest/throat range
     - Compression: Even out the rumble dynamics
     
@@ -127,35 +127,37 @@ def _build_grit_chain(
     """
     board_effects = []
     
-    # 1. Highpass Filter (NEW - Wind Artifact Fix)
-    # MCCC: Explicit Intent - Remove true sub-bass (<40Hz) that causes "wind" feeling
-    # This eliminates low-frequency rumble that distortion would amplify into noise
+    # 1. Highpass Filter (Wind Artifact Prevention)
+    # MCCC: Explicit Intent - Remove true sub-bass (<40Hz)
     board_effects.append(HighpassFilter(cutoff_frequency_hz=40.0))
     
-    # 2. Octave Down (The Beast) - REFINED
+    # 2. Octave Down (The Beast)
     # MCCC: Clear Purpose - Shifts voice down 18 semitones (1.5 octaves)
     # Pushed lower to remove intelligibility, creating pure sub-bass rumble
-    # This prevents the "parallel voice" effect where grit sounds like a duplicate
     board_effects.append(PitchShift(semitones=-18.0))
     
-    # 3. Heavy Distortion (REFINED - Capped Drive)
-    # MCCC: Explicit Range - Scale drive with gruffness: 20dB to 35dB
-    # Previous max (50dB) amplified quantization noise → "wind" artifact
-    # 35dB provides plenty of gravel without excessive noise amplification
-    drive = 20.0 + (gruffness * 15.0)  # Max 35dB (was 50dB)
-    board_effects.append(Distortion(drive_db=drive))
+    # 3. Soft Saturation (REFINED - No More Static!)
+    # MCCC: Explicit Intent - Use Compressor + Gain instead of harsh Distortion
+    # Distortion creates high-frequency aliasing → "static" artifacts
+    # Compression + Gain creates smooth harmonic saturation → "gravel" without static
     
-    # 4. Lowpass Filter (Intelligibility Removal) - REFINED
-    # MCCC: Explicit Intent - Confine grit to pure sub-bass (150-200Hz)
-    # Previous range (250-350Hz) allowed consonants through → "parallel voice" effect
-    # New range removes all intelligibility, leaving only chest rumble
-    cutoff = 150.0 + (gruffness * 50.0)  # 150Hz - 200Hz range
+    # Heavy compression to create saturation
+    board_effects.append(Compressor(threshold_db=-30.0, ratio=20.0, attack_ms=0.5, release_ms=10.0))
+    
+    # Gain boost to drive the compressed signal into soft clipping
+    # Scale with gruffness: 10dB to 25dB
+    gain_boost = 10.0 + (gruffness * 15.0)
+    board_effects.append(Gain(gain_db=gain_boost))
+    
+    # 4. Lowpass Filter (Intelligibility Removal)
+    # MCCC: Explicit Intent - Confine grit to pure sub-bass (120-180Hz)
+    # Lowered further to eliminate ANY chance of static leaking through
+    cutoff = 120.0 + (gruffness * 60.0)  # 120Hz - 180Hz range
     board_effects.append(LowpassFilter(cutoff_frequency_hz=get_safe_nyquist_clamp(cutoff, sample_rate)))
     
-    # 5. Smashed Compression (Rumble Leveling)
-    # MCCC: Clear Purpose - Even out dynamics of the distorted signal
-    # High ratio (10:1) creates consistent "wall of gravel"
-    board_effects.append(Compressor(threshold_db=-24.0, ratio=10.0, attack_ms=1.0, release_ms=30.0))
+    # 5. Final Compression (Rumble Leveling)
+    # MCCC: Clear Purpose - Even out dynamics of the saturated signal
+    board_effects.append(Compressor(threshold_db=-20.0, ratio=8.0, attack_ms=1.0, release_ms=30.0))
     
     return Pedalboard(board_effects)
 
@@ -248,14 +250,15 @@ def apply_pedalboard_effects(
         # B. Grit Chain (Run only if needed)
         audio_mixed = audio_main
         
-        if gruffness > 0.01:
+        if gruffness > 0.1:  # Raised threshold from 0.01 to 0.1
             grit_board = _build_grit_chain(sr, gruffness)
             audio_grit = grit_board(audio, sr)
             
-            # Blend Logic - REFINED
-            # MCCC: Explicit Range - Reduced from 40% to 30% max
-            # Lower mix prevents "parallel voice" effect, integrates gravel into main signal
-            grit_mix = min(gruffness * 0.30, 0.30) 
+            # Blend Logic - REFINED (Smooth Ramp)
+            # MCCC: Explicit Range - Reduced from 40% to 25% max
+            # Lower mix prevents overpowering, creates subtle integration
+            # Quadratic curve for smoother ramp-up (prevents sudden jump at low values)
+            grit_mix = min((gruffness ** 1.5) * 0.25, 0.25) 
             
             # Ensure shapes match (PitchShift might alter length minutely?)
             # Usually safe, but robust coding requires checking.
