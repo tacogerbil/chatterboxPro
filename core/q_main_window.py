@@ -93,9 +93,15 @@ class ChatterboxProQt(QMainWindow):
 
     def _setup_tabs(self) -> None:
         self.tabs = QTabWidget()
-        self.setup_view = SetupView(self.app_state)
-        # Inject project_service if needed (although setup_view currently creates its own)
-        # We can update setup_view to use ours in _inject_dependencies if we want strict DI.
+        
+        # MCCC: Proper dependency injection - pass services to SetupView
+        from core.services.template_service import TemplateService
+        template_service = TemplateService()
+        self.setup_view = SetupView(
+            self.app_state,
+            self.project_service,
+            template_service
+        )
         
         self.gen_view = GenerationView(self.app_state)
         self.chapters_view = ChaptersView(self.app_state)
@@ -142,8 +148,7 @@ class ChatterboxProQt(QMainWindow):
         # Inject dependencies for Auto-Fix Loop in GenService
         self.gen_service.set_playlist_service(self.playlist_service)
         
-        # Inject Project Service into SetupView (prefer shared instance)
-        self.setup_view.project_service = self.project_service
+        # Inject GenerationService into SetupView
         self.setup_view.set_generation_service(self.gen_service)
 
     def _connect_signals(self) -> None:

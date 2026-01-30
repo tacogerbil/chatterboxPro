@@ -22,6 +22,44 @@ class AssemblyService(QObject):
     def __init__(self, app_state: AppState):
         super().__init__()
         self.state = app_state
+    
+    def _validate_settings(self) -> tuple[bool, str]:
+        """
+        Validates assembly settings before processing.
+        
+        Returns:
+            (is_valid, error_message) tuple
+        """
+        from core.constants import (
+            MIN_LUFS, MAX_LUFS,
+            MIN_SILENCE_THRESHOLD, MAX_SILENCE_THRESHOLD,
+            MIN_FRAME_MARGIN, MAX_FRAME_MARGIN,
+            MIN_SILENT_SPEED, MAX_SILENT_SPEED
+        )
+        
+        s = self.state.settings
+        
+        # Validate normalization settings
+        if s.norm_enabled:
+            if s.norm_level is None:
+                return False, "Normalization enabled but target LUFS not set"
+            if not (MIN_LUFS <= s.norm_level <= MAX_LUFS):
+                return False, f"Target LUFS must be between {MIN_LUFS} and {MAX_LUFS} dB"
+        
+        # Validate silence removal settings
+        if s.silence_removal_enabled:
+            if s.silence_threshold is None:
+                return False, "Silence removal enabled but threshold not set"
+            if not (MIN_SILENCE_THRESHOLD <= s.silence_threshold <= MAX_SILENCE_THRESHOLD):
+                return False, f"Silence threshold must be between {MIN_SILENCE_THRESHOLD} and {MAX_SILENCE_THRESHOLD}"
+            
+            if s.frame_margin is None or s.frame_margin < MIN_FRAME_MARGIN:
+                return False, f"Frame margin must be at least {MIN_FRAME_MARGIN}"
+            
+            if s.silent_speed is None or not (MIN_SILENT_SPEED <= s.silent_speed <= MAX_SILENT_SPEED):
+                return False, f"Silent speed must be between {MIN_SILENT_SPEED} and {MAX_SILENT_SPEED}"
+        
+        return True, ""
 
     def assemble_audiobook(self, output_path_str: str, is_for_acx=False, metadata=None):
         if not output_path_str: 
@@ -29,6 +67,12 @@ class AssemblyService(QObject):
             
         self.assembly_started.emit()
         app = self.state # Alias for easier porting
+        
+        # MCCC: Validate settings before processing
+        is_valid, error_msg = self._validate_settings()
+        if not is_valid:
+            self.assembly_error.emit(f"Invalid settings: {error_msg}")
+            return
         
         # Metadata override if provided
         if metadata:
@@ -111,16 +155,12 @@ class AssemblyService(QObject):
             # 1. Silence Removal (Auto-Editor)
             if app.settings.silence_removal_enabled:
                 logging.info("Step 2: Running Auto-Editor for silence removal...")
-                ae_out = getattr(app.settings, 'silence_output_path', temp_dir / "silence_removed.wav")
                 
-                # Construct command
-                # auto-editor <input> --export <output> --margin <margin>s --silent-speed <speed> --silent-threshold <thresh> --no-open
+                # MCCC: Unique filename to prevent conflicts
+                unique_id = uuid.uuid4().hex[:8]
+                ae_out = temp_dir / f"silence_removed_{unique_id}.wav"
+                
                 try:
-                    margin_sec = float(app.settings.frame_margin) / 30.0 # roughly frame margin to seconds? or uses frames if arg is frames
-                    # auto-editor uses --margin (0.2s etc)
-                    # Legacy used frame_margin (int). Let's assume passed validation.
-                    # MCCC: Use known working legacy params
-                    
                     cmd = [
                         "auto-editor", str(path_to_process),
                         "--export", str(ae_out),
@@ -131,31 +171,50 @@ class AssemblyService(QObject):
                     ]
                     
                     logging.info(f"Command: {' '.join(cmd)}")
-                    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    result = subprocess.run(
+                        cmd, 
+                        check=True, 
+                        stdout=subprocess.PIPE, 
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
                     
                     if ae_out.exists():
                         path_to_process = ae_out
                         logging.info("Silence removal complete.")
                     else:
-                        logging.warning("Auto-Editor finished but output file missing. Using original.")
-                except Exception as e:
-                    logging.error(f"Auto-Editor failed: {e}")
+                        error_msg = "Auto-Editor finished but output file missing"
+                        logging.warning(error_msg)
+                        self.assembly_error.emit(f"Warning: {error_msg}. Using original audio.")
+                        
+                except subprocess.CalledProcessError as e:
+                    error_msg = f"Auto-Editor failed: {e.stderr if e.stderr else str(e)}"
+                    logging.error(error_msg)
+                    self.assembly_error.emit(f"Silence removal failed: {error_msg}")
                     # Continue with original file
+                except FileNotFoundError:
+                    error_msg = "auto-editor not found. Please install it: pip install auto-editor"
+                    logging.error(error_msg)
+                    self.assembly_error.emit(error_msg)
             
             # 2. Normalization (EBU R128 / Loudnorm)
             if app.settings.norm_enabled:
                 logging.info(f"Step 3: Normalizing to {app.settings.norm_level} LUFS...")
-                norm_out = temp_dir / "normalized.wav"
+                
+                # MCCC: Unique filename to prevent conflicts
+                unique_id = uuid.uuid4().hex[:8]
+                norm_out = temp_dir / f"normalized_{unique_id}.wav"
                 
                 try:
-                    # Two-pass loudnorm is better but one-pass is simpler for now.
-                    # ffmpeg -i input -af loudnorm=I=-23:TP=-1.5:LRA=11 -ar 44100 output
+                    # MCCC: Use constants for magic numbers
+                    from core.constants import EBU_R128_TRUE_PEAK_MAX, EBU_R128_LOUDNESS_RANGE, DEFAULT_SAMPLE_RATE
+                    
                     target_i = app.settings.norm_level
                     
                     (
                         ffmpeg.input(str(path_to_process))
-                        .filter('loudnorm', I=target_i, TP=-1.5, LRA=11)
-                        .output(str(norm_out), ar=44100)
+                        .filter('loudnorm', I=target_i, TP=EBU_R128_TRUE_PEAK_MAX, LRA=EBU_R128_LOUDNESS_RANGE)
+                        .output(str(norm_out), ar=DEFAULT_SAMPLE_RATE)
                         .overwrite_output()
                         .run(quiet=False, capture_stderr=True)
                     )
@@ -164,9 +223,14 @@ class AssemblyService(QObject):
                         path_to_process = norm_out
                         logging.info("Normalization complete.")
                     else:
-                        logging.warning("Normalization output missing. Using previous.")
+                        error_msg = "Normalization output file missing"
+                        logging.warning(error_msg)
+                        self.assembly_error.emit(f"Warning: {error_msg}. Using previous audio.")
+                        
                 except ffmpeg.Error as e:
-                    logging.error(f"Normalization failed: {e.stderr.decode() if e.stderr else str(e)}")
+                    error_msg = f"Normalization failed: {e.stderr.decode() if e.stderr else str(e)}"
+                    logging.error(error_msg)
+                    self.assembly_error.emit(error_msg)
             
             # Export Final
             logging.info(f"Step 4: Final Export to {output_path}...")

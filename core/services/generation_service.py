@@ -157,6 +157,7 @@ class GenerationService(QObject):
         self.playlist_service: Optional[Any] = None # Injected dependency
         self.auto_fix_stage: str = "NONE" 
         self._loop_iteration: int = 0
+        self.is_running: bool = False  # MCCC: Track generation state
 
     def set_playlist_service(self, service: Any) -> None:
         self.playlist_service = service
@@ -314,7 +315,8 @@ class GenerationService(QObject):
         if self.worker_thread and self.worker_thread.isRunning():
             logging.warning("Generation already running.")
             return
-
+        
+        self.is_running = True  # MCCC: Set running state
         self.started.emit()
         s = self.state.settings
         outputs_dir = "Outputs_Pro" 
@@ -419,11 +421,13 @@ class GenerationService(QObject):
         else:
              self.finished.emit()
         self.worker_thread = None
+        self.is_running = False  # MCCC: Reset running state
 
     @Slot()
     def _on_stopped(self) -> None:
         self.stopped.emit()
         self.worker_thread = None
+        self.is_running = False  # MCCC: Reset running state
 
     # --- Preview Logic ---
     preview_ready = Signal(str) # audio_file_path

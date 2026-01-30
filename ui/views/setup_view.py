@@ -19,13 +19,30 @@ class SetupView(QWidget):
     template_loaded = Signal()
     session_updated = Signal() # New: Emitted when sentences/session data changes
 
-    def __init__(self, app_state: AppState, parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self, 
+        app_state: AppState,
+        project_service: 'ProjectService',
+        template_service: 'TemplateService',
+        parent: Optional[QWidget] = None
+    ) -> None:
+        """
+        MCCC: Proper dependency injection - services are injected, not created.
+        
+        Args:
+            app_state: Application state
+            project_service: Injected project service
+            template_service: Injected template service
+            parent: Optional parent widget
+        """
         super().__init__(parent)
         self.state = app_state
         self.processor = TextPreprocessor()
-        self.project_service = ProjectService()
-        self.template_service = TemplateService()
-        self.gen_service: Optional[Any] = None # Injected
+        
+        # MCCC: Injected dependencies (not self-instantiated)
+        self.project_service = project_service
+        self.template_service = template_service
+        self.gen_service: Optional[Any] = None # Injected later
         
         self.setup_ui()
         self.populate_templates()
