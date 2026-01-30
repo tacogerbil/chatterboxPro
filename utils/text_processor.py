@@ -139,7 +139,48 @@ class TextPreprocessor:
         
         return ' '.join(filtered_words)
 
-    def group_sentences_into_chunks(self, sentences, max_chars=290):
+    def smart_split_long_sentence(self, sentence: str, max_chars: int = 400) -> list:
+        """
+        Splits very long sentences at natural pause points (commas, semicolons).
+        
+        MCCC: Single Responsibility - Handles only long sentence splitting.
+        
+        Args:
+            sentence: The sentence to potentially split
+            max_chars: Maximum length before splitting (default 400)
+        
+        Returns:
+            List of sub-sentences (or [sentence] if no split needed)
+        """
+        if len(sentence) <= max_chars:
+            return [sentence]
+        
+        # Split at commas and semicolons, but keep the delimiters
+        parts = re.split(r'([,;])', sentence)
+        
+        # Recombine into chunks that respect max_chars
+        chunks = []
+        current = ""
+        
+        for part in parts:
+            test_length = len(current + part)
+            
+            if test_length <= max_chars:
+                current += part
+            else:
+                # Current chunk is full, finalize it
+                if current.strip():
+                    chunks.append(current.strip())
+                current = part
+        
+        # Add remaining text
+        if current.strip():
+            chunks.append(current.strip())
+        
+        # Fallback: if no chunks created, return original
+        return chunks if chunks else [sentence]
+
+    def group_sentences_into_chunks(self, sentences, max_chars=250):
         """Groups individual sentences into larger chunks for TTS processing."""
         chunks, current_chunk_items, current_chunk_text = [], [], ""
         
@@ -271,6 +312,13 @@ class TextPreprocessor:
 
             is_chapter_heading = bool(self.chapter_regex.match(clean_sentence))
 
+            # MCCC: Smart Split - Handle sentences >400 chars
+            # Split at natural pause points to improve TTS/ASR accuracy
+            if len(clean_sentence) > 400 and not is_chapter_heading:
+                sub_sentences = self.smart_split_long_sentence(clean_sentence, max_chars=400)
+            else:
+                sub_sentences = [clean_sentence]
+
             try:
                 sentence_start_pos = text.index(sentence_text, char_offset)
                 is_paragraph = any(p_pos >= sentence_start_pos and p_pos < (sentence_start_pos + len(sentence_text)) for p_pos in paragraph_break_positions)
@@ -279,12 +327,40 @@ class TextPreprocessor:
                 is_paragraph = False
                 char_offset += len(sentence_text)
 
-            processed_sentences.append({
-                "uuid": uuid.uuid4().hex,
-                "sentence_number": str(i + 1), "original_sentence": clean_sentence,
-                "text": clean_sentence, # Added missing key for PlaylistModel
-                "paragraph": "yes" if is_paragraph else "no", "tts_generated": "no", "marked": False,
-                "is_chapter_heading": is_chapter_heading
-            })
+            # Create sentence dict for each sub-sentence
+            for sub_idx, sub_sentence in enumerate(sub_sentences):
+                processed_sentences.append({
+                    "uuid": uuid.uuid4().hex,
+                    "sentence_number": str(i + 1) + (f".{sub_idx+1}" if len(sub_sentences) > 1 else ""),
+                    "original_sentence": sub_sentence,
+                    "text": sub_sentence,
+                    "paragraph": "yes" if is_paragraph and sub_idx == 0 else "no",
+                    "tts_generated": "no",
+                    "marked": False,
+                    "is_chapter_heading": is_chapter_heading
+                })
+
             
         return processed_sentences
+
+
+    def rechunk_current_session(self, current_sentences):
+        '''Re-chunks existing session while preserving chapters and pauses.'''
+        chapters, pauses, text_items = [], [], []
+        for idx, s in enumerate(current_sentences):
+            if s.get('is_chapter_heading'):
+                chapters.append((idx, s))
+            elif not s.get('text', '').strip():
+                pauses.append((idx, s))
+            else:
+                text_items.append(s)
+        if not text_items:
+            return current_sentences
+        raw_text = ' '.join([s.get('original_sentence', s.get('text', '')) for s in text_items])
+        new_sentences = self.preprocess_text(raw_text)
+        new_chunks = self.group_sentences_into_chunks(new_sentences)
+        for idx, ch in chapters:
+            new_chunks.insert(min(idx, len(new_chunks)), ch)
+        for idx, p in pauses:
+            new_chunks.insert(min(idx, len(new_chunks)), p)
+        return new_chunks

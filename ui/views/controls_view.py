@@ -199,7 +199,13 @@ class ControlsView(QWidget):
         layout.addWidget(btn_split_marked, 2, 0, 1, 2)
         layout.addWidget(btn_split_all, 2, 2, 1, 2)
         
-        # Row 3: Regen & Loops
+        # Row 2.5: Re-chunk Session (NEW)
+        btn_rechunk = QPushButton("🔄 Re-chunk Session")
+        btn_rechunk.clicked.connect(self._rechunk_session)
+        btn_rechunk.setToolTip("Re-split all text using improved chunking (preserves chapters/pauses)")
+        layout.addWidget(btn_rechunk, 3, 0, 1, 4)
+        
+        # Row 4: Regen & Loops
         btn_regen = QPushButton("↻ Regenerate Marked"); btn_regen.clicked.connect(self._regen_marked)
         btn_regen.setStyleSheet("background-color: #A40000; color: white;")
         btn_regen.setToolTip("Start generation for all items marked for regeneration.")
@@ -210,9 +216,9 @@ class ControlsView(QWidget):
         self.chk_reassemble = QCheckBox("Re-Assemble after")
         self.chk_reassemble.setToolTip("Automatically assemble audiobook after generation completes.")
         
-        layout.addWidget(btn_regen, 3, 0, 1, 2)
-        layout.addWidget(self.chk_auto_loop, 3, 2)
-        layout.addWidget(self.chk_reassemble, 4, 0, 1, 3)
+        layout.addWidget(btn_regen, 4, 0, 1, 2)
+        layout.addWidget(self.chk_auto_loop, 4, 2)
+        layout.addWidget(self.chk_reassemble, 5, 0, 1, 3)
         
         group.add_layout(layout)
         
@@ -586,3 +592,30 @@ class ControlsView(QWidget):
             QMessageBox.information(self, "Split Complete", f"Split {count} marked items.")
         else:
              QMessageBox.information(self, "Info", "No marked items found or no split needed.")
+
+
+    def _rechunk_session(self):
+        '''Re-chunk current session using improved chunking algorithm.'''
+        reply = QMessageBox.question(
+            self, "Re-chunk Session?",
+            "This will re-split all text using improved chunking.\n\n"
+            "✅ Preserves: Chapters, Pauses\n"
+            "⚠️ Warning: Generated audio will need regeneration\n\n"
+            "Continue?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            from utils.text_processor import TextPreprocessor
+            processor = TextPreprocessor()
+            old_count = len(self.state.sentences)
+            new_sentences = processor.rechunk_current_session(self.state.sentences)
+            self.state.sentences = new_sentences
+            self._refresh()
+            self.structure_changed.emit()
+            QMessageBox.information(
+                self, "Re-chunk Complete", 
+                f"Re-chunked session:\n"
+                f"Before: {old_count} items\n"
+                f"After: {len(new_sentences)} items"
+            )

@@ -1,0 +1,40 @@
+
+    def rechunk_current_session(self, current_sentences: list) -> list:
+        """
+        Re-chunks existing session while preserving chapters and pauses.
+        
+        MCCC: Single Responsibility - Handles only session re-chunking.
+        
+        Args:
+            current_sentences: List of sentence dicts from app_state.sentences
+        
+        Returns:
+            New list of sentence dicts with improved chunking
+        """
+        chapters, pauses, text_items = [], [], []
+        
+        for idx, s in enumerate(current_sentences):
+            if s.get('is_chapter_heading'):
+                chapters.append((idx, s))
+            elif s.get('text', '').strip() == '' or s.get('original_sentence', '').strip() == '':
+                pauses.append((idx, s))
+            else:
+                text_items.append(s)
+        
+        text_chunks = [s.get('original_sentence', s.get('text', '')) for s in text_items]
+        if not text_chunks:
+            return current_sentences
+        
+        raw_text = ' '.join(text_chunks)
+        new_sentences = self.preprocess_text(raw_text, is_edited_text=False, aggressive_clean=False)
+        new_chunks = self.group_sentences_into_chunks(new_sentences)
+        
+        for original_idx, chapter in chapters:
+            insert_idx = min(original_idx, len(new_chunks))
+            new_chunks.insert(insert_idx, chapter)
+        
+        for original_idx, pause in pauses:
+            insert_idx = min(original_idx, len(new_chunks))
+            new_chunks.insert(insert_idx, pause)
+        
+        return new_chunks
