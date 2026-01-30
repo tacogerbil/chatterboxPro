@@ -107,9 +107,9 @@ class ConfigView(QWidget):
         self.seed_spin = QSpinBox()
         self.seed_spin.setRange(-1, 2147483647)
         self.seed_spin.setSpecialValueText("Random (-1)")
-        self.seed_spin.setValue(self.state.settings.base_seed)
+        self.seed_spin.setValue(self.state.settings.master_seed)
         self.seed_spin.valueChanged.connect(
-            lambda v: setattr(self.state.settings, 'base_seed', v)
+            lambda v: setattr(self.state.settings, 'master_seed', v)
         )
         a_layout.addRow("Base Seed:", self.seed_spin)
 
