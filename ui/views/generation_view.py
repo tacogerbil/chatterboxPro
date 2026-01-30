@@ -79,7 +79,8 @@ class GenerationView(QWidget):
 
         self.setup_header(layout)
         self.setup_sliders(layout)
-        self.setup_advanced(layout)
+        # Advanced Settings moved to ConfigView
+        layout.addStretch()
         self.setup_preview(layout)
         layout.addStretch()
     
