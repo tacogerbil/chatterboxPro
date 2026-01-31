@@ -117,7 +117,9 @@ class ProjectService:
         data = {
             "source_file_path": app_state.source_file_path,
             "sentences": app_state.sentences,
-            "generation_settings": dataclasses.asdict(app_state.settings)
+            "generation_settings": dataclasses.asdict(app_state.settings),
+            "ref_audio_path": app_state.ref_audio_path,
+            "voice_preset": getattr(app_state.settings, 'voice_preset', 'Custom')
         }
         return self.save_session(app_state.session_name, data)
 

@@ -73,7 +73,7 @@ class ControlsView(QWidget):
         search_widget = QWidget()
         s_layout = QHBoxLayout(search_widget); s_layout.setContentsMargins(0,0,0,0)
         s_layout.addWidget(QLabel("🔍"))
-        s_layout.addWidget(QLabel("🔍"))
+
         self.search_edit = QLineEdit(); self.search_edit.setPlaceholderText("Search text...")
         # MCCC: Force visible size and style to prevent red-box/rendering artifacts
         self.search_edit.setMinimumWidth(150)
@@ -81,8 +81,8 @@ class ControlsView(QWidget):
         self.search_edit.returnPressed.connect(self._search)
         s_layout.addWidget(self.search_edit)
         
-        btn_s_prev = QPushButton("◄"); btn_s_prev.setFixedWidth(30); btn_s_prev.clicked.connect(self._search_prev)
-        btn_s_next = QPushButton("►"); btn_s_next.setFixedWidth(30); btn_s_next.clicked.connect(self._search_next)
+        btn_s_prev = QPushButton("<"); btn_s_prev.setFixedWidth(30); btn_s_prev.clicked.connect(self._search_prev)
+        btn_s_next = QPushButton(">"); btn_s_next.setFixedWidth(30); btn_s_next.clicked.connect(self._search_next)
         s_layout.addWidget(btn_s_prev)
         s_layout.addWidget(btn_s_next)
         
