@@ -302,6 +302,9 @@ def worker_process_chunk(task: WorkerTask):
     bass_boost = task.bass_boost
     treble_boost = task.treble_boost
     model_path = task.model_path
+    auto_expression_enabled = task.auto_expression_enabled
+    expression_sensitivity = task.expression_sensitivity
+
 
     pid = os.getpid()
     logging.info(f"[Worker-{pid}] Starting chunk (Idx: {original_index}, #: {sentence_number}, UUID: {uuid[:8]}) on device {device_str}")
@@ -356,6 +359,25 @@ def worker_process_chunk(task: WorkerTask):
 
 
         try:
+            # --- Auto-Expression Detection (Phase 3 Quality Improvement) ---
+            # Dynamically adjust exaggeration/temperature based on text content
+            if auto_expression_enabled:
+                from utils.expression_analyzer import get_expression_adjustment
+                
+                adjusted_temp, adjusted_exag, reason = get_expression_adjustment(
+                    text_chunk,
+                    temperature,
+                    exaggeration,
+                    expression_sensitivity
+                )
+                
+                # Log if adjustments were made
+                if adjusted_temp != temperature or adjusted_exag != exaggeration:
+                    logging.info(f"Auto-expression: {reason}")
+                    logging.info(f"  Adjusted temp {temperature:.2f}→{adjusted_temp:.2f}, exag {exaggeration:.2f}→{adjusted_exag:.2f}")
+                    temperature = adjusted_temp
+                    exaggeration = adjusted_exag
+            
             # --- TTS Generation ---
             wav_tensor = tts_engine.generate(
                 text_chunk, 

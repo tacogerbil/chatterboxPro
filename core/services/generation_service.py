@@ -300,6 +300,8 @@ class GenerationService(QObject):
                 gruffness=s.gruffness,
                 bass_boost=s.bass_boost,
                 treble_boost=s.treble_boost,
+                auto_expression_enabled=getattr(s, 'auto_expression_enabled', False),
+                expression_sensitivity=getattr(s, 'expression_sensitivity', 1.0),
                 model_path=s.model_path 
             )
             
@@ -491,6 +493,8 @@ class GenerationService(QObject):
             gruffness=s.gruffness,
             bass_boost=s.bass_boost,
             treble_boost=s.treble_boost,
+            auto_expression_enabled=getattr(s, 'auto_expression_enabled', False),
+            expression_sensitivity=getattr(s, 'expression_sensitivity', 1.0),
             model_path=s.model_path
         )
         

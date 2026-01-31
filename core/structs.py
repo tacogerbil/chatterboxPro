@@ -44,5 +44,10 @@ class WorkerTask:
     bass_boost: float
     treble_boost: float
     
+    # Auto-Expression Settings (Phase 3 Quality Improvement)
+    auto_expression_enabled: bool = False
+    expression_sensitivity: float = 1.0
+    
     # Optional Model Overrides
     model_path: Optional[str] = None
+
