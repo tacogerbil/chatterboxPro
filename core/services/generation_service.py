@@ -277,7 +277,7 @@ class GenerationService(QObject):
                 task_index=i,
                 original_index=original_idx,
                 sentence_number=int(sentence_data.get('sentence_number', i+1)),
-                uuid=sentence_data.get('uuid', uuid.uuid4().hex),
+                uuid=sentence_data.get('uuid') or uuid.uuid4().hex,
                 session_name=self.state.session_name,
                 run_idx=0, # flattened
                 output_dir_str=outputs_dir,
