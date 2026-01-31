@@ -9,6 +9,7 @@ import uuid
 
 from core.state import AppState
 from ui.components.q_labeled_slider import QLabeledSlider
+from ui.components.collapsible_frame import CollapsibleFrame
 from core.services.generation_service import GenerationService
 from core.services.template_service import TemplateService
 from PySide6.QtWidgets import QInputDialog, QFileDialog
@@ -97,8 +98,10 @@ class GenerationView(QWidget):
         header.setFont(font)
         layout.addWidget(header)
 
-        engine_group = QGroupBox("Engine Configuration")
-        form = QFormLayout(engine_group)
+        # MCCC: Collapsible Engine Configuration
+        engine_collapsible = CollapsibleFrame("Engine Configuration", start_open=True)
+        
+        form = QFormLayout()
         
         self.engine_combo = QComboBox()
         self.engine_combo.addItems(["chatterbox", "xtts", "f5"])
@@ -125,7 +128,8 @@ class GenerationView(QWidget):
         path_layout.addWidget(self.set_path_btn)
         form.addRow("Model Path:", path_layout)
         
-        layout.addWidget(engine_group)
+        engine_collapsible.add_layout(form)
+        layout.addWidget(engine_collapsible)
 
     def browse_model_path(self) -> None:
         """Opens a directory picker for the model."""
@@ -141,8 +145,9 @@ class GenerationView(QWidget):
             pass
 
     def setup_sliders(self, layout: QVBoxLayout) -> None:
-        voice_group = QGroupBox("Voice Settings")
-        v_layout = QVBoxLayout(voice_group)
+        # MCCC: Collapsible Voice Settings
+        voice_collapsible = CollapsibleFrame("Voice Settings", start_open=True)
+        v_layout = QVBoxLayout()
         
         # --- Source Inputs (New) ---
         src_form = QFormLayout()
@@ -251,10 +256,12 @@ class GenerationView(QWidget):
         )
         v_layout.addWidget(self.cfg_slider)
         
-        layout.addWidget(voice_group)
+        voice_collapsible.add_layout(v_layout)
+        layout.addWidget(voice_collapsible)
         
-        fx_group = QGroupBox("Voice Effects (Post-Process)")
-        f_layout = QVBoxLayout(fx_group)
+        # MCCC: Collapsible Voice Effects (Advanced - Start Collapsed)
+        fx_collapsible = CollapsibleFrame("Voice Effects (Post-Process)", start_open=False)
+        f_layout = QVBoxLayout()
         
         self.pitch_slider = QLabeledSlider(
             "Pitch Shift:", -12.0, 12.0, self.state.settings.pitch_shift, step=0.5,
@@ -306,7 +313,8 @@ class GenerationView(QWidget):
         )
         f_layout.addWidget(self.treble_slider)
         
-        layout.addWidget(fx_group)
+        fx_collapsible.add_layout(f_layout)
+        layout.addWidget(fx_collapsible)
 
         # Advanced Settings Moved to Config Tab (MCCC Architecture)
         layout.addStretch()
@@ -538,8 +546,9 @@ class GenerationView(QWidget):
              QMessageBox.critical(self, "Error", "Failed to save voice.")
 
     def setup_preview(self, layout: QVBoxLayout) -> None:
-        preview_group = QGroupBox("Test Voice Settings")
-        p_layout = QVBoxLayout(preview_group)
+        # MCCC: Collapsible Test Voice Settings
+        preview_collapsible = CollapsibleFrame("Test Voice Settings", start_open=True)
+        p_layout = QVBoxLayout()
         
         # Sample Text
         p_layout.addWidget(QLabel("Sample Text:"))
@@ -562,7 +571,8 @@ class GenerationView(QWidget):
         self.preview_btn.clicked.connect(self.generate_preview)
         p_layout.addWidget(self.preview_btn)
         
-        layout.addWidget(preview_group)
+        preview_collapsible.add_layout(p_layout)
+        layout.addWidget(preview_collapsible)
 
     def generate_preview(self) -> None:
         text = self.sample_text_edit.toPlainText()
