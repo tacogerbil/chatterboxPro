@@ -18,12 +18,16 @@ class GenerationSettings:
     
     # ASR Settings
     asr_validation_enabled: bool = True
-    asr_threshold: float = 0.85
+    asr_threshold: float = 0.98  # Raised from 0.85 for stricter quality control
+    
+    # Auto-Expression Settings (Optional Enhancement)
+    auto_expression_enabled: bool = False
+    expression_sensitivity: float = 1.0  # Multiplier for expression adjustments (0.5-2.0)
     
     # Processing Settings
     disable_watermark: bool = True
     chunking_enabled: bool = True
-    max_chunk_chars: int = 290
+    max_chunk_chars: int = 400  # Increased from 290 for better Chatterbox prosody (Phase 2)
     silence_duration: int = 250
     chapter_buffer_before_ms: int = 1500 # Default before chapter
     chapter_buffer_after_ms: int = 2000 # Default after chapter

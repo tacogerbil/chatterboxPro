@@ -23,8 +23,8 @@ DEFAULT_CHANNELS = 1  # Mono (TTS is typically mono)
 # ============================================================================
 
 # Chunking Parameters
-MAX_CHUNK_CHARS = 250  # Optimal chunk size for TTS processing (balances quality vs speed)
-MIN_CHUNK_CHARS = 50  # Minimum viable chunk size
+MAX_CHUNK_CHARS = 400  # Optimal for Chatterbox prosody (Phase 2: increased from 250)
+MIN_CHUNK_CHARS = 200  # Minimum for maintaining context
 LONG_SENTENCE_THRESHOLD = 400  # Sentences longer than this are split at punctuation
 
 # Sentence Splitting

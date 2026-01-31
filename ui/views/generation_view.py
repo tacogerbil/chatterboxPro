@@ -169,15 +169,53 @@ class GenerationView(QWidget):
         
         v_layout.addLayout(src_form)
         
+        # --- Voice Presets (Phase 3 Quality Improvement) ---
+        preset_label = QLabel("Voice Preset:")
+        preset_label.setToolTip("Quick presets for different content types. Adjusts temperature and exaggeration automatically.")
+        
+        self.preset_combo = QComboBox()
+        from utils.voice_presets import get_preset_names, get_preset_description
+        preset_names = ["Custom"] + get_preset_names()
+        self.preset_combo.addItems(preset_names)
+        self.preset_combo.setCurrentText("Custom")
+        self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
+        
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(preset_label)
+        preset_row.addWidget(self.preset_combo, 1)
+        v_layout.addLayout(preset_row)
+        
+        # Preset description label
+        self.preset_desc_label = QLabel("")
+        self.preset_desc_label.setWordWrap(True)
+        self.preset_desc_label.setStyleSheet("color: gray; font-size: 9pt; padding: 2px;")
+        v_layout.addWidget(self.preset_desc_label)
+        
+        # --- Auto-Expression Detection (Optional Enhancement) ---
+        self.auto_expression_checkbox = QCheckBox("Auto-adjust expression for dialogue")
+        self.auto_expression_checkbox.setToolTip(
+            "Automatically adjusts exaggeration and temperature based on:\n"
+            "• Quoted dialogue (more expressive)\n"
+            "• Exclamation marks (excitement)\n"
+            "• Question marks (curiosity)\n"
+            "• ALL CAPS (shouting)\n"
+            "• Ellipsis (hesitation)"
+        )
+        self.auto_expression_checkbox.setChecked(getattr(self.state.settings, 'auto_expression_enabled', False))
+        self.auto_expression_checkbox.stateChanged.connect(
+            lambda state: setattr(self.state.settings, 'auto_expression_enabled', state == 2)
+        )
+        v_layout.addWidget(self.auto_expression_checkbox)
+        
+        # --- Voice Parameters ---
+        
         # --- Sliders ---
         self.exag_slider = QLabeledSlider(
             "Exaggeration:", 0.0, 1.0, self.state.settings.exaggeration,
             left_label="Monotone", right_label="Expressive"
         )
         self.exag_slider.setToolTip("Emotional intensity. 0.0 = flat/monotone, 0.5 = neutral, 1.0 = very expressive")
-        self.exag_slider.value_changed.connect(
-            lambda v: setattr(self.state.settings, 'exaggeration', v)
-        )
+        self.exag_slider.value_changed.connect(self._on_exag_changed)
         v_layout.addWidget(self.exag_slider)
         
         self.speed_slider = QLabeledSlider(
@@ -195,9 +233,7 @@ class GenerationView(QWidget):
             left_label="Consistent", right_label="Varied"
         )
         self.temp_slider.setToolTip("Creativity/randomness. Lower = consistent/robotic, Higher = varied/natural.")
-        self.temp_slider.value_changed.connect(
-            lambda v: setattr(self.state.settings, 'temperature', v)
-        )
+        self.temp_slider.value_changed.connect(self._on_temp_changed)
         v_layout.addWidget(self.temp_slider)
 
         self.cfg_slider = QLabeledSlider(
@@ -310,6 +346,109 @@ class GenerationView(QWidget):
         if path:
             self.ref_audio_edit.setText(path)
             self.state.ref_audio_path = path
+            
+            # Validate reference audio quality (Phase 1 Quality Improvement)
+            self._validate_and_show_reference_quality(path)
+    
+    def _validate_and_show_reference_quality(self, audio_path: str) -> None:
+        """
+        Validates reference audio and shows feedback to user.
+        Phase 1 Quality Improvement: Prevent bad reference audio.
+        """
+        from utils.reference_validator import (
+            validate_reference_audio,
+            get_validation_summary,
+            get_quick_fixes
+        )
+        
+        is_valid, errors, warnings = validate_reference_audio(audio_path)
+        
+        if not is_valid:
+            # Show errors
+            summary = get_validation_summary(errors, warnings)
+            fixes = get_quick_fixes(errors, warnings)
+            
+            message = f"{summary}\n\n📝 Suggested Fixes:\n"
+            for i, fix in enumerate(fixes, 1):
+                message += f"{i}. {fix}\n"
+            
+            QMessageBox.warning(
+                self,
+                "Reference Audio Quality Issues",
+                message
+            )
+        elif warnings:
+            # Show warnings (non-blocking)
+            summary = get_validation_summary(errors, warnings)
+            fixes = get_quick_fixes(errors, warnings)
+            
+            message = f"{summary}\n\n📝 Suggested Improvements:\n"
+            for i, fix in enumerate(fixes, 1):
+                message += f"{i}. {fix}\n"
+            message += "\nYou can proceed, but quality may be improved by addressing these warnings."
+            
+            QMessageBox.information(
+                self,
+                "Reference Audio Suggestions",
+                message
+            )
+        else:
+            # All good!
+            QMessageBox.information(
+                self,
+                "Reference Audio Validated",
+                "✅ Reference audio is excellent quality!\n\nDuration, sample rate, and clarity are all optimal for Chatterbox."
+            )
+    
+    def _on_preset_changed(self, preset_name: str) -> None:
+        """
+        Handles voice preset selection.
+        Phase 3 Quality Improvement: Quick preset switching.
+        """
+        if preset_name == "Custom":
+            self.preset_desc_label.setText("")
+            return
+        
+        from utils.voice_presets import get_preset_by_name, apply_preset_to_state
+        
+        preset = get_preset_by_name(preset_name)
+        
+        # Update description
+        self.preset_desc_label.setText(f"📝 {preset.description}")
+        
+        # Apply preset to state
+        apply_preset_to_state(preset, self.state.settings)
+        
+        # Update sliders (block signals to prevent triggering "Custom")
+        self.exag_slider.blockSignals(True)
+        self.temp_slider.blockSignals(True)
+        
+        self.exag_slider.set_value(preset.exaggeration)
+        self.temp_slider.set_value(preset.temperature)
+        
+        self.exag_slider.blockSignals(False)
+        self.temp_slider.blockSignals(False)
+    
+    def _on_manual_slider_change(self) -> None:
+        """
+        Called when user manually adjusts sliders.
+        Switches preset to "Custom" if not already.
+        """
+        if hasattr(self, 'preset_combo') and self.preset_combo.currentText() != "Custom":
+            self.preset_combo.blockSignals(True)
+            self.preset_combo.setCurrentText("Custom")
+            self.preset_desc_label.setText("")
+            self.preset_combo.blockSignals(False)
+    
+    def _on_exag_changed(self, value: float) -> None:
+        """Handles exaggeration slider changes."""
+        setattr(self.state.settings, 'exaggeration', value)
+        self._on_manual_slider_change()
+    
+    def _on_temp_changed(self, value: float) -> None:
+        """Handles temperature slider changes."""
+        setattr(self.state.settings, 'temperature', value)
+        self._on_manual_slider_change()
 
     def load_voice_from_combo(self) -> None:
         name = self.voice_load_combo.currentText()

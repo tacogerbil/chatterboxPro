@@ -17,6 +17,7 @@ import soundfile as sf
 from chatterbox.tts import ChatterboxTTS
 import whisper
 from utils.pedalboard_processor import apply_pedalboard_effects # MCCC: Use external processor
+from utils.artifact_detector import detect_audio_artifacts, get_artifact_description
 # --- DEBUG: ASK PYTHON WHERE FFMPEG IS ---
 print(f"\n[DEBUG] Python executable: {sys.executable}")
 ffmpeg_location = shutil.which("ffmpeg")
@@ -355,6 +356,28 @@ def worker_process_chunk(task: WorkerTask):
 
 
         try:
+            # --- Auto-Expression Detection (Optional Enhancement) ---
+            # Dynamically adjust exaggeration/temperature based on text content
+            auto_expression_enabled = getattr(settings, 'auto_expression_enabled', False)
+            if auto_expression_enabled:
+                from utils.expression_analyzer import get_expression_adjustment
+                
+                sensitivity = getattr(settings, 'expression_sensitivity', 1.0)
+                adjusted_temp, adjusted_exag, reason = get_expression_adjustment(
+                    text_chunk,
+                    temperature,
+                    exaggeration,
+                    sensitivity
+                )
+                
+                # Log if adjustments were made
+                if adjusted_temp != temperature or adjusted_exag != exaggeration:
+                    logging.info(f"Auto-expression: {reason}")
+                    logging.info(f"  Adjusted temp {temperature:.2f}→{adjusted_temp:.2f}, exag {exaggeration:.2f}→{adjusted_exag:.2f}")
+                    temperature = adjusted_temp
+                    exaggeration = adjusted_exag
+            
+            # --- TTS Generation ---
             wav_tensor = tts_engine.generate(
                 text_chunk, 
                 ref_audio_path,
@@ -517,6 +540,25 @@ def worker_process_chunk(task: WorkerTask):
         
         if ratio >= asr_threshold:
             logging.info(f"ASR PASSED for chunk #{sentence_number}, attempt {attempt_num+1} (Sim: {ratio:.2f})")
+            
+            # --- Audio Artifact Detection (Phase 1 Quality Improvement) ---
+            # Check for swooshes, clicks, muffled audio that ASR might miss
+            is_clean, artifact_type, confidence = detect_audio_artifacts(temp_path_str, text_chunk)
+            
+            if not is_clean:
+                artifact_desc = get_artifact_description(artifact_type)
+                logging.warning(f"ARTIFACT DETECTED for chunk #{sentence_number}, attempt {attempt_num+1}: {artifact_desc} (confidence: {confidence:.2f})")
+                
+                # Treat as failed attempt, track as best failure if better than existing
+                if best_failed_candidate is None or ratio > best_failed_candidate['similarity_ratio']:
+                    if best_failed_candidate and Path(best_failed_candidate['path']).exists():
+                        os.remove(best_failed_candidate['path'])
+                    best_failed_candidate = current_candidate_data
+                else:
+                    os.remove(temp_path_str)
+                continue
+            
+            # All validations passed
             passed_candidates.append(current_candidate_data)
         else:
             logging.warning(f"ASR FAILED for chunk #{sentence_number}, attempt {attempt_num+1} (Sim: {ratio:.2f})")

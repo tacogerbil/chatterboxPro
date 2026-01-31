@@ -86,6 +86,14 @@ class TextPreprocessor:
             rf'^\s*(chapter\s+([ivxlcdm]+|\d+|{number_words_pattern})|prologue|epilogue)',
             re.IGNORECASE
         )
+        
+        # --- Pronunciation Dictionary (Optional Enhancement) ---
+        # Initialize pronunciation dictionary
+        try:
+            from utils.pronunciation_dict import create_default_dictionary
+            self.pronunciation_dict = create_default_dictionary()
+        except Exception:
+            self.pronunciation_dict = None
 
     def remove_accents(self, text: str) -> str:
         """
@@ -180,8 +188,31 @@ class TextPreprocessor:
         # Fallback: if no chunks created, return original
         return chunks if chunks else [sentence]
 
-    def group_sentences_into_chunks(self, sentences, max_chars=250):
-        """Groups individual sentences into larger chunks for TTS processing."""
+    def group_sentences_into_chunks(self, sentences, max_chars=400):
+        """
+        Groups individual sentences into larger chunks for TTS processing.
+        Phase 2 Quality Improvement: Uses semantic chunking (400 chars) for better Chatterbox prosody.
+        """
+        from utils.semantic_chunker import semantic_chunk_sentences, get_chunking_stats
+        import logging
+        
+        # Use semantic chunking
+        chunks = semantic_chunk_sentences(
+            sentences,
+            target_chars=max_chars,
+            min_chars=200,
+            max_chars=500
+        )
+        
+        # Log stats
+        stats = get_chunking_stats(chunks)
+        if stats['total_chunks'] > 0:
+            logging.info(f"Semantic chunking: {stats['total_chunks']} chunks, avg {stats['avg_length']:.0f} chars")
+        
+        return chunks
+        
+        # OLD CHUNKING LOGIC BELOW (kept for reference, not executed)
+        """
         chunks, current_chunk_items, current_chunk_text = [], [], ""
         
         def finalize_chunk(items):
@@ -280,6 +311,14 @@ class TextPreprocessor:
 
     def preprocess_text(self, text, is_edited_text=False, aggressive_clean=False):
         """Splits raw text into sentences and identifies paragraph breaks."""
+        # --- Pronunciation Dictionary (Optional Enhancement) ---
+        # Apply custom pronunciations before other processing
+        if self.pronunciation_dict:
+            text, replacements = self.pronunciation_dict.apply_pronunciations(text)
+            if replacements:
+                import logging
+                logging.info(f"Applied pronunciations: {', '.join(replacements)}")
+        
         if aggressive_clean:
             text = self.clean_text_aggressively(text)
         
