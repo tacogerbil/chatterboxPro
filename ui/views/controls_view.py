@@ -81,14 +81,14 @@ class ControlsView(QWidget):
         self.search_edit.returnPressed.connect(self._search)
         s_layout.addWidget(self.search_edit)
         
-        btn_s_prev = QPushButton("←")
+        btn_s_prev = QPushButton("◄")
         btn_s_prev.setFixedWidth(40)
-        btn_s_prev.setStyleSheet("padding: 2px;")
+        btn_s_prev.setStyleSheet("padding: 2px; font-size: 16px; font-weight: bold;")
         btn_s_prev.clicked.connect(self._search_prev)
         
-        btn_s_next = QPushButton("→")
+        btn_s_next = QPushButton("►")
         btn_s_next.setFixedWidth(40)
-        btn_s_next.setStyleSheet("padding: 2px;")
+        btn_s_next.setStyleSheet("padding: 2px; font-size: 16px; font-weight: bold;")
         btn_s_next.clicked.connect(self._search_next)
         
         s_layout.addWidget(btn_s_prev)
