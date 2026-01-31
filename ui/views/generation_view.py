@@ -469,6 +469,13 @@ class GenerationView(QWidget):
                  path = data['ref_audio_path']
                  self.state.ref_audio_path = path
                  self.ref_audio_edit.setText(path)
+             
+             # 3. Restore Voice Preset (if present)
+             if 'voice_preset' in data:
+                 preset_name = data['voice_preset']
+                 idx = self.preset_combo.findText(preset_name)
+                 if idx >= 0:
+                     self.preset_combo.setCurrentIndex(idx)
                  
              self.state.voice_name = name # Update State
              self.refresh_values()
@@ -498,7 +505,8 @@ class GenerationView(QWidget):
         voice_keys = [
             'exaggeration', 'speed', 'temperature', 'pitch_shift', 
             'timbre_shift', 'gruffness', 'bass_boost', 'treble_boost',
-            'cfg_weight', 'tts_engine', 'model_path'
+            'cfg_weight', 'tts_engine', 'model_path', 'auto_expression_enabled',
+            'expression_sensitivity'
         ]
         
         data = {k: all_settings[k] for k in voice_keys if k in all_settings}
@@ -506,9 +514,19 @@ class GenerationView(QWidget):
         # Inject ref audio (Crucial for voice identity)
         data['ref_audio_path'] = self.state.ref_audio_path
         
+        # Save current voice preset selection
+        data['voice_preset'] = self.preset_combo.currentText()
+        
         if self.template_service.save_template(name, data):
              QMessageBox.information(self, "Saved", f"Voice '{name}' saved.")
-             self.populate_voices() 
+             
+             # Preserve current loader selection
+             current_loader = self.voice_load_combo.currentText()
+             self.populate_voices()
+             # Restore loader selection
+             idx = self.voice_load_combo.findText(current_loader)
+             if idx >= 0:
+                 self.voice_load_combo.setCurrentIndex(idx) 
         else:
              QMessageBox.critical(self, "Error", "Failed to save voice.")
 

@@ -130,13 +130,19 @@ class SetupView(QWidget):
         
         self.lbl_ref_audio = QLabel("--")
         self.lbl_voice_name = QLabel("--") # New
+        self.lbl_voice_preset = QLabel("--")
         self.lbl_exaggeration = QLabel("--")
         self.lbl_temp = QLabel("--")
+        self.lbl_speed = QLabel("--")
+        self.lbl_auto_expression = QLabel("--")
         
         f_layout.addRow("Voice Profile:", self.lbl_voice_name) # New
+        f_layout.addRow("Voice Preset:", self.lbl_voice_preset)
         f_layout.addRow("Reference Audio:", self.lbl_ref_audio)
         f_layout.addRow("Exaggeration:", self.lbl_exaggeration)
         f_layout.addRow("Temperature:", self.lbl_temp)
+        f_layout.addRow("Speed:", self.lbl_speed)
+        f_layout.addRow("Auto-Expression:", self.lbl_auto_expression)
         
         # Edit Button to jump to Generation Tab? (Optional, kept simpler for now)
         layout.addWidget(group)
@@ -154,6 +160,19 @@ class SetupView(QWidget):
         s = self.state.settings
         self.lbl_exaggeration.setText(f"{s.exaggeration:.2f}")
         self.lbl_temp.setText(f"{s.temperature:.2f}")
+        self.lbl_speed.setText(f"{s.speed:.2f}x")
+        
+        # Voice Preset (from generation view if available)
+        preset = getattr(s, 'voice_preset', 'Custom')
+        self.lbl_voice_preset.setText(preset)
+        
+        # Auto-Expression
+        auto_expr = getattr(s, 'auto_expression_enabled', False)
+        sensitivity = getattr(s, 'expression_sensitivity', 1.0)
+        if auto_expr:
+            self.lbl_auto_expression.setText(f"Enabled (Sensitivity: {sensitivity:.1f})")
+        else:
+            self.lbl_auto_expression.setText("Disabled")
 
     def showEvent(self, event) -> None:
         """Auto-refresh on tab show."""
@@ -350,7 +369,9 @@ class SetupView(QWidget):
         self.project_service.save_session(self.state.session_name, {
             "source_file_path": self.state.source_file_path,
             "sentences": self.state.sentences,
-            "generation_settings": dataclasses.asdict(self.state.settings)
+            "generation_settings": dataclasses.asdict(self.state.settings),
+            "ref_audio_path": self.state.ref_audio_path,
+            "voice_preset": getattr(self.state.settings, 'voice_preset', 'Custom')
         })
 
     def new_session(self) -> None:
@@ -383,6 +404,15 @@ class SetupView(QWidget):
                 
                 if 'generation_settings' in data:
                      self.state.update_settings(**data['generation_settings'])
+                
+                # Restore ref_audio_path
+                if 'ref_audio_path' in data:
+                    self.state.ref_audio_path = data['ref_audio_path']
+                
+                # Restore voice_preset (stored separately from settings)
+                if 'voice_preset' in data:
+                    # This will be picked up by Key Parameters display
+                    setattr(self.state.settings, 'voice_preset', data['voice_preset'])
                 
                 self.session_updated.emit() # Refresh other views
                 
