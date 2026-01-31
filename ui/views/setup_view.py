@@ -211,12 +211,32 @@ class SetupView(QWidget):
         c_layout.addWidget(self.auto_asm_chk)
 
         # Auto Regen
+        # Auto Regen Row
+        reg_layout = QHBoxLayout()
         self.auto_reg_chk = QCheckBox("Continue to Regenerate until all files pass")
-        self.auto_reg_chk.setChecked(self.state.auto_regen_main)
+        self.auto_reg_chk.setChecked(getattr(self.state, 'auto_regen_main', False))
         self.auto_reg_chk.stateChanged.connect(
             lambda s: setattr(self.state, 'auto_regen_main', s == Qt.Checked or s == 2)
         )
-        c_layout.addWidget(self.auto_reg_chk)
+        
+        # ASR Info Label (User Request)
+        s = self.state.settings
+        self.lbl_auto_reg_info = QLabel(f"(Max Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
+        self.lbl_auto_reg_info.setStyleSheet("color: gray; font-size: 8pt; margin-left: 5px;")
+        
+        reg_layout.addWidget(self.auto_reg_chk)
+        reg_layout.addWidget(self.lbl_auto_reg_info)
+        reg_layout.addStretch()
+        
+        c_layout.addLayout(reg_layout)
+
+    def refresh_values(self) -> None:
+        """Updates UI based on state changes."""
+        s = self.state.settings
+        if hasattr(self, 'lbl_auto_reg_info'):
+            self.lbl_auto_reg_info.setText(f"(Max Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
+        if hasattr(self, 'auto_reg_chk'):
+            self.auto_reg_chk.setChecked(getattr(self.state, 'auto_regen_main', False))
 
         # Dual GPU Checkbox (Conditional)
         try:

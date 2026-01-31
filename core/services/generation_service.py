@@ -479,7 +479,7 @@ class GenerationService(QObject):
             cfg_weight=s.cfg_weight,
             disable_watermark=s.disable_watermark,
             num_candidates=1,
-            max_attempts=1,
+            max_attempts=s.max_attempts,
             bypass_asr=True, # skip ASR for preview speed
             session_name="_preview",
             run_idx=0,

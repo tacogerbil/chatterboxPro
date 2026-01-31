@@ -80,8 +80,12 @@ class GenerationView(QWidget):
         self.setup_header(layout)
         self.setup_sliders(layout)
         # Advanced Settings moved to ConfigView
-        layout.addStretch()
+        
+        # MCCC: Logic Swap - Test Voice (Preview) moved ABOVE Voice Save
         self.setup_preview(layout)
+        # Voice Save moved to bottom
+        self.setup_voice_save(layout)
+        
         layout.addStretch()
     
     def setup_header(self, layout: QVBoxLayout) -> None:
@@ -306,7 +310,8 @@ class GenerationView(QWidget):
         # Advanced Settings Moved to Config Tab (MCCC Architecture)
         layout.addStretch()
         
-        # --- Voice Save Section (New) ---
+    def setup_voice_save(self, layout: QVBoxLayout) -> None:
+        # --- Voice Save Section (Moved from Sliders) ---
         save_group = QGroupBox("Voice Save")
         s_layout = QHBoxLayout(save_group)
         
@@ -323,6 +328,7 @@ class GenerationView(QWidget):
         s_layout.addWidget(self.save_voice_btn)
         
         layout.addWidget(save_group)
+        # We need to populate voices here, or rely on initial populate
         self.populate_voices()
 
     def populate_voices(self) -> None:
@@ -543,6 +549,12 @@ class GenerationView(QWidget):
         # Theme handled globally by qt-material
         p_layout.addWidget(self.sample_text_edit)
         
+        # ASR Feedback Label (User Request)
+        self.lbl_preview_retries = QLabel("ASR Max Retries: ?")
+        self.lbl_preview_retries.setStyleSheet("color: gray; font-size: 8pt;")
+        self.lbl_preview_retries.setAlignment(Qt.AlignRight)
+        p_layout.addWidget(self.lbl_preview_retries)
+        
         # Preview Button
         self.preview_btn = QPushButton("▶ Generate Preview")
         self.preview_btn.setStyleSheet("background-color: #27AE60; color: white; font-weight: bold; padding: 10px;")
@@ -592,6 +604,9 @@ class GenerationView(QWidget):
         if hasattr(self, 'asr_thresh'): self.asr_thresh.set_value(s.asr_threshold)
         if hasattr(self, 'chk_watermark'): self.chk_watermark.setChecked(s.disable_watermark)
         
+        # Update ASR feedback label
+        if hasattr(self, 'lbl_preview_retries'):
+             self.lbl_preview_retries.setText(f"ASR Max Retries: {s.max_attempts} | Threshold: {int(s.asr_threshold*100)}%")
         
         # GPU, Seed, Candidates moved to ConfigView - no longer in GenerationView
 

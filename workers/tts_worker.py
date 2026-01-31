@@ -598,6 +598,8 @@ def worker_process_chunk(task: WorkerTask):
         ratio_str = f"{best_failed_candidate.get('similarity_ratio', 0.0):.2f}"
         logging.warning(f"No candidates passed. Using best failure (Sim: {ratio_str}) as placeholder.")
         chosen_candidate = best_failed_candidate
+        # MCCC: Explicitly report ASR failure reason so UI can show it
+        return_payload["error_message"] = f"ASR Failed (Best Sim: {float(ratio_str)*100:.1f}%)"
         status = "failed_placeholder"
     
     # --- Finalize and Cleanup ---

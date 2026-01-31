@@ -192,6 +192,21 @@ class ChaptersView(QWidget):
         header_layout.addWidget(QLabel("Detected Chapters (Double-click to Jump)"))
         header_layout.addStretch()
         
+        # Auto-loop Checkbox (Moved to Header)
+        s = self.app_state.settings
+        self.auto_loop_chk = QCheckBox("Auto-loop")
+        self.auto_loop_chk.setToolTip("Automatically regenerate until success")
+        self.auto_loop_chk.setChecked(getattr(self.app_state, 'auto_regen_main', False))
+        self.auto_loop_chk.stateChanged.connect(
+            lambda s: setattr(self.app_state, 'auto_regen_main', s == Qt.Checked or s == 2)
+        )
+        
+        self.lbl_auto_loop_info = QLabel(f"(Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
+        self.lbl_auto_loop_info.setStyleSheet("color: gray; font-size: 8pt; margin-right: 10px;")
+
+        header_layout.addWidget(self.auto_loop_chk)
+        header_layout.addWidget(self.lbl_auto_loop_info)
+
         refresh_btn = QPushButton("↻ Refresh")
         refresh_btn.setToolTip("Rescan source text for chapters")
         refresh_btn.clicked.connect(self.model.refresh)
@@ -254,14 +269,9 @@ class ChaptersView(QWidget):
         
         footer_layout.addStretch()
         
-        # Auto-loop Checkbox
-        self.auto_loop_chk = QCheckBox("Auto-loop")
-        self.auto_loop_chk.setToolTip("Automatically regenerate until success (Warning: Infinite Loop possible)")
-        self.auto_loop_chk.setChecked(self.app_state.auto_regen_main)
-        self.auto_loop_chk.stateChanged.connect(
-            lambda s: setattr(self.app_state, 'auto_regen_main', s == Qt.Checked or s == 2)
-        )
-        footer_layout.addWidget(self.auto_loop_chk)
+        
+        # Auto-loop Checkbox moved to Header
+
         
         # Generate Selected button
         self.gen_btn = QPushButton("Generate Selected")
@@ -299,6 +309,16 @@ class ChaptersView(QWidget):
             p.setColor(QPalette.Text, QColor("#000000"))       # Black Text
             
         self.list_view.setPalette(p)
+
+    def refresh_values(self) -> None:
+        """Updates UI based on state changes."""
+        s = self.app_state.settings
+        if hasattr(self, 'lbl_auto_loop_info'):
+            self.lbl_auto_loop_info.setText(f"(Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
+        if hasattr(self, 'auto_loop_chk'):
+             self.auto_loop_chk.setChecked(getattr(self.app_state, 'auto_regen_main', False))
+            
+
 
         
 
