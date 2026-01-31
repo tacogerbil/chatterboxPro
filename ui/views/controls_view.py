@@ -81,8 +81,8 @@ class ControlsView(QWidget):
         self.search_edit.returnPressed.connect(self._search)
         s_layout.addWidget(self.search_edit)
         
-        btn_s_prev = QPushButton("<"); btn_s_prev.setFixedWidth(30); btn_s_prev.clicked.connect(self._search_prev)
-        btn_s_next = QPushButton(">"); btn_s_next.setFixedWidth(30); btn_s_next.clicked.connect(self._search_next)
+        btn_s_prev = QPushButton("Prev"); btn_s_prev.setFixedWidth(50); btn_s_prev.clicked.connect(self._search_prev)
+        btn_s_next = QPushButton("Next"); btn_s_next.setFixedWidth(50); btn_s_next.clicked.connect(self._search_next)
         s_layout.addWidget(btn_s_prev)
         s_layout.addWidget(btn_s_next)
         
