@@ -52,7 +52,7 @@ def semantic_chunk_sentences(
             return chunk_sentences[0]
         
         # Combine multiple sentences
-        combined_text = " ".join(s['original_sentence'] for s in chunk_sentences)
+        combined_text = " ".join(s.get('original_sentence', '') for s in chunk_sentences)
         
         # Create new chunk with combined text
         chunk = {
@@ -60,9 +60,13 @@ def semantic_chunk_sentences(
             'original_sentence': combined_text,
             'tts_generated': 'no',
             'is_chapter_heading': False,
-            'is_pause': False,
-            'combined_from': [s['uuid'] for s in chunk_sentences]  # Track source
+            'is_pause': False
         }
+        
+        # Track source UUIDs if available
+        source_uuids = [s.get('uuid') for s in chunk_sentences if s.get('uuid')]
+        if source_uuids:
+            chunk['combined_from'] = source_uuids
         
         return chunk
     

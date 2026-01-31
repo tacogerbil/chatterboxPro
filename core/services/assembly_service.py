@@ -109,7 +109,7 @@ class AssemblyService(QObject):
                     # Handle pauses
                     if s_data.get("is_pause"):
                         pause_duration_ms = s_data.get("duration", 1000)
-                        pause_file = temp_dir / f"pause_{s_data['uuid']}.wav"
+                        pause_file = temp_dir / f"pause_{s_data.get('uuid', 'unknown')}.wav"
                         AudioSegment.silent(duration=int(pause_duration_ms)).export(pause_file, format="wav")
                         f.write(f"file '{pause_file.absolute()}'\n")
                         continue
@@ -117,7 +117,7 @@ class AssemblyService(QObject):
                     # Silence between chunks
                     if len(app.sentences) > 1: 
                          pause_duration = app.settings.silence_duration
-                         silence_file = temp_dir / f"silence_{s_data['uuid']}.wav"
+                         silence_file = temp_dir / f"silence_{s_data.get('uuid', 'unknown')}.wav"
                          AudioSegment.silent(duration=pause_duration).export(silence_file, format="wav")
                          f.write(f"file '{silence_file.absolute()}'\n")
 
@@ -128,11 +128,11 @@ class AssemblyService(QObject):
                     #    f.write(f"file '{chapter_silence.absolute()}'\n")
 
                     # Main Audio
-                    f_path = session_path / "Sentence_wavs" / f"audio_{s_data['uuid']}.wav"
+                    f_path = session_path / "Sentence_wavs" / f"audio_{s_data.get('uuid', 'unknown')}.wav"
                     if f_path.exists():
                         f.write(f"file '{f_path.absolute()}'\n")
                     else:
-                        logging.warning(f"Audio for {s_data['uuid']} not found.")
+                        logging.warning(f"Audio for {s_data.get('uuid', 'unknown')} not found.")
             
             # Check file count
             with open(concat_list_path, 'r') as f:

@@ -218,7 +218,7 @@ class TextPreprocessor:
         def finalize_chunk(items):
             if not items: return None
             is_chapter = len(items) == 1 and items[0].get('is_chapter_heading', False)
-            final_text = " ".join(item['original_sentence'] for item in items)
+            final_text = " ".join(item.get('original_sentence', '') for item in items)
             
             return {
                 "uuid": uuid.uuid4().hex,
@@ -231,7 +231,7 @@ class TextPreprocessor:
             }
 
         for sentence_data in sentences:
-            sentence_text = sentence_data['original_sentence']
+            sentence_text = sentence_data.get('original_sentence', '')
 
             if sentence_data.get('is_chapter_heading'):
                 if current_chunk_items:

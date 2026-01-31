@@ -268,7 +268,7 @@ class GenerationService(QObject):
         if hasattr(self.state, 'generation_order') and self.state.generation_order == "In Order":
              sorted_indices = sorted(indices, key=lambda i: int(self.state.sentences[i].get('sentence_number', 0)))
         else:
-             sorted_indices = sorted(indices, key=lambda i: len(self.state.sentences[i]['original_sentence']), reverse=True)
+             sorted_indices = sorted(indices, key=lambda i: len(self.state.sentences[i].get('original_sentence', '')), reverse=True)
         
         for i, original_idx in enumerate(sorted_indices):
             sentence_data = self.state.sentences[original_idx]
@@ -277,11 +277,11 @@ class GenerationService(QObject):
                 task_index=i,
                 original_index=original_idx,
                 sentence_number=int(sentence_data.get('sentence_number', i+1)),
-                uuid=sentence_data['uuid'],
+                uuid=sentence_data.get('uuid', uuid.uuid4().hex),
                 session_name=self.state.session_name,
                 run_idx=0, # flattened
                 output_dir_str=outputs_dir,
-                text_chunk=punc_norm(sentence_data['original_sentence']),
+                text_chunk=punc_norm(sentence_data.get('original_sentence', '')),
                 ref_audio_path=self.state.ref_audio_path if self.state.ref_audio_path and self.state.ref_audio_path.strip() else None,
                 device_str=devices[i % len(devices)],
                 master_seed=run_seed,
