@@ -5,28 +5,27 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 class TemplateService:
-    def __init__(self, templates_dir: str = None):
+    def __init__(self, templates_dir: str = "Templates"):
         """
         Initialize template service.
         
         Args:
-            templates_dir: Path to templates directory. If None, uses project-relative default.
+            templates_dir: Path to templates directory relative to working directory.
         """
-        if templates_dir is None:
-            # Get project root (parent of 'core' directory)
-            project_root = Path(__file__).parent.parent
-            templates_dir = project_root / "Templates"
-        
         self.templates_dir = Path(templates_dir)
         self.templates_dir.mkdir(exist_ok=True, parents=True)
 
     def list_templates(self) -> List[str]:
         """Returns a sorted list of template names (without extension)."""
         try:
-            files = self.templates_dir.glob("*.json")
-            return sorted([f.stem for f in files])
+            logging.debug(f"Looking for templates in: {self.templates_dir}")
+            files = list(self.templates_dir.glob("*.json"))
+            logging.debug(f"Found {len(files)} template files: {[f.name for f in files]}")
+            result = sorted([f.stem for f in files])
+            logging.debug(f"Returning template names: {result}")
+            return result
         except Exception as e:
-            logging.error(f"Failed to list templates: {e}")
+            logging.error(f"Failed to list templates: {e}", exc_info=True)
             return []
 
     def load_template(self, name: str) -> Optional[Dict]:
