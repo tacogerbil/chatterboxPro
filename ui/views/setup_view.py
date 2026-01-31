@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, QHBoxLayout, 
-    QFileDialog, QMessageBox, QLabel, QGroupBox, QComboBox, QCheckBox, QLayout
+    QFileDialog, QMessageBox, QLabel, QGroupBox, QComboBox, QCheckBox, QLayout,
+    QScrollArea
 )
 from PySide6.QtCore import Qt, Signal
 from typing import Optional, List, Dict, Any
@@ -49,7 +49,16 @@ class SetupView(QWidget):
         self.check_system()
 
     def setup_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        
         self.setup_header(layout)
         self.setup_session_controls(layout)
         self.setup_processing_controls(layout)
@@ -58,6 +67,9 @@ class SetupView(QWidget):
         self.setup_main_controls(layout)
         self.setup_system_check(layout)
         layout.addStretch()
+        
+        scroll.setWidget(container)
+        main_layout.addWidget(scroll)
 
     def setup_header(self, layout: QVBoxLayout) -> None:
         # --- Session Header ---
