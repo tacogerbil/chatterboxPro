@@ -1,3 +1,4 @@
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, QHBoxLayout, 
     QFileDialog, QMessageBox, QLabel, QGroupBox, QComboBox, QCheckBox, QLayout,
     QScrollArea
