@@ -19,8 +19,51 @@ class ConfigView(QWidget):
     def __init__(self, parent: Optional[QWidget] = None, app_state = None) -> None:
         super().__init__(parent)
         self.state = app_state
-        # self.settings = QSettings("ChatterboxPro", "ThemeConfig") # REMOVED MCCC Violation
         self.setup_ui()
+
+    def showEvent(self, event) -> None:
+        """Refresh UI from state whenever tab is opened."""
+        self.refresh_ui()
+        super().showEvent(event)
+
+    def refresh_ui(self) -> None:
+        """Updates all widgets to match current AppState."""
+        s = self.state.settings
+        
+        # Block signals to prevent feedback loops during update
+        self.spin_buf_before.blockSignals(True)
+        self.spin_buf_after.blockSignals(True)
+        self.gpu_edit.blockSignals(True)
+        self.order_combo.blockSignals(True)
+        self.seed_spin.blockSignals(True)
+        self.outputs_spin.blockSignals(True)
+        self.retries_spin.blockSignals(True)
+        self.chk_asr.blockSignals(True)
+        self.asr_thresh.blockSignals(True)
+        self.chk_watermark.blockSignals(True)
+        
+        try:
+            self.spin_buf_before.setValue(s.chapter_buffer_before_ms)
+            self.spin_buf_after.setValue(s.chapter_buffer_after_ms)
+            self.gpu_edit.setText(s.target_gpus)
+            self.order_combo.setCurrentText(s.generation_order)
+            self.seed_spin.setValue(s.master_seed)
+            self.outputs_spin.setValue(s.num_full_outputs)
+            self.retries_spin.setValue(s.max_attempts)
+            self.chk_asr.setChecked(s.asr_validation_enabled)
+            self.asr_thresh.set_value(s.asr_threshold)
+            self.chk_watermark.setChecked(s.disable_watermark)
+        finally:
+            self.spin_buf_before.blockSignals(False)
+            self.spin_buf_after.blockSignals(False)
+            self.gpu_edit.blockSignals(False)
+            self.order_combo.blockSignals(False)
+            self.seed_spin.blockSignals(False)
+            self.outputs_spin.blockSignals(False)
+            self.retries_spin.blockSignals(False)
+            self.chk_asr.blockSignals(False)
+            self.asr_thresh.blockSignals(False)
+            self.chk_watermark.blockSignals(False)
         
     def setup_ui(self) -> None:
         layout = QVBoxLayout(self)

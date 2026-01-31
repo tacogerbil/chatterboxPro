@@ -31,7 +31,7 @@ class GenerationSettings:
     silence_duration: int = 250
     chapter_buffer_before_ms: int = 1500 # Default before chapter
     chapter_buffer_after_ms: int = 2000 # Default after chapter
-    norm_enabled: bool = False
+    norm_enabled: bool = True  # Enable EBU R128 normalization by default
     silence_removal_enabled: bool = False
     norm_level: float = -23.0
     silence_threshold: float = 0.04

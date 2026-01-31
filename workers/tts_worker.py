@@ -427,7 +427,11 @@ def worker_process_chunk(task: WorkerTask):
 
         except Exception as e:
             logging.error(f"Generation crashed for chunk #{sentence_number}, attempt {attempt_num+1}: {e}", exc_info=True)
-            if Path(temp_path_str).exists(): os.remove(temp_path_str) # Clean up partial file
+            if Path(temp_path_str).exists(): 
+                try:
+                    os.remove(temp_path_str) # Clean up partial file
+                except OSError:
+                    pass # Best effort cleanup
             
             # GPU State Recovery: Reset CUDA state after crashes to prevent cascading errors
             if torch.cuda.is_available():
@@ -598,9 +602,27 @@ def worker_process_chunk(task: WorkerTask):
     
     # --- Finalize and Cleanup ---
     if chosen_candidate:
-        # Move the chosen file to the final destination
+        # Move the chosen file to the final destination with retry logic for file locks
         if Path(chosen_candidate['path']).exists():
-            shutil.move(chosen_candidate['path'], final_wav_path)
+            # Windows file lock handling: retry with delays
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    shutil.copy2(chosen_candidate['path'], final_wav_path)
+                    os.remove(chosen_candidate['path'])
+                    break
+                except PermissionError as e:
+                    if attempt < max_retries - 1:
+                        logging.warning(f"File lock detected, retrying in 0.5s (attempt {attempt+1}/{max_retries}): {e}")
+                        import time
+                        time.sleep(0.5)
+                    else:
+                        logging.error(f"Failed to move file after {max_retries} attempts: {e}")
+                        # Copy succeeded but remove failed - file stays in temp
+                        if final_wav_path.exists():
+                            logging.info(f"File copied successfully despite lock, temp file remains: {chosen_candidate['path']}")
+                        else:
+                            raise
             
             # Apply speed adjustment if needed (FFmpeg post-processing)
             # Apply voice effects if needed (Pedalboard post-processing)
