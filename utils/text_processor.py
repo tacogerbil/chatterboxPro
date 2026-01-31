@@ -263,6 +263,7 @@ class TextPreprocessor:
             chunk['sentence_number'] = str(i + 1)
         
         return chunks
+        """
 
     def extract_text_from_file(self, file_path: str) -> str:
         """
