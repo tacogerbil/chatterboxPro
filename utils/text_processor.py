@@ -44,12 +44,43 @@ def punc_norm(text: str) -> str:
 
     # Replace uncommon/llm punc
     punc_to_replace = [
-        ("...", ", "), ("…", ", "), (":", ","), (" - ", ", "), (";", ", "),
+        ("...", ", "), ("…", ", "), (" - ", ", "), (";", ", "),
         ("—", "-"), ("–", "-"), (" ,", ","), ("“", "\""), ("”", "\""),
         ("‘", "'"), ("’", "'"),
     ]
     for old_char_sequence, new_char in punc_to_replace:
         text = text.replace(old_char_sequence, new_char)
+        
+    # Smart Colon Handling: Only replace colons NOT used in times (HH:MM)
+    # 1. Normalize times first (e.g. 06:03 -> six oh three)
+    def time_replacer(match):
+        hours, mins = match.groups()
+        # Remove leading zero from hours if present (06 -> 6)
+        h_val = int(hours)
+        
+        # Handle minutes
+        if mins.startswith('0') and mins != '00':
+            m_str = f"oh {int(mins)}"
+        elif mins == '00':
+            m_str = "o'clock"
+        else:
+            m_str = str(int(mins))
+            
+        # Reconstruct natural speech (e.g. "six oh three")
+        # Use digit-text mixed for now, TTS reads digits fine typically
+        # Or simplistic word mapping could be added, but minimal change is safer
+        # "6 03" might be read as "six zero three" by some models.
+        # "6 oh 3" is explicit.
+        if mins == '00':
+             return f"{h_val} {m_str}" # 6 o'clock
+        
+        return f"{h_val} {m_str}" # 6 15, 6 oh 3
+
+    # Regex for HH:MM (12-hr or 24-hr)
+    text = re.sub(r'\b(\d{1,2}):(\d{2})\b', time_replacer, text)
+
+    # 2. Replace remaining colons (e.g. "Note: Text") with commas
+    text = text.replace(":", ",")
 
     # Add full stop if no ending punc
     text = text.rstrip()
