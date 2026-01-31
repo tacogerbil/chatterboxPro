@@ -131,11 +131,11 @@ class GenerationView(QWidget):
         """Opens a directory picker for the model."""
         path = QFileDialog.getExistingDirectory(self, "Select Model Directory")
         if path:
-            self.state.model_path = path # FIX: Use root AppState
+            self.state.model_path = path # Root State
+            self.state.settings.model_path = path # Settings Sync
+            
             self.path_label.setText(path)
-            # Make label tooltip show full path
             self.path_label.setToolTip(path)
-            # Style: Green to indicate custom path set
             self.path_label.setStyleSheet("color: #27AE60; font-weight: bold;")
         else:
             pass
@@ -578,6 +578,16 @@ class GenerationView(QWidget):
     def refresh_values(self) -> None:
         """Updates UI elements to match current AppState settings."""
         s = self.state.settings
+        
+        # MCCC: Sync UI with State (Fixing lost Engine Config display)
+        current_path = self.state.model_path or s.model_path
+        if current_path:
+             self.path_label.setText(current_path)
+             self.path_label.setToolTip(current_path)
+             self.path_label.setStyleSheet("color: #27AE60; font-weight: bold;")
+        else:
+             self.path_label.setText("Default (system cache)")
+             self.path_label.setStyleSheet("color: gray;")
         
         self.engine_combo.blockSignals(True)
         self.engine_combo.setCurrentText(s.tts_engine)
