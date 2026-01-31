@@ -356,27 +356,6 @@ def worker_process_chunk(task: WorkerTask):
 
 
         try:
-            # --- Auto-Expression Detection (Optional Enhancement) ---
-            # Dynamically adjust exaggeration/temperature based on text content
-            auto_expression_enabled = getattr(settings, 'auto_expression_enabled', False)
-            if auto_expression_enabled:
-                from utils.expression_analyzer import get_expression_adjustment
-                
-                sensitivity = getattr(settings, 'expression_sensitivity', 1.0)
-                adjusted_temp, adjusted_exag, reason = get_expression_adjustment(
-                    text_chunk,
-                    temperature,
-                    exaggeration,
-                    sensitivity
-                )
-                
-                # Log if adjustments were made
-                if adjusted_temp != temperature or adjusted_exag != exaggeration:
-                    logging.info(f"Auto-expression: {reason}")
-                    logging.info(f"  Adjusted temp {temperature:.2f}→{adjusted_temp:.2f}, exag {exaggeration:.2f}→{adjusted_exag:.2f}")
-                    temperature = adjusted_temp
-                    exaggeration = adjusted_exag
-            
             # --- TTS Generation ---
             wav_tensor = tts_engine.generate(
                 text_chunk, 
