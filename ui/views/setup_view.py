@@ -436,7 +436,7 @@ class SetupView(QWidget):
             QMessageBox.warning(self, "No Data", "Please load or process text first.")
             return
         
-        if not self.state.settings.ref_audio_path:
+        if not self.state.ref_audio_path:
             QMessageBox.warning(self, "No Reference", "Please select a reference audio file in the Generation tab.")
             return
         
