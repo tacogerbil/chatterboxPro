@@ -230,14 +230,6 @@ class SetupView(QWidget):
         
         c_layout.addLayout(reg_layout)
 
-    def refresh_values(self) -> None:
-        """Updates UI based on state changes."""
-        s = self.state.settings
-        if hasattr(self, 'lbl_auto_reg_info'):
-            self.lbl_auto_reg_info.setText(f"(Max Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
-        if hasattr(self, 'auto_reg_chk'):
-            self.auto_reg_chk.setChecked(getattr(self.state, 'auto_regen_main', False))
-
         # Dual GPU Checkbox (Conditional)
         try:
              gpu_count = torch.cuda.device_count()
@@ -261,9 +253,7 @@ class SetupView(QWidget):
         
         self.stop_btn = QPushButton("🛑 Stop") 
         self.stop_btn.setToolTip("Stop Generation")
-        # Self-sizing or minimal width
         self.stop_btn.setFixedWidth(100) 
-        # Reddish background
         self.stop_btn.setStyleSheet("background-color: #A93226; color: white; font-weight: bold; border-radius: 4px;")
         self.stop_btn.clicked.connect(self.stop_generation)
         
@@ -272,6 +262,14 @@ class SetupView(QWidget):
         c_layout.addLayout(gen_layout)
         
         layout.addWidget(ctrl_group)
+
+    def refresh_values(self) -> None:
+        """Updates UI based on state changes."""
+        s = self.state.settings
+        if hasattr(self, 'lbl_auto_reg_info'):
+            self.lbl_auto_reg_info.setText(f"(Max Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
+        if hasattr(self, 'auto_reg_chk'):
+            self.auto_reg_chk.setChecked(getattr(self.state, 'auto_regen_main', False))
 
     def setup_system_check(self, layout: QVBoxLayout) -> None:
         sys_group = QGroupBox("System Check")

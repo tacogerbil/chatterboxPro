@@ -36,6 +36,7 @@ class GenerationView(QWidget):
         
         self.setup_ui()
         # self.connect_signals() 
+        self.refresh_values() 
 
     def set_generation_service(self, service: GenerationService) -> None:
         self.service = service
