@@ -52,9 +52,11 @@ class CollapsibleFrame(QWidget):
         """Show/Hide content."""
         if checked:
             self.content_area.setVisible(True)
+            self.content_area.setMaximumHeight(16777215)  # Qt's QWIDGETSIZE_MAX
             self.toggle_btn.setText(f"▼ {self.title_text}")
         else:
             self.content_area.setVisible(False)
+            self.content_area.setMaximumHeight(0)  # Collapse to zero height
             self.toggle_btn.setText(f"▶ {self.title_text}")
 
     def add_widget(self, widget):
