@@ -148,6 +148,8 @@ class GenerationView(QWidget):
         # MCCC: Collapsible Voice Settings
         voice_collapsible = CollapsibleFrame("Voice Settings", start_open=True)
         v_layout = QVBoxLayout()
+        v_layout.setSpacing(5)
+        v_layout.setContentsMargins(0, 0, 0, 0)
         
         # --- Source Inputs (New) ---
         src_form = QFormLayout()
@@ -262,6 +264,8 @@ class GenerationView(QWidget):
         # MCCC: Collapsible Voice Effects (Advanced - Start Collapsed)
         fx_collapsible = CollapsibleFrame("Voice Effects (Post-Process)", start_open=False)
         f_layout = QVBoxLayout()
+        f_layout.setSpacing(5)
+        f_layout.setContentsMargins(0, 0, 0, 0)
         
         self.pitch_slider = QLabeledSlider(
             "Pitch Shift:", -12.0, 12.0, self.state.settings.pitch_shift, step=0.5,
@@ -315,9 +319,6 @@ class GenerationView(QWidget):
         
         fx_collapsible.add_layout(f_layout)
         layout.addWidget(fx_collapsible)
-
-        # Advanced Settings Moved to Config Tab (MCCC Architecture)
-        layout.addStretch()
         
     def setup_voice_save(self, layout: QVBoxLayout) -> None:
         # --- Voice Save Section (Moved from Sliders) ---
@@ -549,6 +550,8 @@ class GenerationView(QWidget):
         # MCCC: Collapsible Test Voice Settings
         preview_collapsible = CollapsibleFrame("Test Voice Settings", start_open=True)
         p_layout = QVBoxLayout()
+        p_layout.setSpacing(5)
+        p_layout.setContentsMargins(0, 0, 0, 0)
         
         # Sample Text
         p_layout.addWidget(QLabel("Sample Text:"))
