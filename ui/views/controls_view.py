@@ -607,11 +607,19 @@ class ControlsView(QWidget):
         if reply == QMessageBox.Yes:
             from utils.text_processor import TextPreprocessor
             processor = TextPreprocessor()
-            old_count = len(self.state.sentences)
-            new_sentences = processor.rechunk_current_session(self.state.sentences)
-            self.state.sentences = new_sentences
+            
+            # Access state through playlist_service
+            state = self.playlist_service.state
+            old_count = len(state.sentences)
+            
+            # Rechunk
+            new_sentences = processor.rechunk_current_session(state.sentences)
+            state.sentences = new_sentences
+            
+            # Refresh UI
             self._refresh()
             self.structure_changed.emit()
+            
             QMessageBox.information(
                 self, "Re-chunk Complete", 
                 f"Re-chunked session:\n"

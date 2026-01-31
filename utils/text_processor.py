@@ -385,22 +385,50 @@ class TextPreprocessor:
 
 
     def rechunk_current_session(self, current_sentences):
-        '''Re-chunks existing session while preserving chapters and pauses.'''
-        chapters, pauses, text_items = [], [], []
-        for idx, s in enumerate(current_sentences):
-            if s.get('is_chapter_heading'):
-                chapters.append((idx, s))
-            elif not s.get('text', '').strip():
-                pauses.append((idx, s))
-            else:
-                text_items.append(s)
-        if not text_items:
+        """
+        Re-chunks existing session while preserving chapters and pauses.
+        Uses semantic chunking for better prosody.
+        """
+        import logging
+        
+        try:
+            chapters, pauses, text_items = [], [], []
+            
+            # Separate chapters, pauses, and text
+            for idx, s in enumerate(current_sentences):
+                if s.get('is_chapter_heading'):
+                    chapters.append((idx, s))
+                elif s.get('is_pause') or not s.get('text', '').strip():
+                    pauses.append((idx, s))
+                else:
+                    text_items.append(s)
+            
+            # If no text items, return original
+            if not text_items:
+                logging.warning("No text items to rechunk")
+                return current_sentences
+            
+            # Combine all text
+            raw_text = ' '.join([s.get('original_sentence', s.get('text', '')) for s in text_items])
+            
+            if not raw_text.strip():
+                logging.warning("Empty text after combining")
+                return current_sentences
+            
+            # Preprocess and chunk
+            new_sentences = self.preprocess_text(raw_text)
+            new_chunks = self.group_sentences_into_chunks(new_sentences)
+            
+            # Re-insert chapters and pauses at their original positions
+            for idx, ch in chapters:
+                new_chunks.insert(min(idx, len(new_chunks)), ch)
+            for idx, p in pauses:
+                new_chunks.insert(min(idx, len(new_chunks)), p)
+            
+            logging.info(f"Rechunked: {len(current_sentences)} → {len(new_chunks)} items")
+            return new_chunks
+            
+        except Exception as e:
+            logging.error(f"Rechunk failed: {e}", exc_info=True)
+            # Return original on error
             return current_sentences
-        raw_text = ' '.join([s.get('original_sentence', s.get('text', '')) for s in text_items])
-        new_sentences = self.preprocess_text(raw_text)
-        new_chunks = self.group_sentences_into_chunks(new_sentences)
-        for idx, ch in chapters:
-            new_chunks.insert(min(idx, len(new_chunks)), ch)
-        for idx, p in pauses:
-            new_chunks.insert(min(idx, len(new_chunks)), p)
-        return new_chunks
