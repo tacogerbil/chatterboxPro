@@ -18,41 +18,6 @@ from chatterbox.tts import ChatterboxTTS
 import whisper
 from utils.pedalboard_processor import apply_pedalboard_effects # MCCC: Use external processor
 from utils.artifact_detector import detect_audio_artifacts, get_artifact_description, extract_audio_features
-
-# ... (inside worker_process_chunk) ...
-    # Update return payload with final path
-    if chosen_candidate:
-        chosen_candidate['path'] = str(final_wav_path)
-        return_payload.update(chosen_candidate)
-        return_payload["status"] = status
-        
-        # MCCC: Extract Audio Features for Outlier Detection (Volume/Pitch)
-        # Done here to distribute CPU load to worker process
-        # Features: RMS (Loudness), F0 (Pitch)
-        try:
-            audio_stats = extract_audio_features(str(final_wav_path))
-            return_payload["audio_stats"] = audio_stats
-            
-            # Log for debug visibility
-            if audio_stats:
-                rms = audio_stats.get('rms_mean', 0)
-                f0 = audio_stats.get('f0_mean', 0)
-                # Assuming sentence_number is available in this scope, otherwise it needs to be passed in.
-                # For now, using a placeholder if not defined.
-                sentence_number_display = locals().get('sentence_number', 'N/A')
-                logging.info(f"Audio Stats [#{sentence_number_display}]: RMS={rms:.4f}, Pitch={f0:.1f}Hz")
-        except Exception as e:
-            logging.warning(f"Audio feature extraction failed: {e}")
-            
-    else:
-        return_payload["status"] = status
-        if status == "failed_placeholder":
-             # Already set error_message above
-             pass
-        else:
-             return_payload["error"] = "No candidate audio produced."
-
-    return return_payload
 # --- DEBUG: ASK PYTHON WHERE FFMPEG IS ---
 print(f"\n[DEBUG] Python executable: {sys.executable}")
 ffmpeg_location = shutil.which("ffmpeg")
@@ -684,14 +649,32 @@ def worker_process_chunk(task: WorkerTask):
             if cand['path'] != chosen_candidate['path'] and Path(cand['path']).exists():
                 os.remove(cand['path'])
 
-        return_payload.update({
-            "status": status,
-            "path": str(final_wav_path),
-            "seed": chosen_candidate.get('seed'),
-            "similarity_ratio": chosen_candidate.get('similarity_ratio')
-        })
-        logging.info(f"Chunk #{sentence_number} (Status: {status}) processed. Final audio: {final_wav_path.name}")
+    if chosen_candidate:
+        # Move temporary file to final location if not already moved/referenced
+        chosen_candidate['path'] = str(final_wav_path)
+        return_payload.update(chosen_candidate)
+        return_payload["status"] = status
+        
+        # MCCC: Extract Audio Features for Outlier Detection (Volume/Pitch)
+        # Done here to distribute CPU load to worker process
+        try:
+            audio_stats = extract_audio_features(str(final_wav_path))
+            return_payload["audio_stats"] = audio_stats
+            
+            # Log for debug visibility
+            if audio_stats:
+                rms = audio_stats.get('rms_mean', 0)
+                f0 = audio_stats.get('f0_mean', 0)
+                logging.info(f"Audio Stats [#{sentence_number}]: RMS={rms:.4f}, Pitch={f0:.1f}Hz")
+        except Exception as e:
+            logging.warning(f"Audio feature extraction failed: {e}")
+            
     else:
-        return_payload.update({"status": "error", "error_message": "All generation attempts failed."})
+        return_payload["status"] = status
+        if status == "failed_placeholder":
+             pass
+        else:
+             return_payload["error"] = "No candidate audio produced."
 
+    logging.info(f"Chunk #{sentence_number} (Status: {status}) processed.")
     return return_payload
