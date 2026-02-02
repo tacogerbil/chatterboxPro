@@ -327,11 +327,27 @@ class GenerationService(QObject):
         
         # MCCC: Reset Progress Statistics
         import time
+        import os
         self.state.chunks_passed = 0
         self.state.chunks_failed = 0
         self.state.chunks_completed = 0
         self.state.generation_start_time = time.time()
         self.state.chunk_status.clear()
+        
+        # MCCC: Smart WAV File Cleanup
+        # Delete WAV files for chunks that are NOT marked as successful
+        # This ensures a clean slate when regenerating unmarked chunks
+        for idx, sentence in enumerate(self.state.sentences):
+            # Only delete if chunk is NOT marked as successful
+            if sentence.get('tts_generated') != STATUS_YES:
+                audio_path = sentence.get('audio_path')
+                if audio_path and os.path.exists(audio_path):
+                    try:
+                        os.remove(audio_path)
+                        logging.info(f"🗑️ Cleaned up WAV file for unmarked chunk [{idx+1}]: {os.path.basename(audio_path)}")
+                        sentence['audio_path'] = None  # Clear the path reference
+                    except Exception as e:
+                        logging.warning(f"Failed to delete {audio_path}: {e}")
         
         s = self.state.settings
         outputs_dir = "Outputs_Pro" 
