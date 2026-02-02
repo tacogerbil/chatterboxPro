@@ -202,3 +202,51 @@ def get_artifact_description(artifact_type: Optional[str]) -> str:
         "analysis_error": "Error analyzing audio file",
     }
     return descriptions.get(artifact_type, "Unknown artifact type")
+
+
+def extract_audio_features(audio_path: str) -> dict:
+    """
+    Extracts key prosody features for outlier detection (Scream Detector).
+    
+    Returns:
+        Dictionary containing:
+        - rms_mean: Average loudness
+        - rms_max: Peak loudness
+        - f0_mean: Average pitch (Hz)
+        - f0_max: Peak pitch (Hz)
+        - peak_amp: Absolute peak amplitude
+        - duration: Total duration in seconds
+    """
+    try:
+        y, sr = librosa.load(audio_path, sr=None)
+        
+        # 1. Loudness (RMS)
+        rms = librosa.feature.rms(y=y)[0]
+        rms_mean = float(np.mean(rms))
+        rms_max = float(np.max(rms))
+        peak_amp = float(np.max(np.abs(y)))
+        
+        # 2. Pitch (F0) using Yin algorithm
+        # Restrict range to normal speech (50Hz - 600Hz) to avoid noise errors
+        f0 = librosa.yin(y, fmin=50, fmax=600, sr=sr)
+        # Filter out unvoiced parts (where Yin is unreliable) - naive approximation is good enough
+        f0_valid = f0[f0 > 50] # Simple filtering
+        
+        if len(f0_valid) > 0:
+            f0_mean = float(np.mean(f0_valid))
+            f0_max = float(np.max(f0_valid))
+        else:
+            f0_mean = 0.0
+            f0_max = 0.0
+            
+        return {
+            'rms_mean': rms_mean,
+            'rms_max': rms_max,
+            'f0_mean': f0_mean,
+            'f0_max': f0_max,
+            'peak_amp': peak_amp,
+            'duration': float(librosa.get_duration(y=y, sr=sr))
+        }
+    except Exception as e:
+        logging.warning(f"Feature extraction failed for {audio_path}: {e}")
+        return {}

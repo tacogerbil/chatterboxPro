@@ -42,6 +42,11 @@ class PlaylistModel(QAbstractListModel):
             icon = ""
             if is_marked: icon += "🔷 "
             
+            # Show Outlier Warning if present
+            # User requested: "yellow diamond with an exclamation mark", then updated to "⚠️ is better"
+            if item.get('outlier_reason'):
+                icon += "⚠️ "
+            
             if status == 'yes': icon += "✅ "
             elif status == 'failed': icon += "❌ "
             # elif status == 'no': icon = "⬜ " # User requested 'red x' for 'hadn't been generated', but ❌ is usually error.
