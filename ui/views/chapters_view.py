@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 from core.state import AppState
 from core.services.generation_service import GenerationService
 from core.services.chapter_service import ChapterService
+from ui.components.progress_widget import ProgressWidget
 
 class ChapterModel(QAbstractListModel):
     def __init__(self, app_state: AppState):
@@ -288,6 +289,11 @@ class ChaptersView(QWidget):
         footer_layout.addWidget(self.stop_btn)
         
         layout.addLayout(footer_layout)
+        
+        # MCCC: Progress Tracking Widget
+        self.progress_widget = ProgressWidget()
+        self.progress_widget.setVisible(False)  # Hidden until generation starts
+        layout.addWidget(self.progress_widget)
 
     def update_theme(self, theme_name: str) -> None:
         """
@@ -348,6 +354,14 @@ class ChaptersView(QWidget):
 
     def set_generation_service(self, gen_service: GenerationService) -> None:
         self.gen_service = gen_service
+        
+        # MCCC: Connect Progress Tracking Signals
+        gen_service.progress_update.connect(self.progress_widget.update_progress)
+        gen_service.stats_updated.connect(self.progress_widget.update_stats)
+        gen_service.eta_updated.connect(self.progress_widget.update_eta)
+        gen_service.started.connect(lambda: self.progress_widget.setVisible(True))
+        gen_service.finished.connect(lambda: self.progress_widget.setVisible(False))
+        gen_service.stopped.connect(lambda: self.progress_widget.setVisible(False))
 
     def generate_selected(self) -> None:
         # Merge Checkbox selection + Highlighting selection

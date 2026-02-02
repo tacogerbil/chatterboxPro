@@ -44,9 +44,12 @@ class LogView(QWidget):
         # Create Handler
         self.handler = QtLogHandler(self.emitter)
         self.handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        self.handler.setLevel(logging.DEBUG)  # MCCC: Capture all log levels
         
         # Add to Root Logger
-        logging.getLogger().addHandler(self.handler)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(self.handler)
+        root_logger.setLevel(logging.DEBUG)  # MCCC: Ensure root logger captures DEBUG+
         
         # Log initial message
         logging.info("Log View initialized.")

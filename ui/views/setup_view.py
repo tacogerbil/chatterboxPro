@@ -15,6 +15,7 @@ from core.state import AppState
 from utils.text_processor import TextPreprocessor
 from core.services.project_service import ProjectService
 from core.services.template_service import TemplateService
+from ui.components.progress_widget import ProgressWidget
 
 class SetupView(QWidget):
     template_loaded = Signal()
@@ -275,6 +276,11 @@ class SetupView(QWidget):
         c_layout.addLayout(gen_layout)
         
         layout.addWidget(ctrl_group)
+        
+        # MCCC: Progress Tracking Widget
+        self.progress_widget = ProgressWidget()
+        self.progress_widget.setVisible(False)  # Hidden until generation starts
+        layout.addWidget(self.progress_widget)
 
     def refresh_values(self) -> None:
         """Updates UI based on state changes."""
@@ -559,6 +565,14 @@ class SetupView(QWidget):
 
     def set_generation_service(self, service: Any) -> None:
         self.gen_service = service
+        
+        # MCCC: Connect Progress Tracking Signals
+        service.progress_update.connect(self.progress_widget.update_progress)
+        service.stats_updated.connect(self.progress_widget.update_stats)
+        service.eta_updated.connect(self.progress_widget.update_eta)
+        service.started.connect(lambda: self.progress_widget.setVisible(True))
+        service.finished.connect(lambda: self.progress_widget.setVisible(False))
+        service.stopped.connect(lambda: self.progress_widget.setVisible(False))
 
     def stop_generation(self) -> None:
         if self.gen_service:

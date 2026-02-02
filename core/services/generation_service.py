@@ -147,6 +147,10 @@ class GenerationService(QObject):
     stopped = Signal()
     error_occurred = Signal(str)
     
+    # Progress Tracking Signals (MCCC: Explicit Statistics Interface)
+    stats_updated = Signal(int, int, int)  # total, passed, failed
+    eta_updated = Signal(float)  # seconds remaining
+    
     # Auto-Fix Signals
     auto_fix_status = Signal(str) # Status message for UI
     
@@ -320,6 +324,15 @@ class GenerationService(QObject):
         
         self.is_running = True  # MCCC: Set running state
         self.started.emit()
+        
+        # MCCC: Reset Progress Statistics
+        import time
+        self.state.chunks_passed = 0
+        self.state.chunks_failed = 0
+        self.state.chunks_completed = 0
+        self.state.generation_start_time = time.time()
+        self.state.chunk_status.clear()
+        
         s = self.state.settings
         outputs_dir = "Outputs_Pro" 
         
@@ -377,6 +390,10 @@ class GenerationService(QObject):
             
             tasks.extend(run_tasks)
             
+        # MCCC: Set total chunks for progress tracking
+        self.state.total_chunks = len(process_indices)  # Unique chunks, not tasks (which may include multiple runs)
+        self.stats_updated.emit(self.state.total_chunks, 0, 0)  # Initial stats
+            
         # 5. Start Thread
         self.worker_thread = GenerationThread(tasks, max_workers, outputs_dir)
         
@@ -402,15 +419,55 @@ class GenerationService(QObject):
         status = result.get('status')
         asr = result.get('similarity_ratio', 0.0)
         
+        # MCCC: Track Statistics (Dynamic - Handles Regeneration)
+        old_status = self.state.chunk_status.get(original_idx)
+        new_status = 'passed' if status == 'success' else 'failed'
+        
+        # Update counters based on status transition
+        if old_status == 'failed' and new_status == 'passed':
+            # Regeneration success: failed -> passed
+            self.state.chunks_failed -= 1
+            self.state.chunks_passed += 1
+        elif old_status == 'passed' and new_status == 'failed':
+            # Regression: passed -> failed (rare, but possible)
+            self.state.chunks_passed -= 1
+            self.state.chunks_failed += 1
+        elif old_status is None:
+            # First time processing this chunk
+            if new_status == 'passed':
+                self.state.chunks_passed += 1
+            else:
+                self.state.chunks_failed += 1
+        # else: same status, no change needed
+        
+        self.state.chunk_status[original_idx] = new_status
+        self.state.chunks_completed += 1
+        
+        # Emit statistics update
+        self.stats_updated.emit(
+            self.state.total_chunks,
+            self.state.chunks_passed,
+            self.state.chunks_failed
+        )
+        
+        # Calculate and emit ETA
+        import time
+        elapsed = time.time() - self.state.generation_start_time
+        if self.state.chunks_completed > 0:
+            avg_time_per_chunk = elapsed / self.state.chunks_completed
+            remaining_chunks = self.state.total_chunks - self.state.chunks_completed
+            eta_seconds = avg_time_per_chunk * remaining_chunks
+            self.eta_updated.emit(eta_seconds)
+        
         if status == 'success':
             self.state.sentences[original_idx]['tts_generated'] = STATUS_YES
             self.state.sentences[original_idx]['marked'] = False
-            logging.info(f"Chunk [{original_idx+1}] Success: ASR Match={asr*100:.1f}%")
+            logging.info(f"✅ Chunk [{original_idx+1}] PASSED: ASR Match={asr*100:.1f}%")
         else:
             self.state.sentences[original_idx]['tts_generated'] = STATUS_FAILED
             self.state.sentences[original_idx]['marked'] = True
             error_msg = result.get('error_message', 'Unknown Error')
-            logging.warning(f"Chunk [{original_idx+1}] Failed: {error_msg} (ASR={asr*100:.1f}%)")
+            logging.warning(f"❌ Chunk [{original_idx+1}] FAILED: {error_msg} (ASR={asr*100:.1f}%)")
         
         # Emit update for UI
         self.item_updated.emit(original_idx)

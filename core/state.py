@@ -96,6 +96,14 @@ class AppState:
     # Global Engine Config
     model_path: Optional[str] = None
     
+    # Progress Tracking (MCCC: Centralized Statistics)
+    total_chunks: int = 0
+    chunks_passed: int = 0
+    chunks_failed: int = 0
+    chunks_completed: int = 0
+    generation_start_time: float = 0.0  # timestamp
+    chunk_status: Dict[int, str] = field(default_factory=dict)  # {index: 'passed'|'failed'}
+    
     def update_settings(self, **kwargs):
         """Update settings from a dictionary."""
         for key, value in kwargs.items():
