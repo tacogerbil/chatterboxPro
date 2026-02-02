@@ -529,7 +529,7 @@ class ControlsView(QWidget):
     def _nav_success(self, direction):
         """Navigate to next/previous successful chunk."""
         idx = self._get_selected_index()
-        next_idx = self.playlist_service.find_next_status(idx, direction, 'success')
+        next_idx = self.playlist_service.find_next_status(idx, direction, 'yes')
         if next_idx != -1:
             self.playlist.jump_to_row(next_idx)
 
