@@ -415,6 +415,7 @@ class ChatterboxTTS:
             s3gen_output = inference_model.inference(
                 speech_tokens=speech_tokens,
                 ref_dict=self.conds.gen,
+                temperature=temperature,
             )
             print(f"[TTS Debug] S3Gen inference returned.", flush=True)
 
