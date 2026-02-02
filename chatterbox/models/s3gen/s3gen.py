@@ -172,7 +172,6 @@ class S3Token2Mel(torch.nn.Module):
         # pre-computed ref embedding (prod API)
         ref_dict: Optional[dict] = None,
         finalize: bool = False,
-        temperature: float = 1.0,
     ):
         """
         Generate waveforms from S3 speech tokens and a reference waveform, which the speaker timbre is inferred from.
@@ -213,7 +212,6 @@ class S3Token2Mel(torch.nn.Module):
             token=speech_tokens,
             token_len=speech_token_lens,
             finalize=finalize,
-            temperature=temperature,
             **ref_dict,
         )
         print(f"[S3Token2Mel Debug] flow.inference returned. Shape: {output_mels.shape}", flush=True)
@@ -256,9 +254,8 @@ class S3Token2Wav(S3Token2Mel):
         # pre-computed ref embedding (prod API)
         ref_dict: Optional[dict] = None,
         finalize: bool = False,
-        temperature: float = 1.0,
     ):
-        output_mels = super().forward(speech_tokens, ref_wav=ref_wav, ref_sr=ref_sr, ref_dict=ref_dict, finalize=finalize, temperature=temperature)
+        output_mels = super().forward(speech_tokens, ref_wav=ref_wav, ref_sr=ref_sr, ref_dict=ref_dict, finalize=finalize)
 
         # TODO jrm: ignoring the speed control (mel interpolation) and the HiFTGAN caching mechanisms for now.
         hift_cache_source = torch.zeros(1, 1, 0).to(self.device)
@@ -282,9 +279,8 @@ class S3Token2Wav(S3Token2Mel):
         # pre-computed ref embedding (prod API)
         ref_dict: Optional[dict] = None,
         finalize: bool = False,
-        temperature: float = 1.0,
     ):
-        return super().forward(speech_tokens, ref_wav=ref_wav, ref_sr=ref_sr, ref_dict=ref_dict, finalize=finalize, temperature=temperature)
+        return super().forward(speech_tokens, ref_wav=ref_wav, ref_sr=ref_sr, ref_dict=ref_dict, finalize=finalize)
 
     @torch.inference_mode()
     def hift_inference(self, speech_feat, cache_source: torch.Tensor = None):
@@ -303,11 +299,10 @@ class S3Token2Wav(S3Token2Mel):
         ref_dict: Optional[dict] = None,
         cache_source: torch.Tensor = None, # NOTE: this arg is for streaming, it can probably be removed here
         finalize: bool = True,
-        temperature: float = 1.0,
     ):
         print(f"[S3Gen Debug] Inside inference. speech_tokens shape: {speech_tokens.shape}", flush=True)
         try:
-            output_mels = self.flow_inference(speech_tokens, ref_wav=ref_wav, ref_sr=ref_sr, ref_dict=ref_dict, finalize=finalize, temperature=temperature)
+            output_mels = self.flow_inference(speech_tokens, ref_wav=ref_wav, ref_sr=ref_sr, ref_dict=ref_dict, finalize=finalize)
             print(f"[S3Gen Debug] flow_inference success. mels shape: {output_mels.shape}", flush=True)
             output_wavs, output_sources = self.hift_inference(output_mels, cache_source)
             print(f"[S3Gen Debug] hift_inference success. wavs shape: {output_wavs.shape}", flush=True)

@@ -110,8 +110,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
                   prompt_feat,
                   prompt_feat_len,
                   embedding,
-                  flow_cache,
-                  temperature=1.0):
+                  flow_cache):
         if self.fp16 is True:
             prompt_feat = prompt_feat.half()
             embedding = embedding.half()
@@ -146,8 +145,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
             cond=conds,
             n_timesteps=10,
             prompt_len=mel_len1,
-            flow_cache=flow_cache,
-            temperature=temperature
+            flow_cache=flow_cache
         )
         feat = feat[:, :, mel_len1:]
         assert feat.shape[2] == mel_len2
