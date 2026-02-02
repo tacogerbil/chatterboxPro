@@ -61,13 +61,31 @@ class ControlsView(QWidget):
         # Row 1: Nav
         btn_up = QPushButton("▲ Move Up"); btn_up.clicked.connect(lambda: self._move_items(-1))
         btn_down = QPushButton("▼ Move Down"); btn_down.clicked.connect(lambda: self._move_items(1))
-        btn_prev_err = QPushButton("◄ Prev Error"); btn_prev_err.clicked.connect(lambda: self._nav_error(-1))
-        btn_next_err = QPushButton("Next Error ►"); btn_next_err.clicked.connect(lambda: self._nav_error(1))
+        
+        # Success Navigation (Light Green)
+        btn_prev_success = QPushButton("◄ Prev Success")
+        btn_prev_success.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
+        btn_prev_success.clicked.connect(lambda: self._nav_success(-1))
+        
+        btn_next_success = QPushButton("Next Success ►")
+        btn_next_success.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
+        btn_next_success.clicked.connect(lambda: self._nav_success(1))
+        
+        # Error Navigation (Light Red)
+        btn_prev_err = QPushButton("◄ Prev Error")
+        btn_prev_err.setStyleSheet("background-color: #FFB6C1; color: black; font-weight: bold;")
+        btn_prev_err.clicked.connect(lambda: self._nav_error(-1))
+        
+        btn_next_err = QPushButton("Next Error ►")
+        btn_next_err.setStyleSheet("background-color: #FFB6C1; color: black; font-weight: bold;")
+        btn_next_err.clicked.connect(lambda: self._nav_error(1))
         
         layout.addWidget(btn_up, 1, 0)
         layout.addWidget(btn_down, 1, 1)
-        layout.addWidget(btn_prev_err, 1, 2)
-        layout.addWidget(btn_next_err, 1, 3)
+        layout.addWidget(btn_prev_success, 1, 2)
+        layout.addWidget(btn_next_success, 1, 3)
+        layout.addWidget(btn_prev_err, 1, 4)
+        layout.addWidget(btn_next_err, 1, 5)
         
         # Row 2: Search
         search_widget = QWidget()
@@ -507,6 +525,14 @@ class ControlsView(QWidget):
         next_idx = self.playlist_service.find_next_status(idx, direction, 'failed')
         if next_idx != -1:
             self.playlist.jump_to_row(next_idx)
+    
+    def _nav_success(self, direction):
+        """Navigate to next/previous successful chunk."""
+        idx = self._get_selected_index()
+        next_idx = self.playlist_service.find_next_status(idx, direction, 'success')
+        if next_idx != -1:
+            self.playlist.jump_to_row(next_idx)
+
 
     def _search(self):
         q = self.search_edit.text()

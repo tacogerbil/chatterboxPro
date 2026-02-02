@@ -335,11 +335,11 @@ class GenerationService(QObject):
         self.state.chunk_status.clear()
         
         # MCCC: Smart WAV File Cleanup
-        # Delete WAV files for chunks that are NOT marked as successful
+        # Delete WAV files for chunks that are NOT marked (gold star)
         # This ensures a clean slate when regenerating unmarked chunks
         for idx, sentence in enumerate(self.state.sentences):
-            # Only delete if chunk is NOT marked as successful
-            if sentence.get('tts_generated') != STATUS_YES:
+            # Only delete if chunk is NOT marked (user unmarked it manually)
+            if not sentence.get('marked', False):
                 audio_path = sentence.get('audio_path')
                 if audio_path and os.path.exists(audio_path):
                     try:
