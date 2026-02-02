@@ -40,7 +40,7 @@ class PlaylistModel(QAbstractListModel):
             
             icon = ""
             icon = ""
-            if is_marked: icon += "🟨 "
+            if is_marked: icon += "🔷 "
             
             if status == 'yes': icon += "✅ "
             elif status == 'failed': icon += "❌ "
