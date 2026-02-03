@@ -132,16 +132,23 @@ def validate_audio_signal(wav_tensor, sr):
 
     # Check 4: Trailing Noise (The "Woosh" Check)
     # If the file ends with loud noise (didn't fade out), reject it.
-    # We check the last 250ms.
+    # We traditionally check the last 250ms.
     num_samples = wav_tensor.numel()
-    tail_len = int(sr * 0.25) # 250ms
-    if num_samples > tail_len * 2: # Only check if file is at least 500ms long
+    std_tail_len = int(sr * 0.25) # 250ms
+    
+    # Adaptive Tail: If file is short (<500ms), check last 33% instead of skipping
+    if num_samples < std_tail_len * 2:
+        tail_len = int(num_samples * 0.33)
+    else:
+        tail_len = std_tail_len
+        
+    # Only check if we have enough samples to be meaningful (>50ms)
+    if tail_len > sr * 0.05:
         tail_tensor = wav_tensor[-tail_len:]
         tail_rms = torch.sqrt(torch.mean(tail_tensor**2)).item()
         
-        # Threshold 0.04 (approx -28dB). 
-        # Valid speech usually decays. 
-        # A "Woosh" or "Screech" loop stays loud > 0.05.
+        # Threshold 0.035 (approx -29dB). 
+        # Valid speech usually decays. A "Woosh" loop stays loud.
         if tail_rms > 0.035:
             return False, f"Trailing Noise Detected (Tail RMS: {tail_rms:.4f})"
 
