@@ -1,4 +1,5 @@
 import logging
+import os
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
 from PySide6.QtCore import QObject, Signal, Slot
 
@@ -51,6 +52,23 @@ class LogView(QWidget):
         root_logger.addHandler(self.handler)
         root_logger.setLevel(logging.DEBUG)  # MCCC: Ensure root logger captures DEBUG+
         
+        # MCCC: Safety Guard - Prevent DEBUG flood in file logs
+        # Setting root to DEBUG affects all handlers. We must clamp file handlers.
+        for h in root_logger.handlers:
+            if isinstance(h, logging.FileHandler):
+                try:
+                    base_name = os.path.basename(h.baseFilename).lower()
+                    if 'error' in base_name:
+                        if h.level < logging.ERROR:
+                            h.setLevel(logging.ERROR)
+                            logging.info(f"Fixed Config: Clamped {base_name} to ERROR level.")
+                    elif 'debug' not in base_name:
+                        # Default others to INFO to avoid massive log files
+                        if h.level < logging.INFO:
+                            h.setLevel(logging.INFO)
+                except Exception as e:
+                    print(f"Failed to adjust log handler {h}: {e}")
+
         # Log initial message
         logging.info("Log View initialized.")
 
