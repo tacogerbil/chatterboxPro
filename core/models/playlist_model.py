@@ -70,7 +70,12 @@ class PlaylistModel(QAbstractListModel):
             return item.get('marked', False)
             
         elif role == Qt.ToolTipRole:
-            return item.get('original_sentence', '')
+            # MCCC: Format tooltip with HTML for word wrapping
+            import html
+            raw_text = item.get('original_sentence', '')
+            safe_text = html.escape(raw_text)
+            # Use styling to limit width and force wrap
+            return f"<div style='width: 400px; text-align: left;'>{safe_text}</div>"
             
         return None
         
