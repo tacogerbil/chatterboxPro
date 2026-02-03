@@ -463,3 +463,110 @@ class TextPreprocessor:
             logging.error(f"Rechunk failed: {e}", exc_info=True)
             # Return original on error
             return current_sentences
+
+# MCCC Refactor: Extracted from workers/tts_worker.py
+def _parse_compound_number(text, ones, teens, tens):
+    """Helper to parse complex compound numbers like 'two thousand twenty-four'."""
+    total = 0
+    current = 0
+    
+    words = text.lower().replace('-', ' ').split()
+    
+    for word in words:
+        if word == 'and':
+            continue
+        elif word in ones:
+            current += ones[word]
+        elif word in teens:
+            current += teens[word]
+        elif word in tens:
+            current += tens[word]
+        elif word == 'hundred':
+            current *= 100
+        elif word == 'thousand':
+            current *= 1000
+            total += current
+            current = 0
+    
+    return total + current
+
+def normalize_numbers(text):
+    """Convert written number words to digits for consistent ASR comparison.
+    
+    Whisper often transcribes spoken numbers as digits (e.g., "one" -> "1"),
+    even when the TTS model correctly says the word. This function normalizes
+    both texts to use digits before comparison.
+    """
+    text_lower = text.lower()
+    
+    # Single number words (for direct replacement and compound building)
+    ones = {
+        'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4,
+        'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9
+    }
+    teens = {
+        'ten': 10, 'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14,
+        'fifteen': 15, 'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19
+    }
+    tens = {
+        'twenty': 20, 'thirty': 30, 'forty': 40, 'fifty': 50,
+        'sixty': 60, 'seventy': 70, 'eighty': 80, 'ninety': 90
+    }
+    
+    # Pattern for compound numbers - process from most specific to least specific
+    
+    # Pattern: "X thousand Y hundred Z" (e.g., "two thousand three hundred forty-two")
+    text_lower = re.sub(
+        r'\b(one|two|three|four|five|six|seven|eight|nine)\s+thousand\s+(one|two|three|four|five|six|seven|eight|nine)\s+hundred\s+(?:and\s+)?(\w+(?:\s+|-)\w+|\w+)',
+        lambda m: str(_parse_compound_number(m.group(0), ones, teens, tens)),
+        text_lower
+    )
+    
+    # Pattern: "X thousand Y hundred" (e.g., "five thousand three hundred")
+    text_lower = re.sub(
+        r'\b(one|two|three|four|five|six|seven|eight|nine)\s+thousand\s+(one|two|three|four|five|six|seven|eight|nine)\s+hundred\b',
+        lambda m: str(_parse_compound_number(m.group(0), ones, teens, tens)),
+        text_lower
+    )
+    
+    # Pattern: "X thousand Y" where Y is a compound/teen/ten (e.g., "two thousand twenty-four")
+    text_lower = re.sub(
+        r'\b(one|two|three|four|five|six|seven|eight|nine)\s+thousand\s+(\w+(?:\s+|-)\w+|\w+)',
+        lambda m: str(_parse_compound_number(m.group(0), ones, teens, tens)),
+        text_lower
+    )
+    
+    # Pattern: "X thousand" alone (e.g., "two thousand")
+    text_lower = re.sub(
+        r'\b(one|two|three|four|five|six|seven|eight|nine)\s+thousand\b',
+        lambda m: str(ones.get(m.group(1), 0) * 1000),
+        text_lower
+    )
+    
+    # Pattern: "X hundred Y" (e.g., "one hundred fifty-six")
+    text_lower = re.sub(
+        r'\b(one|two|three|four|five|six|seven|eight|nine)\s+hundred\s+(?:and\s+)?(\w+(?:\s+|-)\w+|\w+)',
+        lambda m: str(_parse_compound_number(m.group(0), ones, teens, tens)),
+        text_lower
+    )
+    
+    # Pattern: "X hundred" alone (e.g., "two hundred")
+    text_lower = re.sub(
+        r'\b(one|two|three|four|five|six|seven|eight|nine)\s+hundred\b',
+        lambda m: str(ones.get(m.group(1), 0) * 100),
+        text_lower
+    )
+    
+    # Pattern: tens + ones (e.g., "twenty-three", "twenty three")
+    text_lower = re.sub(
+        r'\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[\s-](one|two|three|four|five|six|seven|eight|nine)\b',
+        lambda m: str(tens.get(m.group(1), 0) + ones.get(m.group(2), 0)),
+        text_lower
+    )
+    
+    # Replace single-word numbers (excluding 'hundred' and 'thousand' which are handled above)
+    all_numbers = {**ones, **teens, **tens}
+    for word, digit in all_numbers.items():
+        text_lower = re.sub(r'\b' + word + r'\b', str(digit), text_lower)
+    
+    return text_lower

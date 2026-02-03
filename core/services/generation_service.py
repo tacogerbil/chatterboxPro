@@ -360,74 +360,7 @@ class GenerationService(QObject):
 
     # ... (skipping to _on_chunk_complete) ...
 
-        # MCCC: Store audio path for playback
-        if result.get('path'):
-            self.state.sentences[original_idx]['audio_path'] = result.get('path')
-        
-        # MCCC: Prosody Outlier Detection (Scream Detector)
-        # Check if the generated audio is statistically anomalous (too loud, too high pitched)
-        audio_stats = result.get('audio_stats')
-        is_outlier = False
-        outlier_reason = ""
-        
-        if audio_stats and status == 'success':
-            rms = audio_stats.get('rms_mean', 0)
-            f0 = audio_stats.get('f0_mean', 0)
-            
-            # Update history
-            self.stats_history['rms'].append(rms)
-            self.stats_history['f0_mean'].append(f0)
-            
-            # Only check for outliers after we have a baseline (e.g., 5 samples)
-            if len(self.stats_history['rms']) >= 5:
-                # Calculate Median and MAD (Median Absolute Deviation) - more robust than Mean/StdDev
-                import numpy as np
-                rms_hist = np.array(self.stats_history['rms'])
-                f0_hist = np.array(self.stats_history['f0_mean'])
-                
-                rms_med = np.median(rms_hist)
-                f0_med = np.median(f0_hist)
-                
-                # --- THRESHOLDS ---
-                # 1. Relative (vs Median)
-                rms_rel_thresh = rms_med * 2.0
-                f0_rel_thresh = f0_med * 1.5
-                
-                # 2. Absolute (Safety Net)
-                ABS_PITCH_CEILING = 600.0 # Hz (Scream range)
-                ABS_RMS_CEILING = 0.5     # Amplitude (Very loud)
-                
-                # --- DETECTION LOGIC ---
-                
-                # Volume Checks
-                if rms > ABS_RMS_CEILING:
-                    is_outlier = True
-                    outlier_reason = f"Extreme Volume (RMS {rms:.3f} > {ABS_RMS_CEILING} abs)"
-                elif rms > rms_rel_thresh:
-                    is_outlier = True
-                    outlier_reason = f"Volume Spike (RMS {rms:.3f} > {rms_rel_thresh:.3f} rel)"
-                    
-                # Pitch Checks
-                elif f0 > ABS_PITCH_CEILING:
-                    is_outlier = True
-                    outlier_reason = f"Extreme Pitch (F0 {f0:.0f}Hz > {ABS_PITCH_CEILING}Hz abs)"
-                elif f0 > f0_rel_thresh and f0 > 250: # Only flag relative pitch if it's >250Hz base
-                    is_outlier = True
-                    outlier_reason = f"Pitch Spike (F0 {f0:.0f}Hz > {f0_rel_thresh:.0f}Hz rel)"
-
-                # Log Stats for Tuning
-                # logging.debug(f"Stats: RMS={rms:.3f} (Med={rms_med:.3f}), F0={f0:.0f} (Med={f0_med:.0f})")
-
-            if is_outlier:
-                logging.warning(f"⚠️ PROSODY OUTLIER [{original_idx+1}]: {outlier_reason}. Marking for review.")
-                self.state.sentences[original_idx]['outlier_reason'] = outlier_reason
-            else:
-                # Clear any previous outlier flag if it passed this time
-                if 'outlier_reason' in self.state.sentences[original_idx]:
-                    del self.state.sentences[original_idx]['outlier_reason']
-
-        status = result.get('status')
-        asr = result.get('similarity_ratio', 0.0) 
+ 
         
         # 1. Determine Scope
         if indices_to_process is not None:
