@@ -69,6 +69,10 @@ class LogView(QWidget):
                 except Exception as e:
                     print(f"Failed to adjust log handler {h}: {e}")
 
+        # MCCC: Silence noisy third-party libraries that spam DEBUG logs
+        for lib in ["numba", "llvmlite", "matplotlib", "PIL", "urllib3"]:
+            logging.getLogger(lib).setLevel(logging.WARNING)
+
         # Log initial message
         logging.info("Log View initialized.")
 
