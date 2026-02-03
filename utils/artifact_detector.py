@@ -245,8 +245,46 @@ def extract_audio_features(audio_path: str) -> dict:
             'f0_mean': f0_mean,
             'f0_max': f0_max,
             'peak_amp': peak_amp,
-            'duration': float(librosa.get_duration(y=y, sr=sr))
+            'duration': float(librosa.get_duration(y=y, sr=sr)),
+            'y': y, # Return raw audio to avoid reloading for MFCC
+            'sr': sr
         }
     except Exception as e:
         logging.warning(f"Feature extraction failed for {audio_path}: {e}")
         return {}
+
+
+def extract_mfcc_profile(audio_path: str = None, y: np.ndarray = None, sr: int = None) -> np.ndarray:
+    """
+    Extracts Mel-frequency cepstral coefficients (MFCCs) to represent timbre/accent.
+    Returns: 1D array of mean MFCCs (shape: (13,))
+    """
+    try:
+        if y is None:
+            y, sr = librosa.load(audio_path, sr=None)
+            
+        # Extract 13 MFCCs (standard for speech)
+        # Use mean across time to get a static "voice profile"
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        return np.mean(mfcc, axis=1)
+    except Exception as e:
+        logging.warning(f"MFCC extraction failed: {e}")
+        return None
+
+def calculate_timbre_similarity(profile1: np.ndarray, profile2: np.ndarray) -> float:
+    """
+    Calculates Cosine Similarity between two MFCC profiles.
+    Range: -1.0 to 1.0 (1.0 = Identical Timbre)
+    """
+    if profile1 is None or profile2 is None:
+        return 0.0
+        
+    # Cosine Similarity
+    dot_product = np.dot(profile1, profile2)
+    norm1 = np.linalg.norm(profile1)
+    norm2 = np.linalg.norm(profile2)
+    
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+        
+    return dot_product / (norm1 * norm2)

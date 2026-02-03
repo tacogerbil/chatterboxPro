@@ -17,8 +17,14 @@ import soundfile as sf
 from chatterbox.tts import ChatterboxTTS
 import whisper
 from utils.pedalboard_processor import apply_pedalboard_effects # MCCC: Use external processor
-from utils.artifact_detector import detect_audio_artifacts, get_artifact_description, extract_audio_features
-# --- DEBUG: ASK PYTHON WHERE FFMPEG IS ---
+from utils.artifact_detector import (
+    detect_audio_artifacts, 
+    get_artifact_description, 
+    extract_audio_features,
+    extract_mfcc_profile,
+    calculate_timbre_similarity
+)
+from utils.text_processor import normalize_numbers # MCCC: Extracted utility
 print(f"\n[DEBUG] Python executable: {sys.executable}")
 ffmpeg_location = shutil.which("ffmpeg")
 if ffmpeg_location:
@@ -217,6 +223,26 @@ def worker_process_chunk(task: WorkerTask):
         logging.error(f"[Worker-{pid}] Failed to prepare reference for chunk {sentence_number}: {e}", exc_info=True)
         return {"original_index": original_index, "status": "error", "error_message": f"Reference Prep Fail: {e}"}
 
+    # MCCC: Analyze Reference Audio ONCE if present to use as Ground Truth
+    ref_features = {}
+    ref_mfcc_profile = None
+    
+    if ref_audio_path and str(ref_audio_path).strip():
+        try:
+            logging.info(f"[Worker-{pid}] Analyzing Reference Audio: {ref_audio_path}")
+            ref_features = extract_audio_features(str(ref_audio_path))
+            
+            # Efficiently extract MFCC from the already loaded audio (if available)
+            if 'y' in ref_features and 'sr' in ref_features:
+                 ref_mfcc_profile = extract_mfcc_profile(y=ref_features['y'], sr=ref_features['sr'])
+            else:
+                 ref_mfcc_profile = extract_mfcc_profile(audio_path=str(ref_audio_path))
+                 
+            if ref_features:
+                logging.info(f"[Worker-{pid}] Reference Baseline: F0={ref_features.get('f0_mean', 0):.1f}Hz, Timbre Profile Set: {ref_mfcc_profile is not None}")
+        except Exception as e_ref:
+            logging.warning(f"Failed to analyze reference audio: {e_ref}")
+
     passed_candidates = []
     best_failed_candidate = None
     
@@ -232,6 +258,7 @@ def worker_process_chunk(task: WorkerTask):
         
         logging.info(f"[Worker-{pid}] Chunk #{sentence_number}, Attempt {attempt_num + 1}/{max_attempts} with seed {seed}")
         
+        # ... (CUDA Check Omitted for brevity in matching, assume context handles it) ...
         # CUDA State Validation: Check if GPU is in a valid state before attempting generation
         if torch.cuda.is_available():
             try:
@@ -262,7 +289,7 @@ def worker_process_chunk(task: WorkerTask):
                 # Log if adjustments were made
                 if adjusted_temp != temperature or adjusted_exag != exaggeration:
                     logging.info(f"Auto-expression: {reason}")
-                    logging.info(f"  Adjusted temp {temperature:.2f}→{adjusted_temp:.2f}, exag {exaggeration:.2f}→{adjusted_exag:.2f}")
+                    logging.info(f"  Adjusted temp {temperature:.2f}->{adjusted_temp:.2f}, exag {exaggeration:.2f}->{adjusted_exag:.2f}")
                     temperature = adjusted_temp
                     exaggeration = adjusted_exag
             
@@ -275,21 +302,17 @@ def worker_process_chunk(task: WorkerTask):
                 cfg_weight=cfg_weight,
                 apply_watermark=not disable_watermark
             )
-            # logging.debug(f"[Worker] generate returned. Tensor type: {type(wav_tensor)}")
             
             if not (torch.is_tensor(wav_tensor) and wav_tensor.numel() > tts_engine.sr * 0.1):
                 logging.warning(f"Generation failed (empty audio) for chunk #{sentence_number}, attempt {attempt_num+1}.")
                 continue
             
-            # logging.debug(f"[Worker] Saving to {temp_path_str}...")
-#            torchaudio.save(temp_path_str, wav_tensor.cpu(), tts_engine.sr, backend="soundfile")
             audio_data = wav_tensor.cpu().numpy()
             if len(audio_data.shape) > 1:
                 audio_data = audio_data.T
             
             try:
                 sf.write(temp_path_str, audio_data, tts_engine.sr)
-                # logging.debug(f"[Worker] File saved to disk.")
             except Exception as e_sf:
                 logging.error(f"[Worker] sf.write failed: {e_sf}")
                 raise
@@ -297,21 +320,64 @@ def worker_process_chunk(task: WorkerTask):
             duration = wav_tensor.shape[-1] / tts_engine.sr
             
             # --- Signal Processing Check (Pre-Whisper) ---
-            # logging.debug(f"[Worker] Validating audio signal...")
             is_valid_signal, signal_error = validate_audio_signal(wav_tensor.cpu(), tts_engine.sr)
-            # logging.debug(f"[Worker] Validation result: {is_valid_signal}")
             
             if not is_valid_signal:
                 logging.warning(f"Signal Rejected inside worker chunk #{sentence_number}, attempt {attempt_num+1}: {signal_error}")
                 if Path(temp_path_str).exists(): os.remove(temp_path_str) # Cleanup if we wrote it (logic above wrote sf.write first)
                 continue
+
+            # --- MCCC: Reference Fidelity Check (Pitch & Timbre) ---
+            # Gate 1: Pitch Validation (Gender/Tone Check)
+            ref_f0 = ref_features.get('f0_mean')
+            
+            # Efficiently extract candidate features (MFCC needs audio, so do it once)
+            try:
+                # We can load Y/SR once for both checks if we modify extract_audio_features, 
+                # but for modularity let's just use the path which is safe.
+                cand_features = extract_audio_features(temp_path_str)
+            except:
+                cand_features = {}
+                
+            if ref_f0 and ref_f0 > 50: 
+                cand_f0 = cand_features.get('f0_mean', 0)
+                if cand_f0 > 50:
+                    ratio = cand_f0 / ref_f0
+                    if ratio > 1.4: 
+                         logging.warning(f"FIDELITY REJECT: Pitch too high ({cand_f0:.0f}Hz) vs Ref ({ref_f0:.0f}Hz). Ratio: {ratio:.2f}")
+                         if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                         continue
+                    if ratio < 0.6: 
+                         logging.warning(f"FIDELITY REJECT: Pitch too low ({cand_f0:.0f}Hz) vs Ref ({ref_f0:.0f}Hz). Ratio: {ratio:.2f}")
+                         if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                         continue
+            
+            # Gate 2: Timbre Similarity (Accent/Speaker Identity Check)
+            if ref_mfcc_profile is not None:
+                # Reuse 'y' if possible, or load fresh
+                cand_y = cand_features.get('y')
+                cand_sr = cand_features.get('sr')
+                cand_mfcc = extract_mfcc_profile(temp_path_str, y=cand_y, sr=cand_sr)
+                
+                timbre_score = calculate_timbre_similarity(ref_mfcc_profile, cand_mfcc)
+                
+                # Threshold Tuning:
+                # Same speaker typically > 0.9
+                # Slight accent drift might dip to 0.8
+                # Different speaker/Total collapse < 0.7
+                TIMBRE_THRESHOLD = 0.75 
+                
+                if timbre_score < TIMBRE_THRESHOLD:
+                    logging.warning(f"FIDELITY REJECT: Timbre Mismatch (Score: {timbre_score:.2f} < {TIMBRE_THRESHOLD}). Possible accent drift.")
+                    if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                    continue
+                else:
+                    logging.info(f"Fidelity Passed: Pitch OK, Timbre Score {timbre_score:.2f}")
             
             # GPU Memory Cleanup: Free tensor immediately after use
-            # logging.debug(f"[Worker] Cleaning up GPU memory...")
             del wav_tensor
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-            # logging.debug(f"[Worker] GPU memory cleaned.")
 
         except Exception as e:
             logging.error(f"Generation crashed for chunk #{sentence_number}, attempt {attempt_num+1}: {e}", exc_info=True)
