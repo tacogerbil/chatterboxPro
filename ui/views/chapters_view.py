@@ -210,9 +210,6 @@ class ChaptersView(QWidget):
         header_layout.addWidget(self.lbl_auto_loop_info)
         
         # Initial Status Check
-        
-        # Initial Status Check
-        self.refresh_gpu_status()
 
         refresh_btn = QPushButton("↻ Refresh")
         refresh_btn.setToolTip("Rescan source text for chapters")
@@ -316,6 +313,9 @@ class ChaptersView(QWidget):
         self.progress_widget = ProgressWidget()
         self.progress_widget.setVisible(False)  # Hidden until generation starts
         layout.addWidget(self.progress_widget)
+        
+        # Initial Refresh (Must be after UI init)
+        self.refresh_gpu_status()
 
     def showEvent(self, event) -> None:
         """MCCC: Refresh status when tab becomes visible."""
