@@ -267,13 +267,32 @@ class SetupView(QWidget):
         # Dual GPU Checkbox (Conditional)
         # MCCC: Use centralized system capabilities
         gpu_count = self.state.system_capabilities.get('gpu_count', 0)
-             
-        if gpu_count >= 2:
-            self.dual_gpu_chk = QCheckBox(f"Use Both GPUs ({gpu_count} detected)")
-            is_dual = "," in self.state.settings.target_gpus
-            self.dual_gpu_chk.setChecked(is_dual)
-            self.dual_gpu_chk.stateChanged.connect(self.toggle_dual_gpu)
-            c_layout.addWidget(self.dual_gpu_chk)
+        gpu_names = self.state.system_capabilities.get('gpu_names', [])
+        
+        self.gpu_checkboxes = []
+        if gpu_count > 0:
+            gpu_group = QGroupBox("GPU Selection")
+            g_layout = QVBoxLayout(gpu_group)
+            
+            # Current Setting
+            current_targets = self.state.settings.target_gpus.split(',')
+            
+            for i, name in enumerate(gpu_names):
+                chk = QCheckBox(f"GPU {i}: {name}")
+                device_str = f"cuda:{i}"
+                
+                # Check if currently enabled
+                chk.setChecked(device_str in current_targets)
+                
+                # Connect
+                chk.stateChanged.connect(self.update_gpu_config)
+                
+                # Store ref
+                chk.setProperty("device_id", i) # Store logical ID
+                self.gpu_checkboxes.append(chk)
+                g_layout.addWidget(chk)
+                
+            c_layout.addWidget(gpu_group)
 
         # Generation Control Layout: [ Start ] [ Stop ]
         gen_layout = QHBoxLayout()
@@ -300,19 +319,30 @@ class SetupView(QWidget):
         
         layout.addWidget(ctrl_group)
 
-    def toggle_dual_gpu(self, state: int) -> None:
-        """Toggles between single (cuda:0) and dual (cuda:0,cuda:1) GPU mode."""
-        if state == Qt.Checked or state == 2:
-            self.state.settings.target_gpus = "cuda:0,cuda:1"
-            self.state.settings.gpu_devices = "0,1" # Maintain parallel for compatibility if used elsewhere
-        else:
-            self.state.settings.target_gpus = "cuda:0"
-            self.state.settings.gpu_devices = "0"
-            
-        # Log change
-        logging.info(f"GPU Mode changed: {self.state.settings.target_gpus}")
+    def update_gpu_config(self) -> None:
+        """Rebuilds target_gpus string based on checked boxes."""
+        selected = []
+        indices = []
         
-        # MCCC: Sync UI immediately
+        for chk in self.gpu_checkboxes:
+            if chk.isChecked():
+                device_id = chk.property("device_id")
+                selected.append(f"cuda:{device_id}")
+                indices.append(str(device_id))
+        
+        # Safety: If none selected, default to cuda:0 and check the box
+        if not selected and self.gpu_checkboxes:
+            self.gpu_checkboxes[0].setChecked(True)
+            selected = ["cuda:0"]
+            indices = ["0"]
+        
+        # Update State
+        self.state.settings.target_gpus = ",".join(selected)
+        self.state.settings.gpu_devices = ",".join(indices)
+        
+        logging.info(f"GPU Config Updated: {self.state.settings.target_gpus}")
+        
+        # Sync UI
         self.check_system()
         self.refresh_params_display()
 
@@ -347,28 +377,35 @@ class SetupView(QWidget):
         self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
 
         # MCCC: Hardware Isolation - Read from State
-        caps = self.state.system_capabilities
         if caps.get('cuda_available', False):
             count = caps.get('gpu_count', 0)
-            name = caps.get('gpu_name', 'Unknown')
-            is_dual = count > 1 and "cuda:0,cuda:1" in self.state.settings.target_gpus
+            names = caps.get('gpu_names', [])
+            targets = self.state.settings.target_gpus
             
-            if is_dual:
-                self.lbl_gpu.setText(f"Dual GPU Mode (Using 2 of {count} devices)")
+            active_indices = []
+            if "cuda:" in targets:
+                parts = targets.split(',')
+                for p in parts:
+                    try:
+                        idx = int(p.split(':')[1])
+                        active_indices.append(idx)
+                    except: pass
+            
+            if active_indices:
+                active_names = [names[i] for i in active_indices if i < len(names)]
+                if len(active_names) > 1:
+                    # Dual/Multi Mode
+                    self.lbl_gpu.setText(f"Multi-GPU Active ({len(active_names)} devices): {', '.join(active_names)}")
+                else:
+                    # Single Mode
+                    self.lbl_gpu.setText(f"Single GPU Active: {active_names[0]}")
             else:
-                 # Single Mode
-                self.lbl_gpu.setText(f"Single GPU Mode (Using Device 0: {name}) / {count} Available")
-                
+                 self.lbl_gpu.setText("No GPUs Selected")
+
             self.lbl_gpu.setStyleSheet("color: green")
         else:
             self.lbl_gpu.setText("CPU Mode (No CUDA found)")
             self.lbl_gpu.setStyleSheet("color: orange")
-
-    def toggle_dual_gpu(self, state: int) -> None:
-        if state == Qt.Checked or state == 2:
-            self.state.settings.target_gpus = "cuda:0,cuda:1"
-        else:
-            self.state.settings.target_gpus = "cuda:0"
 
     def browse_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Select Text Source", "", 

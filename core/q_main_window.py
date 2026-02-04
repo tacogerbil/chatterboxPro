@@ -45,16 +45,16 @@ class ChatterboxProQt(QMainWindow):
         try:
             cuda_available = torch.cuda.is_available()
             gpu_count = torch.cuda.device_count()
-            gpu_name = torch.cuda.get_device_name(0) if cuda_available and gpu_count > 0 else "Unknown"
+            gpu_names = [torch.cuda.get_device_name(i) for i in range(gpu_count)] if cuda_available else []
         except:
             cuda_available = False
             gpu_count = 0
-            gpu_name = "Unknown"
+            gpu_names = []
             
         self.app_state.system_capabilities = {
             'cuda_available': cuda_available,
             'gpu_count': gpu_count,
-            'gpu_name': gpu_name
+            'gpu_names': gpu_names
         }
         
         # Instantiate Backend Services
