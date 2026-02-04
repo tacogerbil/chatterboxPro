@@ -445,9 +445,9 @@ class ChaptersView(QWidget):
             gpu_settings = self.app_state.settings.target_gpus
             
             if ',' in str(gpu_settings): # Multi-GPU Mode
+                # MCCC: Qt CSS doesn't support text-shadow, replaced with simple color change
                 self.lbl_gpu_status.setStyleSheet(
-                    "color: #00FF00; font-size: 14pt; margin-left: 5px; "
-                    "text-shadow: 0 0 8px #00FF00;"
+                    "color: #00FF00; font-size: 14pt; margin-left: 5px; font-weight: bold;"
                 )
                 self.lbl_gpu_status.setToolTip(f"Multi-GPU Active: {gpu_settings}")
             else: # Single Mode

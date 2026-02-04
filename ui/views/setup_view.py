@@ -8,8 +8,6 @@ from typing import Optional, List, Dict, Any
 import os
 import shutil
 import dataclasses
-import shutil
-import dataclasses
 import logging
 
 from core.state import AppState
@@ -298,6 +296,11 @@ class SetupView(QWidget):
         
         c_layout.addLayout(gen_layout)
         
+        # MCCC: Progress Tracking Widget (Restored to correct scope)
+        self.progress_widget = ProgressWidget()
+        self.progress_widget.setVisible(False)  # Hidden until generation starts
+        layout.addWidget(self.progress_widget)
+        
         layout.addWidget(ctrl_group)
 
     def toggle_dual_gpu(self, state: int) -> None:
@@ -311,11 +314,6 @@ class SetupView(QWidget):
             
         # Log change
         logging.info(f"GPU Mode changed: {self.state.settings.target_gpus}")
-        
-        # MCCC: Progress Tracking Widget
-        self.progress_widget = ProgressWidget()
-        self.progress_widget.setVisible(False)  # Hidden until generation starts
-        layout.addWidget(self.progress_widget)
 
     def refresh_values(self) -> None:
         """Updates UI based on state changes."""
