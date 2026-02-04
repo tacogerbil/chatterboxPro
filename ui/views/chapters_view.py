@@ -278,6 +278,11 @@ class ChaptersView(QWidget):
         
         footer_layout.addStretch()
         
+        # Generate Selected button (Restored Initialization)
+        self.gen_btn = QPushButton("Generate Selected")
+        self.gen_btn.setStyleSheet("background-color: #D35400; color: white; font-weight: bold; padding: 5px;")
+        self.gen_btn.clicked.connect(self.generate_selected)
+        
         # Stacked Layout: Auto-loop (Top) + GPU Status (Bottom)
         stats_layout = QVBoxLayout()
         stats_layout.setSpacing(2)
