@@ -2,6 +2,11 @@ import logging
 import random
 import uuid
 import multiprocessing
+import multiprocessing.connection
+import time
+import os
+import signal
+import subprocess # MCCC: For taskkill
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Dict, Any, Tuple, Optional, Union
@@ -21,16 +26,16 @@ STATUS_NO = 'no'
 class GenerationThread(QThread):
     """
     Background thread that manages the ProcessPoolExecutor loop.
-    Emits signals for progress and completion so the Service/UI stays responsive.
+    Emits batched signals for progress and completion to prevent UI lockups.
     """
     # Signals to communicate back to the Service (which runs on Main Thread)
     progress_update = Signal(int, int) # completed, total
-    chunk_complete = Signal(int, dict) # original_index, result_payload
+    # MCCC: Batch signal instead of single item to prevent event loop flooding
+    batch_complete = Signal(list) # list of result dicts
     finished = Signal()
     error_occurred = Signal(str)
     stopped = Signal()
 
-    # Task structure passed via content dictionary for simplicity
     def __init__(self, tasks: List[Any], max_workers: int, outputs_dir: str) -> None:
         super().__init__()
         self.tasks = tasks
@@ -43,43 +48,45 @@ class GenerationThread(QThread):
         """Stops the loop and NUKES worker processes with extreme prejudice."""
         self.stop_requested.set()
         
+        logging.warning("🛑 NUCLEAR STOP: Initiating Sequence...")
+        
+        # 1. Capture PIDs BEFORE shutting down implementation (Critical for Windows)
+        pids = []
         if self.executor:
-            logging.warning("🛑 NUCLEAR STOP: Killing worker processes...")
+            # Try to get PIDs from private attribute (Standard in 3.9+)
+            if hasattr(self.executor, '_processes') and self.executor._processes:
+                 pids = list(self.executor._processes.keys())
+        
+        if not pids:
+            logging.warning("Could not find active PIDs in executor. Processes may be orphaned.")
+
+        # 2. Cancel Future Work
+        if self.executor:
             try:
-                # 1. Cancel pending futures
                 self.executor.shutdown(wait=False, cancel_futures=True)
-                
-                # 2. KILL running processes (not terminate - KILL)
-                # MCCC: Explicit Intent - terminate() sends SIGTERM which CUDA can ignore
-                # kill() sends SIGKILL which is instant death, no cleanup
-                if hasattr(self.executor, '_processes') and self.executor._processes is not None:
-                    for pid, process in list(self.executor._processes.items()):
-                        try:
-                            process.kill()  # SIGKILL (was terminate/SIGTERM)
-                            logging.warning(f"KILLED worker process {pid}")
-                        except Exception as e:
-                            logging.error(f"Failed to kill process {pid}: {e}")
-                            
-                # 3. Delayed Cleanup (Fallback)
-                # If processes are STILL alive after 1 second, force kill again
-                import threading
-                def delayed_cleanup():
-                    import time
-                    time.sleep(1.0)
-                    if hasattr(self.executor, '_processes') and self.executor._processes is not None:
-                        for pid, process in list(self.executor._processes.items()):
-                            if process.is_alive():
-                                try:
-                                    process.kill()
-                                    logging.warning(f"Delayed KILL on zombie process {pid}")
-                                except:
-                                    pass
-                                    
-                cleanup_thread = threading.Thread(target=delayed_cleanup, daemon=True)
-                cleanup_thread.start()
-                
             except Exception as e:
-                logging.error(f"Error during nuclear stop: {e}")
+                logging.error(f"Error during executor shutdown: {e}")
+
+        # 3. Aggressive Kill (The "Double Tap")
+        if pids:
+            logging.warning(f"Killing {len(pids)} worker processes: {pids}")
+            for pid in pids:
+                try:
+                    # Windows: use taskkill /F /T to kill process tree (including child threads/ffmpeg)
+                    if os.name == 'nt':
+                        subprocess.run(
+                            ["taskkill", "/F", "/T", "/PID", str(pid)], 
+                            stdout=subprocess.DEVNULL, 
+                            stderr=subprocess.DEVNULL,
+                            timeout=2
+                        )
+                    else:
+                        # Linux/Mac: SIGKILL
+                        os.kill(pid, signal.SIGKILL)
+                        
+                    logging.warning(f"KILLED worker process {pid}")
+                except Exception as e:
+                     logging.error(f"Failed to kill process {pid}: {e}")
 
     def _cleanup_memory(self) -> None:
         import gc
@@ -101,24 +108,40 @@ class GenerationThread(QThread):
                 # Map future -> task info (index 1 is original_index)
                 futures = {executor.submit(worker_process_chunk, task): task for task in self.tasks}
                 
+                # MCCC: Batching Buffer
+                result_batch = []
+                last_emit_time = time.time()
+                
                 for future in as_completed(futures):
                     if self.stop_requested.is_set():
-                         executor.shutdown(wait=False, cancel_futures=True)
+                         # Clean shutdown handled by request_stop, just exit loop
                          self.stopped.emit()
                          return
 
                     try:
                         result = future.result()
                         if result and 'original_index' in result:
-                            # Pass result back to Main Thread for state update
-                            self.chunk_complete.emit(result['original_index'], result)
+                            result_batch.append(result)
                     except Exception as e:
                         logging.error(f"Worker task error: {e}")
-                        # Don't abort entire run for one chunk failure unless critical?
                         pass
                     
                     completed_count += 1
-                    self.progress_update.emit(completed_count, total_tasks)
+                    
+                    # MCCC: Dynamic Batch Emission (Throttle to ~10fps max)
+                    # Emit if batch is large OR time has passed
+                    current_time = time.time()
+                    if len(result_batch) >= 10 or (current_time - last_emit_time) > 0.1:
+                        if result_batch:
+                            self.batch_complete.emit(result_batch)
+                            result_batch = []
+                        self.progress_update.emit(completed_count, total_tasks)
+                        last_emit_time = current_time
+                
+                # Flush remaining
+                if result_batch:
+                     self.batch_complete.emit(result_batch)
+                     self.progress_update.emit(completed_count, total_tasks)
             
             self._cleanup_memory()
             
@@ -141,7 +164,7 @@ class GenerationService(QObject):
     
     # Signals
     progress_update = Signal(int, int) # completed, total
-    item_updated = Signal(int) # index of updated item
+    items_updated = Signal(list) # list of indices of updated items (MCCC: Batched)
     started = Signal()
     finished = Signal()
     stopped = Signal()
@@ -356,13 +379,6 @@ class GenerationService(QObject):
         outputs_dir = "Outputs_Pro" 
         
         # 1. Determine Scope
-        # ... (rest of start_generation logic) ...
-
-    # ... (skipping to _on_chunk_complete) ...
-
- 
-        
-        # 1. Determine Scope
         if indices_to_process is not None:
              # Explicit list (e.g. retry or selected chapters)
              # MCCC: Must filter out pauses here too!
@@ -395,9 +411,6 @@ class GenerationService(QObject):
         
         # 3. Prepare Logic (Seed, etc)
         # MCCC Audit: Handle Multiple Full Outputs
-        # If indices_to_process is None (Full Run), respect num_full_outputs.
-        # If explicit indices (Repair/Retry), run only once (run_idx=0).
-        
         num_runs = 1
         if indices_to_process is None: # Only for full runs
              num_runs = max(1, s.num_full_outputs)
@@ -424,59 +437,78 @@ class GenerationService(QObject):
         self.worker_thread = GenerationThread(tasks, max_workers, outputs_dir)
         
         self.worker_thread.progress_update.connect(self.progress_update)
-        self.worker_thread.chunk_complete.connect(self._on_chunk_complete)
+        # MCCC: Connect updated batch signal
+        self.worker_thread.batch_complete.connect(self._on_batch_complete)
         self.worker_thread.finished.connect(self._on_finished)
         self.worker_thread.stopped.connect(self._on_stopped)
         self.worker_thread.error_occurred.connect(self.error_occurred)
         
         self.worker_thread.start()
+
+    @Slot(list)
+    def _on_batch_complete(self, results: List[Dict[str, Any]]) -> None:
+        """Called on Main Thread when a BATCH of chunks finishes."""
+        if not results: return
         
-    @Slot(int, dict)
-    def _on_chunk_complete(self, original_idx: int, result: Dict[str, Any]) -> None:
-        """Called on Main Thread when a chunk finishes."""
-        # Update State
-        self.state.sentences[original_idx]['generation_seed'] = result.get('seed')
-        self.state.sentences[original_idx]['similarity_ratio'] = result.get('similarity_ratio')
+        updated_indices = []
         
-        # MCCC: Store audio path for playback
-        if result.get('path'):
-            self.state.sentences[original_idx]['audio_path'] = result.get('path')
-        
-        status = result.get('status')
-        asr = result.get('similarity_ratio', 0.0)
-        
-        # MCCC: Track Statistics (Dynamic - Handles Regeneration)
-        old_status = self.state.chunk_status.get(original_idx)
-        new_status = 'passed' if status == 'success' else 'failed'
-        
-        # Update counters based on status transition
-        if old_status == 'failed' and new_status == 'passed':
-            # Regeneration success: failed -> passed
-            self.state.chunks_failed -= 1
-            self.state.chunks_passed += 1
-        elif old_status == 'passed' and new_status == 'failed':
-            # Regression: passed -> failed (rare, but possible)
-            self.state.chunks_passed -= 1
-            self.state.chunks_failed += 1
-        elif old_status is None:
-            # First time processing this chunk
-            if new_status == 'passed':
+        for result in results:
+            original_idx = result.get('original_index')
+            if original_idx is None: continue
+            
+            updated_indices.append(original_idx)
+            
+            # Update State
+            self.state.sentences[original_idx]['generation_seed'] = result.get('seed')
+            self.state.sentences[original_idx]['similarity_ratio'] = result.get('similarity_ratio')
+            
+            # MCCC: Store audio path for playback
+            if result.get('path'):
+                self.state.sentences[original_idx]['audio_path'] = result.get('path')
+            
+            status = result.get('status')
+            asr = result.get('similarity_ratio', 0.0)
+            
+            # MCCC: Track Statistics (Dynamic - Handles Regeneration)
+            old_status = self.state.chunk_status.get(original_idx)
+            new_status = 'passed' if status == 'success' else 'failed'
+            
+            # Update counters based on status transition
+            if old_status == 'failed' and new_status == 'passed':
+                self.state.chunks_failed -= 1
                 self.state.chunks_passed += 1
-            else:
+            elif old_status == 'passed' and new_status == 'failed':
+                self.state.chunks_passed -= 1
                 self.state.chunks_failed += 1
-        # else: same status, no change needed
+            elif old_status is None:
+                if new_status == 'passed':
+                    self.state.chunks_passed += 1
+                else:
+                    self.state.chunks_failed += 1
+            
+            self.state.chunk_status[original_idx] = new_status
+            self.state.chunks_completed += 1
+            
+            if status == 'success':
+                self.state.sentences[original_idx]['tts_generated'] = STATUS_YES
+                self.state.sentences[original_idx]['marked'] = False
+                logging.info(f"✅ Chunk [{original_idx+1}] PASSED: ASR Match={asr*100:.1f}%")
+            else:
+                self.state.sentences[original_idx]['tts_generated'] = STATUS_FAILED
+                self.state.sentences[original_idx]['marked'] = True
+                error_msg = result.get('error_message', 'Unknown Error')
+                logging.warning(f"❌ Chunk [{original_idx+1}] FAILED: {error_msg} (ASR={asr*100:.1f}%)")
         
-        self.state.chunk_status[original_idx] = new_status
-        self.state.chunks_completed += 1
+        # Emit Aggregated Signals (Once per batch)
         
-        # Emit statistics update
+        # 1. Stats
         self.stats_updated.emit(
             self.state.total_chunks,
             self.state.chunks_passed,
             self.state.chunks_failed
         )
         
-        # Calculate and emit ETA
+        # 2. ETA
         import time
         elapsed = time.time() - self.state.generation_start_time
         if self.state.chunks_completed > 0:
@@ -484,19 +516,9 @@ class GenerationService(QObject):
             remaining_chunks = self.state.total_chunks - self.state.chunks_completed
             eta_seconds = avg_time_per_chunk * remaining_chunks
             self.eta_updated.emit(eta_seconds)
-        
-        if status == 'success':
-            self.state.sentences[original_idx]['tts_generated'] = STATUS_YES
-            self.state.sentences[original_idx]['marked'] = False
-            logging.info(f"✅ Chunk [{original_idx+1}] PASSED: ASR Match={asr*100:.1f}%")
-        else:
-            self.state.sentences[original_idx]['tts_generated'] = STATUS_FAILED
-            self.state.sentences[original_idx]['marked'] = True
-            error_msg = result.get('error_message', 'Unknown Error')
-            logging.warning(f"❌ Chunk [{original_idx+1}] FAILED: {error_msg} (ASR={asr*100:.1f}%)")
-        
-        # Emit update for UI
-        self.item_updated.emit(original_idx)
+            
+        # 3. Item Updates (Pass list to View)
+        self.items_updated.emit(updated_indices)
 
     @Slot()
     def _on_finished(self) -> None:
@@ -545,8 +567,6 @@ class GenerationService(QObject):
         devices, _ = self._configure_workers(s.target_gpus)
         device = devices[0]
         
-        # Create task tuple (similar to _prepare_tasks but simplified)
-        # Note: Index -1 indicates this is a transient preview, not a sentence item
         # Create task object (MCCC: Explicit Interface)
         # Note: Index -1 indicates this is a transient preview
         task = WorkerTask(
@@ -581,9 +601,6 @@ class GenerationService(QObject):
             model_path=s.model_path
         )
         
-        # We can reuse GenerationThread, or just spawn a simple thread 
-        # Since GenerationThread assumes "chunk_complete" behavior mapped to state, 
-        # we might want a lightweight PreviewThread.
         self._preview_worker = PreviewWorker(task)
         self._preview_worker.finished_signal.connect(self.preview_ready)
         self._preview_worker.error_signal.connect(self.preview_error)

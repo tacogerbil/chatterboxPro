@@ -1,6 +1,7 @@
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex
 from core.state import AppState
 import html  # MCCC: Move import out of hot path
+from typing import List
 
 class PlaylistModel(QAbstractListModel):
     """
@@ -89,6 +90,22 @@ class PlaylistModel(QAbstractListModel):
         idx = self.index(row_index, 0)
         if idx.isValid():
             self.dataChanged.emit(idx, idx, [Qt.DisplayRole, self.StatusRole])
+
+    def update_rows(self, row_indices: List[int]):
+        """MCCC: Batched update for efficiency."""
+        if not row_indices: return
+        
+        # Determine range (assuming somewhat contiguous for efficiency)
+        min_idx = min(row_indices)
+        max_idx = max(row_indices)
+        
+        # Emit one signal covering the range
+        # This is more efficient than emitting 100 signals for 100 rows
+        start = self.index(min_idx, 0)
+        end = self.index(max_idx, 0)
+        
+        if start.isValid() and end.isValid():
+            self.dataChanged.emit(start, end, [Qt.DisplayRole, self.StatusRole])
 
     def get_item(self, row_index: int):
         """Returns the raw data dict for a given row index."""

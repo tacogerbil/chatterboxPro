@@ -393,6 +393,23 @@ class ChaptersView(QWidget):
         gen_service.started.connect(lambda: self.progress_widget.setVisible(True))
         gen_service.finished.connect(lambda: self.progress_widget.setVisible(False))
         gen_service.stopped.connect(lambda: self.progress_widget.setVisible(False))
+        
+        # MCCC: Handle batched updates to prevent UI freeze
+        if hasattr(gen_service, 'items_updated'):
+             gen_service.items_updated.connect(self.on_items_updated)
+
+    @Slot(list)
+    def on_items_updated(self, indices: List[int]) -> None:
+        """
+        Handles batched updates from GenerationService.
+        Emits dataChanged for the range of affected rows.
+        """
+        if not indices: return
+        # Since ChaptersView shows CHAPTERS, not sentences, we typically don't update individual rows 
+        # based on sentence updates unless we track status per chapter.
+        # But if we did, we would map sentence index -> chapter row.
+        # For now, just ensuring this slot exists prevents crashes if connected.
+        pass
 
     def generate_selected(self) -> None:
         # Merge Checkbox selection + Highlighting selection
