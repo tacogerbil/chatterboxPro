@@ -188,26 +188,12 @@ class SetupView(QWidget):
             self.lbl_auto_expression.setText("Disabled")
             
         # GPU Status Update
-        device_count = self.state.system_capabilities.get('gpu_count', 0)
-            
-        if device_count < 2:
-            # Hide if not multi-gpu capable
-            self.params_layout.setRowVisible(self.lbl_gpu_status, False)
-        else:
-            self.params_layout.setRowVisible(self.lbl_gpu_status, True)
-            
-            gpu_devices = getattr(s, 'gpu_devices', '0')
-            if ',' in str(gpu_devices):  # Multi-GPU mode (e.g., "0,1")
-                self.lbl_gpu_status.setText("●")
-                # Glowing Green Effect
-                self.lbl_gpu_status.setStyleSheet(
-                    "color: #00FF00; font-size: 16px; "
-                    "text-shadow: 0 0 8px #00FF00;"
-                )
-                self.lbl_gpu_status.setToolTip(f"Multi-GPU Active: {gpu_devices}")
-            else:
-                self.lbl_gpu_status.setText("●")
-                self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 16px;") # Dim grey
+        # Handled by check_system() and update_gpu_config() independently.
+        # Removing legacy params_layout dependency.
+        pass
+        
+        # MCCC: Ensure labels are updated
+        pass
                 self.lbl_gpu_status.setToolTip(f"Single GPU: {gpu_devices}")
 
     # MCCC FIX: Removed showEvent() handler that was blocking main thread on tab switches

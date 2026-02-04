@@ -206,8 +206,7 @@ class ChaptersView(QWidget):
         self.lbl_auto_loop_info.setStyleSheet("color: gray; font-size: 8pt; margin-right: 10px;")
 
         # Add to layout
-        header_layout.addWidget(self.auto_loop_chk)
-        header_layout.addWidget(self.lbl_auto_loop_info)
+        # (Auto-loop moved to Footer)
         
         # Initial Status Check
 
