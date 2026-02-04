@@ -277,20 +277,29 @@ class ChaptersView(QWidget):
         footer_layout.addWidget(check_high)
         
         footer_layout.addStretch()
-
         
-        # Generate Selected button
-        self.gen_btn = QPushButton("Generate Selected")
-        self.gen_btn.setStyleSheet("background-color: #D35400; color: white; font-weight: bold; padding: 5px;")
-        self.gen_btn.clicked.connect(self.generate_selected)
+        # Stacked Layout: Auto-loop (Top) + GPU Status (Bottom)
+        stats_layout = QVBoxLayout()
+        stats_layout.setSpacing(2)
         
-        # MCCC: GPU Status in Footer (Left of Generate)
+        # Row 1: Auto-loop (Align Right)
+        auto_loop_layout = QHBoxLayout()
+        auto_loop_layout.setAlignment(Qt.AlignRight)
+        auto_loop_layout.addWidget(self.auto_loop_chk)
+        auto_loop_layout.addWidget(self.lbl_auto_loop_info)
+        stats_layout.addLayout(auto_loop_layout)
+        
+        # Row 2: GPU Status (Align Right)
         self.lbl_gpu_status = QLabel("")
         self.lbl_gpu_status.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.lbl_gpu_status.setTextFormat(Qt.RichText) # Ensure <br> works
-        self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 10pt; margin-right: 10px;")
+        self.lbl_gpu_status.setTextFormat(Qt.RichText) 
+        self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 10pt;")
+        stats_layout.addWidget(self.lbl_gpu_status)
         
-        footer_layout.addWidget(self.lbl_gpu_status)
+        footer_layout.addLayout(stats_layout)
+        
+        # Spacer
+        footer_layout.addSpacing(10)
         footer_layout.addWidget(self.gen_btn)
         
         # Stop Button
