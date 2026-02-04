@@ -377,6 +377,7 @@ class SetupView(QWidget):
         self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
 
         # MCCC: Hardware Isolation - Read from State
+        caps = self.state.system_capabilities
         if caps.get('cuda_available', False):
             count = caps.get('gpu_count', 0)
             names = caps.get('gpu_names', [])
