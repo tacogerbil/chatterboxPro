@@ -188,10 +188,7 @@ class SetupView(QWidget):
             self.lbl_auto_expression.setText("Disabled")
             
         # GPU Status Update
-        try:
-            device_count = torch.cuda.device_count()
-        except:
-            device_count = 0
+        device_count = self.state.system_capabilities.get('gpu_count', 0)
             
         if device_count < 2:
             # Hide if not multi-gpu capable
@@ -345,19 +342,21 @@ class SetupView(QWidget):
         self.lbl_auto.setText("Found" if ae else "Not Found (Optional)")
         self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
 
-        try:
-            if torch.cuda.is_available():
-                count = torch.cuda.device_count()
-                name = torch.cuda.get_device_name(0)
-                mode = "Dual GPU" if count > 1 and "cuda:0,cuda:1" in self.state.settings.target_gpus else "Single GPU"
-                self.lbl_gpu.setText(f"{mode} ({count} devices) - {name}")
-                self.lbl_gpu.setStyleSheet("color: green")
-            else:
-                self.lbl_gpu.setText("CPU Mode (No CUDA found)")
-                self.lbl_gpu.setStyleSheet("color: orange")
-        except:
-             self.lbl_gpu.setText("Error Checking GPU")
-             self.lbl_gpu.setStyleSheet("color: red")
+        ae = shutil.which('auto-editor')
+        self.lbl_auto.setText("Found" if ae else "Not Found (Optional)")
+        self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
+
+        # MCCC: Hardware Isolation - Read from State
+        caps = self.state.system_capabilities
+        if caps.get('cuda_available', False):
+            count = caps.get('gpu_count', 0)
+            name = caps.get('gpu_name', 'Unknown')
+            mode = "Dual GPU" if count > 1 and "cuda:0,cuda:1" in self.state.settings.target_gpus else "Single GPU"
+            self.lbl_gpu.setText(f"{mode} ({count} devices) - {name}")
+            self.lbl_gpu.setStyleSheet("color: green")
+        else:
+            self.lbl_gpu.setText("CPU Mode (No CUDA found)")
+            self.lbl_gpu.setStyleSheet("color: orange")
 
     def toggle_dual_gpu(self, state: int) -> None:
         if state == Qt.Checked or state == 2:

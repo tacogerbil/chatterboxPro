@@ -43,10 +43,19 @@ class ChatterboxProQt(QMainWindow):
             
         # MCCC: Initialize System Capabilities (Hardware Isolation)
         try:
+            cuda_available = torch.cuda.is_available()
             gpu_count = torch.cuda.device_count()
+            gpu_name = torch.cuda.get_device_name(0) if cuda_available and gpu_count > 0 else "Unknown"
         except:
+            cuda_available = False
             gpu_count = 0
-        self.app_state.system_capabilities = {'gpu_count': gpu_count}
+            gpu_name = "Unknown"
+            
+        self.app_state.system_capabilities = {
+            'cuda_available': cuda_available,
+            'gpu_count': gpu_count,
+            'gpu_name': gpu_name
+        }
         
         # Instantiate Backend Services
         self.gen_service = GenerationService(self.app_state)
