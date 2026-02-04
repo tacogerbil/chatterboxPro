@@ -194,7 +194,6 @@ class SetupView(QWidget):
         
         # MCCC: Ensure labels are updated
         pass
-                self.lbl_gpu_status.setToolTip(f"Single GPU: {gpu_devices}")
 
     # MCCC FIX: Removed showEvent() handler that was blocking main thread on tab switches
     # UI refreshes should be signal-driven, not event-driven
