@@ -205,9 +205,6 @@ class ChaptersView(QWidget):
         self.lbl_auto_loop_info = QLabel(f"(Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
         self.lbl_auto_loop_info.setStyleSheet("color: gray; font-size: 8pt; margin-right: 10px;")
 
-        # Add to layout
-        # (Auto-loop moved to Footer)
-        
         # Initial Status Check
 
         refresh_btn = QPushButton("↻ Refresh")
@@ -280,9 +277,6 @@ class ChaptersView(QWidget):
         footer_layout.addWidget(check_high)
         
         footer_layout.addStretch()
-        
-        
-        # Auto-loop Checkbox moved to Header
 
         
         # Generate Selected button

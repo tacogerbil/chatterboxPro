@@ -187,11 +187,6 @@ class SetupView(QWidget):
         else:
             self.lbl_auto_expression.setText("Disabled")
             
-        # GPU Status Update
-        # Handled by check_system() and update_gpu_config() independently.
-        # Removing legacy params_layout dependency.
-        pass
-        
         # MCCC: Ensure labels are updated
         pass
 
