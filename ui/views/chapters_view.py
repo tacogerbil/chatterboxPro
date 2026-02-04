@@ -235,7 +235,7 @@ class ChaptersView(QWidget):
         self.list_view.setItemDelegate(self.delegate)
         self.list_view.setMouseTracking(True) 
         
-        layout.addWidget(self.list_view)
+        layout.addWidget(self.list_view, stretch=1)
         
         # Initial Theme Apply
 
@@ -287,6 +287,7 @@ class ChaptersView(QWidget):
         # MCCC: GPU Status in Footer (Left of Generate)
         self.lbl_gpu_status = QLabel("")
         self.lbl_gpu_status.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.lbl_gpu_status.setTextFormat(Qt.RichText) # Ensure <br> works
         self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 10pt; margin-right: 10px;")
         
         footer_layout.addWidget(self.lbl_gpu_status)
