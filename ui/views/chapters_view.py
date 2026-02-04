@@ -205,15 +205,11 @@ class ChaptersView(QWidget):
         self.lbl_auto_loop_info = QLabel(f"(Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
         self.lbl_auto_loop_info.setStyleSheet("color: gray; font-size: 8pt; margin-right: 10px;")
 
-        # GPU Status Indicator (Chapters Tab)
-        self.lbl_gpu_status = QLabel("●")
-        self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 14pt; margin-left: 5px;")
-        self.lbl_gpu_status.setVisible(False) # Hidden by default until check
-
         # Add to layout
         header_layout.addWidget(self.auto_loop_chk)
-        header_layout.addWidget(self.lbl_gpu_status) # Next to checkbox (below in user mind, but horizontal layout)
         header_layout.addWidget(self.lbl_auto_loop_info)
+        
+        # Initial Status Check
         
         # Initial Status Check
         self.refresh_gpu_status()
@@ -297,6 +293,13 @@ class ChaptersView(QWidget):
         self.gen_btn = QPushButton("Generate Selected")
         self.gen_btn.setStyleSheet("background-color: #D35400; color: white; font-weight: bold; padding: 5px;")
         self.gen_btn.clicked.connect(self.generate_selected)
+        
+        # MCCC: GPU Status in Footer (Left of Generate)
+        self.lbl_gpu_status = QLabel("")
+        self.lbl_gpu_status.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 10pt; margin-right: 10px;")
+        
+        footer_layout.addWidget(self.lbl_gpu_status)
         footer_layout.addWidget(self.gen_btn)
         
         # Stop Button
@@ -313,6 +316,11 @@ class ChaptersView(QWidget):
         self.progress_widget = ProgressWidget()
         self.progress_widget.setVisible(False)  # Hidden until generation starts
         layout.addWidget(self.progress_widget)
+
+    def showEvent(self, event) -> None:
+        """MCCC: Refresh status when tab becomes visible."""
+        self.refresh_gpu_status()
+        super().showEvent(event)
 
     def update_theme(self, theme_name: str) -> None:
         """
@@ -343,10 +351,6 @@ class ChaptersView(QWidget):
         if hasattr(self, 'auto_loop_chk'):
              self.auto_loop_chk.setChecked(getattr(self.app_state, 'auto_regen_main', False))
             
-
-
-        
-
 
     def select_all(self) -> None:
         for i in range(self.model.rowCount()):
@@ -433,23 +437,33 @@ class ChaptersView(QWidget):
             self.gen_btn.setEnabled(has_items)
 
     def refresh_gpu_status(self):
-        """Updates visibility/glow of the multi-GPU indicator."""
-        # MCCC: Read hardware capabilities from centralized AppState
-        device_count = self.app_state.system_capabilities.get('gpu_count', 0)
+        """Updates footer indicator with active GPU names."""
+        caps = self.app_state.system_capabilities
+        gpu_names = caps.get('gpu_names', [])
+        targets = self.app_state.settings.target_gpus
+        
+        # Parse targets
+        active_names = []
+        if "cuda:" in targets:
+            try:
+                parts = targets.split(',')
+                for p in parts:
+                    idx = int(p.split(':')[1])
+                    if idx < len(gpu_names):
+                        active_names.append(gpu_names[idx])
+            except: 
+                pass
+                
+        if active_names:
+            if len(active_names) > 1:
+                text = f"Active GPUs: {', '.join(active_names)} ●"
+                self.lbl_gpu_status.setText(text)
+                self.lbl_gpu_status.setStyleSheet("color: #00FF00; font-weight: bold; margin-right: 15px;") # Bright Green
+            else:
+                text = f"GPU: {active_names[0]} ●"
+                self.lbl_gpu_status.setText(text)
+                self.lbl_gpu_status.setStyleSheet("color: #27AE60; font-weight: bold; margin-right: 15px;") # Normal Green
             
-        if device_count < 2:
-            self.lbl_gpu_status.setVisible(False)
-        else:
             self.lbl_gpu_status.setVisible(True)
-            # Check target_gpus string (e.g. "cuda:0,cuda:1")
-            gpu_settings = self.app_state.settings.target_gpus
-            
-            if ',' in str(gpu_settings): # Multi-GPU Mode
-                # MCCC: Qt CSS doesn't support text-shadow, replaced with simple color change
-                self.lbl_gpu_status.setStyleSheet(
-                    "color: #00FF00; font-size: 14pt; margin-left: 5px; font-weight: bold;"
-                )
-                self.lbl_gpu_status.setToolTip(f"Multi-GPU Active: {gpu_settings}")
-            else: # Single Mode
-                self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 14pt; margin-left: 5px;")
-                self.lbl_gpu_status.setToolTip(f"Single GPU: {gpu_settings}")
+        else:
+            self.lbl_gpu_status.setVisible(False)
