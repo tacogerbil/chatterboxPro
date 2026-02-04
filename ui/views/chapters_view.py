@@ -262,26 +262,11 @@ class ChaptersView(QWidget):
         self.model.modelReset.connect(self._update_empty_state)
         self._update_empty_state()
         
-    def refresh_gpu_status(self):
-        """Updates visibility/glow of the multi-GPU indicator."""
-        # MCCC: Read hardware capabilities from centralized AppState
-        device_count = self.app_state.system_capabilities.get('gpu_count', 0)
-            
-        if device_count < 2:
-            self.lbl_gpu_status.setVisible(False)
-        else:
-            self.lbl_gpu_status.setVisible(True)
-            gpu_settings = getattr(self.app_state.settings, 'gpu_devices', '0')
-            
-            if ',' in str(gpu_settings): # Multi-GPU Mode
-                self.lbl_gpu_status.setStyleSheet(
-                    "color: #00FF00; font-size: 14pt; margin-left: 5px; "
-                    "text-shadow: 0 0 8px #00FF00;"
-                )
-                self.lbl_gpu_status.setToolTip(f"Multi-GPU Active: {gpu_settings}")
-            else: # Single Mode
-                self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 14pt; margin-left: 5px;")
-                self.lbl_gpu_status.setToolTip(f"Single GPU: {gpu_settings}")
+        # Listen to model changes to toggle view
+        self.model.modelReset.connect(self._update_empty_state)
+        self._update_empty_state()
+        
+        # Continuation of setup_ui...
         self.model.rowsInserted.connect(self._update_empty_state)
         self.model.rowsRemoved.connect(self._update_empty_state)
 
@@ -446,4 +431,24 @@ class ChaptersView(QWidget):
         self.empty_label.setVisible(not has_items)
         if hasattr(self, 'gen_btn'):
             self.gen_btn.setEnabled(has_items)
-        
+
+    def refresh_gpu_status(self):
+        """Updates visibility/glow of the multi-GPU indicator."""
+        # MCCC: Read hardware capabilities from centralized AppState
+        device_count = self.app_state.system_capabilities.get('gpu_count', 0)
+            
+        if device_count < 2:
+            self.lbl_gpu_status.setVisible(False)
+        else:
+            self.lbl_gpu_status.setVisible(True)
+            gpu_settings = getattr(self.app_state.settings, 'gpu_devices', '0')
+            
+            if ',' in str(gpu_settings): # Multi-GPU Mode
+                self.lbl_gpu_status.setStyleSheet(
+                    "color: #00FF00; font-size: 14pt; margin-left: 5px; "
+                    "text-shadow: 0 0 8px #00FF00;"
+                )
+                self.lbl_gpu_status.setToolTip(f"Multi-GPU Active: {gpu_settings}")
+            else: # Single Mode
+                self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 14pt; margin-left: 5px;")
+                self.lbl_gpu_status.setToolTip(f"Single GPU: {gpu_settings}")
