@@ -205,12 +205,24 @@ class ChaptersView(QWidget):
         self.lbl_auto_loop_info = QLabel(f"(Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
         self.lbl_auto_loop_info.setStyleSheet("color: gray; font-size: 8pt; margin-right: 10px;")
 
+        # GPU Status Indicator (Chapters Tab)
+        self.lbl_gpu_status = QLabel("●")
+        self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 14pt; margin-left: 5px;")
+        self.lbl_gpu_status.setVisible(False) # Hidden by default until check
+
+        # Add to layout
         header_layout.addWidget(self.auto_loop_chk)
+        header_layout.addWidget(self.lbl_gpu_status) # Next to checkbox (below in user mind, but horizontal layout)
         header_layout.addWidget(self.lbl_auto_loop_info)
+        
+        # Initial Status Check
+        self.refresh_gpu_status()
 
         refresh_btn = QPushButton("↻ Refresh")
         refresh_btn.setToolTip("Rescan source text for chapters")
         refresh_btn.clicked.connect(self.model.refresh)
+        # Also refresh GPU status on clicking refresh (why not?)
+        refresh_btn.clicked.connect(self.refresh_gpu_status)
         header_layout.addWidget(refresh_btn)
         
         layout.addLayout(header_layout)
@@ -248,6 +260,28 @@ class ChaptersView(QWidget):
         
         # Listen to model changes to toggle view
         self.model.modelReset.connect(self._update_empty_state)
+        self._update_empty_state()
+        
+    def refresh_gpu_status(self):
+        """Updates visibility/glow of the multi-GPU indicator."""
+        # MCCC: Read hardware capabilities from centralized AppState
+        device_count = self.app_state.system_capabilities.get('gpu_count', 0)
+            
+        if device_count < 2:
+            self.lbl_gpu_status.setVisible(False)
+        else:
+            self.lbl_gpu_status.setVisible(True)
+            gpu_settings = getattr(self.app_state.settings, 'gpu_devices', '0')
+            
+            if ',' in str(gpu_settings): # Multi-GPU Mode
+                self.lbl_gpu_status.setStyleSheet(
+                    "color: #00FF00; font-size: 14pt; margin-left: 5px; "
+                    "text-shadow: 0 0 8px #00FF00;"
+                )
+                self.lbl_gpu_status.setToolTip(f"Multi-GPU Active: {gpu_settings}")
+            else: # Single Mode
+                self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 14pt; margin-left: 5px;")
+                self.lbl_gpu_status.setToolTip(f"Single GPU: {gpu_settings}")
         self.model.rowsInserted.connect(self._update_empty_state)
         self.model.rowsRemoved.connect(self._update_empty_state)
 

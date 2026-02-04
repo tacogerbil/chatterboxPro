@@ -1,6 +1,7 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTabWidget, QSplitter, QMessageBox
 from typing import Optional, Dict, Any
+import torch # MCCC: For initialization of hardware capabilities
 
 from core.state import AppState
 
@@ -37,7 +38,15 @@ class ChatterboxProQt(QMainWindow):
         else:
             self.config_service = ConfigService()
             # If we created it fresh, load state now
+            # If we created it fresh, load state now
             self.config_service.load_state(self.app_state)
+            
+        # MCCC: Initialize System Capabilities (Hardware Isolation)
+        try:
+            gpu_count = torch.cuda.device_count()
+        except:
+            gpu_count = 0
+        self.app_state.system_capabilities = {'gpu_count': gpu_count}
         
         # Instantiate Backend Services
         self.gen_service = GenerationService(self.app_state)

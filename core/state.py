@@ -104,6 +104,9 @@ class AppState:
     generation_start_time: float = 0.0  # timestamp
     chunk_status: Dict[int, str] = field(default_factory=dict)  # {index: 'passed'|'failed'}
     
+    # System Capabilities (MCCC: Hardware isolation)
+    system_capabilities: Dict[str, Any] = field(default_factory=dict)
+    
     def update_settings(self, **kwargs):
         """Update settings from a dictionary."""
         for key, value in kwargs.items():

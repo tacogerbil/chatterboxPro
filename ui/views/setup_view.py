@@ -8,7 +8,8 @@ from typing import Optional, List, Dict, Any
 import os
 import shutil
 import dataclasses
-import torch
+import shutil
+import dataclasses
 import logging
 
 from core.state import AppState
@@ -150,19 +151,13 @@ class SetupView(QWidget):
         self.lbl_speed = QLabel("--")
         self.lbl_auto_expression = QLabel("--")
         
-        # GPU Status Indicator (Visual feedback for multi-GPU mode)
-        self.lbl_gpu_status = QLabel("●")
-        self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 16px;")
-        self.lbl_gpu_status.setToolTip("GPU Status: Single GPU")
-        
-        self.params_layout.addRow("Voice Profile:", self.lbl_voice_name) # New
-        self.params_layout.addRow("Voice Preset:", self.lbl_voice_preset)
-        self.params_layout.addRow("Reference Audio:", self.lbl_ref_audio)
-        self.params_layout.addRow("Exaggeration:", self.lbl_exaggeration)
-        self.params_layout.addRow("Temperature:", self.lbl_temp)
-        self.params_layout.addRow("Speed:", self.lbl_speed)
-        self.params_layout.addRow("Auto-Expression:", self.lbl_auto_expression)
-        self.params_layout.addRow("Multi-GPU:", self.lbl_gpu_status)
+        f_layout.addRow("Voice Profile:", self.lbl_voice_name) # New
+        f_layout.addRow("Voice Preset:", self.lbl_voice_preset)
+        f_layout.addRow("Reference Audio:", self.lbl_ref_audio)
+        f_layout.addRow("Exaggeration:", self.lbl_exaggeration)
+        f_layout.addRow("Temperature:", self.lbl_temp)
+        f_layout.addRow("Speed:", self.lbl_speed)
+        f_layout.addRow("Auto-Expression:", self.lbl_auto_expression)
         
         # Edit Button to jump to Generation Tab? (Optional, kept simpler for now)
         layout.addWidget(group)
