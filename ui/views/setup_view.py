@@ -311,6 +311,10 @@ class SetupView(QWidget):
             
         # Log change
         logging.info(f"GPU Mode changed: {self.state.settings.target_gpus}")
+        
+        # MCCC: Sync UI immediately
+        self.check_system()
+        self.refresh_params_display()
 
     def refresh_values(self) -> None:
         """Updates UI based on state changes."""
