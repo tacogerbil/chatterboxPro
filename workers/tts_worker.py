@@ -48,16 +48,20 @@ if os.name == 'nt':  # Check if we are on Windows
 _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL = None, None
 _CURRENT_ENGINE_NAME = None
 _CURRENT_MODEL_PATH = None
+_CURRENT_DEVICE = None
 
 def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', model_path: str = None):
     """Initializes models once per worker process to save memory and time."""
-    global _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL, _CURRENT_ENGINE_NAME, _CURRENT_MODEL_PATH
+    global _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL, _CURRENT_ENGINE_NAME, _CURRENT_MODEL_PATH, _CURRENT_DEVICE
     pid = os.getpid()
     
-    # Check if we need to switch engines OR switch model paths
+    # Check if we need to switch engines OR switch model paths OR switch device
     config_changed = False
     if _WORKER_TTS_ENGINE is not None:
-        if _CURRENT_ENGINE_NAME != engine_name:
+        if _CURRENT_DEVICE != device_str:
+             logging.info(f"[Worker-{pid}] Device switch: {_CURRENT_DEVICE} -> {device_str}")
+             config_changed = True
+        elif _CURRENT_ENGINE_NAME != engine_name:
             logging.info(f"[Worker-{pid}] Engine switch: {_CURRENT_ENGINE_NAME} -> {engine_name}")
             config_changed = True
         elif _CURRENT_MODEL_PATH != model_path:
@@ -65,8 +69,12 @@ def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', 
             config_changed = True
             
     if config_changed and _WORKER_TTS_ENGINE is not None:
-        _WORKER_TTS_ENGINE.cleanup()
+        try:
+             if hasattr(_WORKER_TTS_ENGINE, 'cleanup'):
+                 _WORKER_TTS_ENGINE.cleanup()
+        except: pass
         _WORKER_TTS_ENGINE = None
+        _WORKER_WHISPER_MODEL = None # Whisper usually stays on same device as TTS, reload it too
     
     if _WORKER_TTS_ENGINE is None:
         logging.info(f"[Worker-{pid}] Initializing {engine_name} engine on device: {device_str}")
@@ -76,6 +84,7 @@ def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', 
             _WORKER_TTS_ENGINE = get_engine(engine_name, device_str, model_path=model_path)
             _CURRENT_ENGINE_NAME = engine_name
             _CURRENT_MODEL_PATH = model_path
+            _CURRENT_DEVICE = device_str
             
             whisper_device = torch.device(device_str if "cuda" in device_str and torch.cuda.is_available() else "cpu")
             _WORKER_WHISPER_MODEL = whisper.load_model("base.en", device=whisper_device, download_root=str(Path.home() / ".cache" / "whisper"))

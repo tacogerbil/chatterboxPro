@@ -52,7 +52,7 @@ class GenerationThread(QThread):
                 # 2. KILL running processes (not terminate - KILL)
                 # MCCC: Explicit Intent - terminate() sends SIGTERM which CUDA can ignore
                 # kill() sends SIGKILL which is instant death, no cleanup
-                if hasattr(self.executor, '_processes'):
+                if hasattr(self.executor, '_processes') and self.executor._processes is not None:
                     for pid, process in list(self.executor._processes.items()):
                         try:
                             process.kill()  # SIGKILL (was terminate/SIGTERM)
@@ -66,7 +66,7 @@ class GenerationThread(QThread):
                 def delayed_cleanup():
                     import time
                     time.sleep(1.0)
-                    if hasattr(self.executor, '_processes'):
+                    if hasattr(self.executor, '_processes') and self.executor._processes is not None:
                         for pid, process in list(self.executor._processes.items()):
                             if process.is_alive():
                                 try:
