@@ -456,13 +456,15 @@ class ChaptersView(QWidget):
                 
         if active_names:
             if len(active_names) > 1:
-                text = f"Active GPUs: {', '.join(active_names)} ●"
+                # Stacked Names
+                joined = "<br>".join([f"{n} ●" for n in active_names])
+                text = f"Active GPUs:<br>{joined}"
                 self.lbl_gpu_status.setText(text)
-                self.lbl_gpu_status.setStyleSheet("color: #00FF00; font-weight: bold; margin-right: 15px;") # Bright Green
+                self.lbl_gpu_status.setStyleSheet("color: #00FF00; font-weight: bold;") # Bright Green
             else:
-                text = f"GPU: {active_names[0]} ●"
+                text = f"Active GPU:<br>{active_names[0]} ●"
                 self.lbl_gpu_status.setText(text)
-                self.lbl_gpu_status.setStyleSheet("color: #27AE60; font-weight: bold; margin-right: 15px;") # Normal Green
+                self.lbl_gpu_status.setStyleSheet("color: #27AE60; font-weight: bold;") # Normal Green
             
             self.lbl_gpu_status.setVisible(True)
         else:
