@@ -441,7 +441,8 @@ class ChaptersView(QWidget):
             self.lbl_gpu_status.setVisible(False)
         else:
             self.lbl_gpu_status.setVisible(True)
-            gpu_settings = getattr(self.app_state.settings, 'gpu_devices', '0')
+            # Check target_gpus string (e.g. "cuda:0,cuda:1")
+            gpu_settings = self.app_state.settings.target_gpus
             
             if ',' in str(gpu_settings): # Multi-GPU Mode
                 self.lbl_gpu_status.setStyleSheet(

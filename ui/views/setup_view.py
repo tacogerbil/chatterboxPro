@@ -270,10 +270,8 @@ class SetupView(QWidget):
         c_layout.addLayout(reg_layout)
 
         # Dual GPU Checkbox (Conditional)
-        try:
-             gpu_count = torch.cuda.device_count()
-        except:
-             gpu_count = 0
+        # MCCC: Use centralized system capabilities
+        gpu_count = self.state.system_capabilities.get('gpu_count', 0)
              
         if gpu_count >= 2:
             self.dual_gpu_chk = QCheckBox(f"Use Both GPUs ({gpu_count} detected)")
@@ -301,6 +299,18 @@ class SetupView(QWidget):
         c_layout.addLayout(gen_layout)
         
         layout.addWidget(ctrl_group)
+
+    def toggle_dual_gpu(self, state: int) -> None:
+        """Toggles between single (cuda:0) and dual (cuda:0,cuda:1) GPU mode."""
+        if state == Qt.Checked or state == 2:
+            self.state.settings.target_gpus = "cuda:0,cuda:1"
+            self.state.settings.gpu_devices = "0,1" # Maintain parallel for compatibility if used elsewhere
+        else:
+            self.state.settings.target_gpus = "cuda:0"
+            self.state.settings.gpu_devices = "0"
+            
+        # Log change
+        logging.info(f"GPU Mode changed: {self.state.settings.target_gpus}")
         
         # MCCC: Progress Tracking Widget
         self.progress_widget = ProgressWidget()
