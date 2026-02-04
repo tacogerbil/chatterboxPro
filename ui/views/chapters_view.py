@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QMessageBox, QCheckBox, QStyledItemDelegate, QStyle, QApplication, QStyleOptionViewItem
 )
 from PySide6.QtGui import QColor, QBrush, QPalette
-from PySide6.QtCore import Qt, Signal, QModelIndex, QRect, QEvent, QAbstractListModel
+from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QRect, QEvent, QAbstractListModel
 from typing import Optional, List, Dict, Any
 from core.state import AppState
 from core.services.generation_service import GenerationService
