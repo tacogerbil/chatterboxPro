@@ -346,17 +346,19 @@ class SetupView(QWidget):
         self.lbl_auto.setText("Found" if ae else "Not Found (Optional)")
         self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
 
-        ae = shutil.which('auto-editor')
-        self.lbl_auto.setText("Found" if ae else "Not Found (Optional)")
-        self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
-
         # MCCC: Hardware Isolation - Read from State
         caps = self.state.system_capabilities
         if caps.get('cuda_available', False):
             count = caps.get('gpu_count', 0)
             name = caps.get('gpu_name', 'Unknown')
-            mode = "Dual GPU" if count > 1 and "cuda:0,cuda:1" in self.state.settings.target_gpus else "Single GPU"
-            self.lbl_gpu.setText(f"{mode} ({count} devices) - {name}")
+            is_dual = count > 1 and "cuda:0,cuda:1" in self.state.settings.target_gpus
+            
+            if is_dual:
+                self.lbl_gpu.setText(f"Dual GPU Mode (Using 2 of {count} devices)")
+            else:
+                 # Single Mode
+                self.lbl_gpu.setText(f"Single GPU Mode (Using Device 0: {name}) / {count} Available")
+                
             self.lbl_gpu.setStyleSheet("color: green")
         else:
             self.lbl_gpu.setText("CPU Mode (No CUDA found)")
