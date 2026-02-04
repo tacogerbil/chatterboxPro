@@ -188,11 +188,9 @@ class SetupView(QWidget):
         else:
             self.lbl_auto_expression.setText("Disabled")
 
-    def showEvent(self, event) -> None:
-        """Auto-refresh on tab show."""
-        self.refresh_params_display()
-        super().showEvent(event)
-
+    # MCCC FIX: Removed showEvent() handler that was blocking main thread on tab switches
+    # UI refreshes should be signal-driven, not event-driven
+    
     def setup_voice_controls(self, layout: QVBoxLayout) -> None:
         tpl_group = QGroupBox("Generation Voices")
         t_layout = QHBoxLayout(tpl_group)

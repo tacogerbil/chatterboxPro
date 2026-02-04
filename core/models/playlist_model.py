@@ -1,5 +1,6 @@
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex
 from core.state import AppState
+import html  # MCCC: Move import out of hot path
 
 class PlaylistModel(QAbstractListModel):
     """
@@ -71,7 +72,6 @@ class PlaylistModel(QAbstractListModel):
             
         elif role == Qt.ToolTipRole:
             # MCCC: Format tooltip with HTML for word wrapping
-            import html
             raw_text = item.get('original_sentence', '')
             safe_text = html.escape(raw_text)
             # Use styling to limit width and force wrap

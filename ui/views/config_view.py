@@ -21,11 +21,9 @@ class ConfigView(QWidget):
         self.state = app_state
         self.setup_ui()
 
-    def showEvent(self, event) -> None:
-        """Refresh UI from state whenever tab is opened."""
-        self.refresh_ui()
-        super().showEvent(event)
-
+    # MCCC FIX: Removed showEvent() handler that was blocking main thread on tab switches
+    # UI refreshes should be signal-driven, not event-driven
+    
     def refresh_ui(self) -> None:
         """Updates all widgets to match current AppState."""
         s = self.state.settings
