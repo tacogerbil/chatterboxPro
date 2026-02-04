@@ -141,7 +141,7 @@ class SetupView(QWidget):
     def setup_key_params(self, layout: QVBoxLayout) -> None:
         """Restores the 'Key Parameters (Loaded)' display from Reference."""
         group = QGroupBox("Key Parameters (Summary)")
-        self.params_layout = QFormLayout(group) # MCCC: Store for row visibility toggling
+        f_layout = QFormLayout(group)
         
         self.lbl_ref_audio = QLabel("--")
         self.lbl_voice_name = QLabel("--") # New
