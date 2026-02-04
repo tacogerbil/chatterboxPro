@@ -140,7 +140,7 @@ class SetupView(QWidget):
     def setup_key_params(self, layout: QVBoxLayout) -> None:
         """Restores the 'Key Parameters (Loaded)' display from Reference."""
         group = QGroupBox("Key Parameters (Summary)")
-        f_layout = QFormLayout(group)
+        self.params_layout = QFormLayout(group) # MCCC: Store for row visibility toggling
         
         self.lbl_ref_audio = QLabel("--")
         self.lbl_voice_name = QLabel("--") # New
@@ -150,13 +150,19 @@ class SetupView(QWidget):
         self.lbl_speed = QLabel("--")
         self.lbl_auto_expression = QLabel("--")
         
-        f_layout.addRow("Voice Profile:", self.lbl_voice_name) # New
-        f_layout.addRow("Voice Preset:", self.lbl_voice_preset)
-        f_layout.addRow("Reference Audio:", self.lbl_ref_audio)
-        f_layout.addRow("Exaggeration:", self.lbl_exaggeration)
-        f_layout.addRow("Temperature:", self.lbl_temp)
-        f_layout.addRow("Speed:", self.lbl_speed)
-        f_layout.addRow("Auto-Expression:", self.lbl_auto_expression)
+        # GPU Status Indicator (Visual feedback for multi-GPU mode)
+        self.lbl_gpu_status = QLabel("●")
+        self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 16px;")
+        self.lbl_gpu_status.setToolTip("GPU Status: Single GPU")
+        
+        self.params_layout.addRow("Voice Profile:", self.lbl_voice_name) # New
+        self.params_layout.addRow("Voice Preset:", self.lbl_voice_preset)
+        self.params_layout.addRow("Reference Audio:", self.lbl_ref_audio)
+        self.params_layout.addRow("Exaggeration:", self.lbl_exaggeration)
+        self.params_layout.addRow("Temperature:", self.lbl_temp)
+        self.params_layout.addRow("Speed:", self.lbl_speed)
+        self.params_layout.addRow("Auto-Expression:", self.lbl_auto_expression)
+        self.params_layout.addRow("Multi-GPU:", self.lbl_gpu_status)
         
         # Edit Button to jump to Generation Tab? (Optional, kept simpler for now)
         layout.addWidget(group)
@@ -187,6 +193,32 @@ class SetupView(QWidget):
             self.lbl_auto_expression.setText(f"Enabled (Sensitivity: {sensitivity:.1f})")
         else:
             self.lbl_auto_expression.setText("Disabled")
+            
+        # GPU Status Update
+        try:
+            device_count = torch.cuda.device_count()
+        except:
+            device_count = 0
+            
+        if device_count < 2:
+            # Hide if not multi-gpu capable
+            self.params_layout.setRowVisible(self.lbl_gpu_status, False)
+        else:
+            self.params_layout.setRowVisible(self.lbl_gpu_status, True)
+            
+            gpu_devices = getattr(s, 'gpu_devices', '0')
+            if ',' in str(gpu_devices):  # Multi-GPU mode (e.g., "0,1")
+                self.lbl_gpu_status.setText("●")
+                # Glowing Green Effect
+                self.lbl_gpu_status.setStyleSheet(
+                    "color: #00FF00; font-size: 16px; "
+                    "text-shadow: 0 0 8px #00FF00;"
+                )
+                self.lbl_gpu_status.setToolTip(f"Multi-GPU Active: {gpu_devices}")
+            else:
+                self.lbl_gpu_status.setText("●")
+                self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 16px;") # Dim grey
+                self.lbl_gpu_status.setToolTip(f"Single GPU: {gpu_devices}")
 
     # MCCC FIX: Removed showEvent() handler that was blocking main thread on tab switches
     # UI refreshes should be signal-driven, not event-driven
