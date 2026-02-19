@@ -12,6 +12,7 @@ from ui.components.q_labeled_slider import QLabeledSlider
 from ui.components.collapsible_frame import CollapsibleFrame
 from core.services.generation_service import GenerationService
 from core.services.template_service import TemplateService
+from engines import list_engines # MCCC: Dynamic Engine Loading
 from PySide6.QtWidgets import QInputDialog, QFileDialog
 
 # Worker thread wrapper for GenerationService
@@ -104,7 +105,7 @@ class GenerationView(QWidget):
         form = QFormLayout()
         
         self.engine_combo = QComboBox()
-        self.engine_combo.addItems(["chatterbox", "xtts", "f5"])
+        self.engine_combo.addItems(list_engines()) # MCCC: Dynamic Source of Truth
         self.engine_combo.setCurrentText(self.state.settings.tts_engine)
         self.engine_combo.currentTextChanged.connect(
             lambda t: setattr(self.state.settings, 'tts_engine', t)
@@ -241,7 +242,7 @@ class GenerationView(QWidget):
         v_layout.addWidget(self.speed_slider)
         
         self.temp_slider = QLabeledSlider(
-            "Temperature:", 0.1, 1.5, self.state.settings.temperature,
+            "Temperature:", 0.1, 2.5, self.state.settings.temperature,
             left_label="Consistent", right_label="Varied"
         )
         self.temp_slider.setToolTip("Creativity/randomness. Lower = consistent/robotic, Higher = varied/natural.")

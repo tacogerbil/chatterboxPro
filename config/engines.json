@@ -3,11 +3,7 @@
         "model_path": "",
         "enabled": true
     },
-    "xtts": {
-        "model_path": "",
-        "enabled": true
-    },
-    "f5": {
+    "moss": {
         "model_path": "",
         "enabled": true
     }

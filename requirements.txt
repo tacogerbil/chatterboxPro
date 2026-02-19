@@ -54,11 +54,9 @@ ffmpeg-python==0.2.0
 auto-editor==27.1.1
 
 # --- TTS Engines ---
-# XTTS v2 for better accent preservation (optional, install if needed)
-# pip install TTS
-
-# F5-TTS for state-of-the-art quality (optional, install if needed)
-# pip install git+https://github.com/SWivid/F5-TTS.git
+# MOSS-TTS (loaded via Transformers)
+# Requires flash-attn for optimized performance (optional but recommended)
+flash-attn>=2.5.0
 
 # =================================================================
 # System Dependencies (install separately):

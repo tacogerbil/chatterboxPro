@@ -44,11 +44,7 @@ class EngineConfig:
                 'model_path': '',  # Uses project directory
                 'enabled': True
             },
-            'xtts': {
-                'model_path': '',  # Uses default cache
-                'enabled': True
-            },
-            'f5': {
+            'moss': {
                 'model_path': '',  # Uses default cache
                 'enabled': True
             }

@@ -4,14 +4,13 @@ TTS Engine Registry and Factory.
 """
 from .base_engine import BaseTTSEngine
 from .chatterbox_engine import ChatterboxEngine
-from .xtts_engine import XTTSEngine
-from .f5_engine import F5Engine
+from .moss_engine import MossEngine
 
 # Engine registry
+# MCCC: Only Chatterbox and MOSS are supported as per user request.
 AVAILABLE_ENGINES = {
     'chatterbox': ChatterboxEngine,
-    'xtts': XTTSEngine,
-    'f5': F5Engine,
+    'moss': MossEngine,
 }
 
 def get_engine(engine_name: str, device: str, **kwargs) -> BaseTTSEngine:
@@ -19,7 +18,7 @@ def get_engine(engine_name: str, device: str, **kwargs) -> BaseTTSEngine:
     Factory function to create TTS engine instances.
     
     Args:
-        engine_name: Name of the engine ('chatterbox', 'xtts', etc.)
+        engine_name: Name of the engine ('chatterbox', 'moss', etc.)
         device: Device string ('cuda:0', 'cpu', etc.)
         **kwargs: specific engine args (e.g. model_path)
     
@@ -42,4 +41,4 @@ def list_engines():
     """Return list of available engine names."""
     return list(AVAILABLE_ENGINES.keys())
 
-__all__ = ['BaseTTSEngine', 'ChatterboxEngine', 'XTTSEngine', 'get_engine', 'list_engines']
+__all__ = ['BaseTTSEngine', 'ChatterboxEngine', 'MossEngine', 'get_engine', 'list_engines']
