@@ -149,7 +149,7 @@ class MossLoader:
                 # torch.cuda.mem_get_info(i) returns (free_bytes, total_bytes) at this exact moment,
                 # so Whisper's footprint is automatically accounted for.
                 max_mem = {}
-                activation_headroom_gb = 2.0  # Reserve for forward-pass activations during generation
+                activation_headroom_gb = 3.0  # Reserve for forward-pass activations (MOSS 8B has large KV cache)
                 for i in range(torch.cuda.device_count()):
                     free_bytes, total_bytes = torch.cuda.mem_get_info(i)
                     free_gb = free_bytes / (1024**3)
@@ -158,7 +158,21 @@ class MossLoader:
                     max_mem[i] = f"{usable_gb:.2f}GiB"
                     logging.info(f"GPU {i}: {free_gb:.2f}GiB free / {total_gb:.2f}GiB total → allocating {usable_gb:.2f}GiB for MOSS weights.")
                 
-                load_kwargs["device_map"] = "balanced"
+                # Guard: if available VRAM is too low, MOSS would silently offload layers to
+                # disk (meta device), making generation hang at 0% indefinitely. Fail fast instead.
+                # MOSS 8B @ bfloat16 = ~16GB. We need at least 14GB GPU VRAM to avoid disk offload.
+                MIN_GPU_VRAM_GB = 14.0
+                total_usable_gb = sum(float(v.replace("GiB", "")) for v in max_mem.values())
+                if total_usable_gb < MIN_GPU_VRAM_GB:
+                    raise RuntimeError(
+                        f"Insufficient GPU VRAM for MOSS in-memory inference: only {total_usable_gb:.1f}GiB "
+                        f"usable across all GPUs (need {MIN_GPU_VRAM_GB}GiB). GPU memory from a prior "
+                        f"failed attempt may still be allocated. Restart the application to reset GPU state."
+                    )
+
+                # "auto" fills GPU 0 first (now empty — Whisper is on GPU 1), then spills to GPU 1.
+                # More predictable than "balanced" and avoids fragmentation from split allocations.
+                load_kwargs["device_map"] = "auto"
                 load_kwargs["max_memory"] = max_mem
                 # Do NOT use 8-bit. We have enough combined VRAM to run native precision!
             else:

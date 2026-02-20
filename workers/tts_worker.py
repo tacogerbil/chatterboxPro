@@ -94,11 +94,19 @@ def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', 
             # --- MCCC: Upgraded to faster-whisper for 4x ASR speeds ---
             from faster_whisper import WhisperModel
             import torch
-            
+
             w_device = "cuda" if "cuda" in device_str and torch.cuda.is_available() else "cpu"
-            # Extract specific GPU index if available (e.g., "cuda:1" -> [1])
-            w_device_index = [int(device_str.split(":")[-1])] if ":" in device_str else [0]
-            
+
+            # When combining GPUs, place Whisper on GPU 1 (the higher-VRAM card).
+            # MOSS loads from GPU 0 first (device_map="auto"), so keeping Whisper off GPU 0
+            # eliminates VRAM fragmentation that causes MOSS to OOM at 14% of its layers.
+            # If not combining, use whatever GPU the worker was assigned.
+            if combine_gpus and w_device == "cuda" and torch.cuda.device_count() > 1:
+                w_device_index = [1]
+                logging.info(f"[Worker-{pid}] combine_gpus: Placing Whisper on GPU 1 to keep GPU 0 free for MOSS.")
+            else:
+                w_device_index = [int(device_str.split(":")[-1])] if ":" in device_str else [0]
+
             compute_type = "float16" if w_device == "cuda" else "int8" # Auto-quantization
             
             # Note: We use the 'turbo' variant of faster-whisper which corresponds to Large-v3-Turbo

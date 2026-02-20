@@ -123,11 +123,18 @@ class MossEngine(BaseTTSEngine):
                 "audio_repetition_penalty": 1.0, 
             }
             
-            # Isolation: Disable cuDNN SDPA for MOSS to prevent crashes
-            # This context manager ensures it DOES NOT affect other parts of the app
+            # Isolation: Disable cuDNN SDPA for MOSS to prevent crashes.
+            # torch.backends.cuda.sdp_kernel() was deprecated in PyTorch 2.3;
+            # use torch.nn.attention.sdpa_kernel() instead.
             ctx = nullcontext()
-            if "cuda" in self.device and hasattr(torch.backends.cuda, "sdp_kernel"):
-                 ctx = torch.backends.cuda.sdp_kernel(enable_cudnn=False)
+            if "cuda" in self.device:
+                try:
+                    from torch.nn.attention import sdpa_kernel, SDPBackend
+                    ctx = sdpa_kernel([SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH])
+                except (ImportError, AttributeError):
+                    # Fallback for older PyTorch builds
+                    if hasattr(torch.backends.cuda, "sdp_kernel"):
+                        ctx = torch.backends.cuda.sdp_kernel(enable_cudnn=False)
             
             with ctx, torch.no_grad():
                 outputs = self.model.generate(
