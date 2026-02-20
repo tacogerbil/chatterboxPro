@@ -54,8 +54,9 @@ class GenerationSettings:
     bass_boost: float = 0.0
     treble_boost: float = 0.0
     
-    # Custom Model Paths
-    model_path: Optional[str] = None
+    # Custom Model Paths (engine-specific — do NOT share across engines)
+    model_path: Optional[str] = None       # Chatterbox local path
+    moss_model_path: Optional[str] = None  # MOSS-TTS local path
 
 @dataclass
 class AppState:
@@ -93,9 +94,6 @@ class AppState:
     
     # Window State
     window_geometry_hex: str = ""
-    
-    # Global Engine Config
-    model_path: Optional[str] = None
     
     # Progress Tracking (MCCC: Centralized Statistics)
     total_chunks: int = 0

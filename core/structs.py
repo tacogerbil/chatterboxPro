@@ -49,6 +49,7 @@ class WorkerTask:
     auto_expression_enabled: bool = False
     expression_sensitivity: float = 1.0
     
-    # Optional Model Overrides
-    model_path: Optional[str] = None
+    # Optional Model Overrides (engine-specific)
+    model_path: Optional[str] = None       # Chatterbox local path
+    moss_model_path: Optional[str] = None  # MOSS-TTS local path
 

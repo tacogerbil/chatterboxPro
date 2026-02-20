@@ -337,7 +337,8 @@ class GenerationService(QObject):
                 treble_boost=s.treble_boost,
                 auto_expression_enabled=getattr(s, 'auto_expression_enabled', False),
                 expression_sensitivity=getattr(s, 'expression_sensitivity', 1.0),
-                model_path=s.model_path 
+                model_path=s.model_path,            # Chatterbox local path
+                moss_model_path=s.moss_model_path,   # MOSS-TTS local path
             )
             
             tasks.append(task)
@@ -607,7 +608,8 @@ class GenerationService(QObject):
             treble_boost=s.treble_boost,
             auto_expression_enabled=getattr(s, 'auto_expression_enabled', False),
             expression_sensitivity=getattr(s, 'expression_sensitivity', 1.0),
-            model_path=s.model_path
+            model_path=s.model_path,            # Chatterbox local path
+            moss_model_path=s.moss_model_path,   # MOSS-TTS local path
         )
         
         self._preview_worker = PreviewWorker(task)

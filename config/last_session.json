@@ -37,12 +37,12 @@
         "gruffness": 0.61,
         "bass_boost": 6.44,
         "treble_boost": 1.65,
-        "model_path": "I:/TTS_Engines/chatterbox"
+        "model_path": "",
+        "moss_model_path": ""
     },
     "session_name": "NeverDealWithADragon",
     "source_file_path": "A:/AudioBooks/AudioBooks Workroom/AI_Conversion/NeverDealWithADragon/Never Deal With a Dragon - Robert N. Charrette.txt",
     "ref_audio_path": "//crate/Crate/Coding_Projects/AI Coding/TTS_Server/audio_samples/Johnny Silverhand - All Voice Lines/Silverhand_01.wav",
-    "model_path": null,
     "auto_regen_main": true,
     "auto_regen_sub": false,
     "auto_assemble_after_run": false,

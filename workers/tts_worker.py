@@ -241,17 +241,28 @@ def worker_process_chunk(task: WorkerTask):
     bass_boost = task.bass_boost
     treble_boost = task.treble_boost
     model_path = task.model_path
+    moss_model_path = getattr(task, 'moss_model_path', None)  # MCCC: may be absent in old tasks
     auto_expression_enabled = task.auto_expression_enabled
     expression_sensitivity = task.expression_sensitivity
     combine_gpus = task.combine_gpus
+
+    # MCCC: Engine-aware path resolution.
+    # Each engine has its own model path field. Resolve the correct one here,
+    # at the boundary, so get_or_init_worker_models stays engine-agnostic.
+    if engine_name == 'moss':
+        resolved_model_path = moss_model_path or ''
+    else:
+        resolved_model_path = model_path or ''
+    # Normalise empty string to None so engine adapters can use truthiness checks
+    resolved_model_path = resolved_model_path if resolved_model_path else None
 
 
     pid = os.getpid()
     logging.info(f"[Worker-{pid}] Starting chunk (Idx: {original_index}, #: {sentence_number}, UUID: {uuid[:8]}) on device {device_str}")
 
     try:
-        # Pass model_path to efficient initializer
-        tts_engine, whisper_model = get_or_init_worker_models(device_str, engine_name, model_path, combine_gpus)
+        # MCCC: Pass resolved (engine-specific) model path to the initializer
+        tts_engine, whisper_model = get_or_init_worker_models(device_str, engine_name, resolved_model_path, combine_gpus)
         if tts_engine is None or whisper_model is None:
             raise RuntimeError(f"Engine initialization failed for device {device_str}")
     except Exception as e_model_load:

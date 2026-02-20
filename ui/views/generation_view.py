@@ -122,12 +122,12 @@ class GenerationView(QWidget):
         form.addRow("", self.combine_gpus_cb)
         
         path_layout = QHBoxLayout()
-        # Init Label with current state
-        lbl_text = self.state.model_path if self.state.model_path else "Default (system cache)"
+        # Init Label with current engine's path
+        lbl_text = self._get_current_engine_path() or "Default (system cache)"
         self.path_label = QLabel(lbl_text)
         
-        if self.state.model_path:
-             self.path_label.setToolTip(self.state.model_path)
+        if self._get_current_engine_path():
+             self.path_label.setToolTip(self._get_current_engine_path())
              self.path_label.setStyleSheet("color: #27AE60; font-weight: bold;")
         else:
              self.path_label.setStyleSheet("color: gray;")
@@ -141,18 +141,33 @@ class GenerationView(QWidget):
         engine_collapsible.add_layout(form)
         layout.addWidget(engine_collapsible)
 
+    def _get_current_engine_path(self) -> str:
+        """
+        Engine-aware model path lookup.
+        Returns the stored path for whichever engine is currently selected.
+        MCCC: Pure accessor — no side effects.
+        """
+        engine = self.state.settings.tts_engine
+        if engine == 'moss':
+            return self.state.settings.moss_model_path or ''
+        return self.state.settings.model_path or ''
+
     def browse_model_path(self) -> None:
-        """Opens a directory picker for the model."""
+        """Opens a directory picker and writes to the correct engine path field."""
         path = QFileDialog.getExistingDirectory(self, "Select Model Directory")
-        if path:
-            self.state.model_path = path # Root State
-            self.state.settings.model_path = path # Settings Sync
-            
-            self.path_label.setText(path)
-            self.path_label.setToolTip(path)
-            self.path_label.setStyleSheet("color: #27AE60; font-weight: bold;")
+        if not path:
+            return
+
+        engine = self.state.settings.tts_engine
+        if engine == 'moss':
+            self.state.settings.moss_model_path = path
         else:
-            pass
+            # MCCC: Chatterbox (and any future engine) writes to model_path
+            self.state.settings.model_path = path
+
+        self.path_label.setText(path)
+        self.path_label.setToolTip(path)
+        self.path_label.setStyleSheet("color: #27AE60; font-weight: bold;")
 
     def setup_sliders(self, layout: QVBoxLayout) -> None:
         # MCCC: Collapsible Voice Settings
@@ -529,10 +544,12 @@ class GenerationView(QWidget):
         # Voice Template should ONLY contain Voice Design params.
         # It should NOT contain Session Config (GPU, Retries, ASR thresholds).
         voice_keys = [
-            'exaggeration', 'speed', 'temperature', 'pitch_shift', 
+            'exaggeration', 'speed', 'temperature', 'pitch_shift',
             'timbre_shift', 'gruffness', 'bass_boost', 'treble_boost',
-            'cfg_weight', 'tts_engine', 'model_path', 'auto_expression_enabled',
+            'cfg_weight', 'tts_engine', 'auto_expression_enabled',
             'expression_sensitivity'
+            # MCCC: model_path / moss_model_path intentionally omitted.
+            # They are infrastructure config, not voice design parameters.
         ]
         
         data = {k: all_settings[k] for k in voice_keys if k in all_settings}
@@ -602,8 +619,8 @@ class GenerationView(QWidget):
         """Updates UI elements to match current AppState settings."""
         s = self.state.settings
         
-        # MCCC: Sync UI with State (Fixing lost Engine Config display)
-        current_path = self.state.model_path or s.model_path
+        # MCCC: Engine-aware path display — each engine has its own field
+        current_path = self._get_current_engine_path()
         if current_path:
              self.path_label.setText(current_path)
              self.path_label.setToolTip(current_path)

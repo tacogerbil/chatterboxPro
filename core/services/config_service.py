@@ -58,9 +58,10 @@ class ConfigService:
             # 2. Restore Global State (Paths, etc.)
             # Whitelist of safe fields to restore
             safe_globals = {
-                'session_name', 'source_file_path', 'ref_audio_path', 
-                'model_path', # Added for custom model path persistence
-                'auto_regen_main', 'auto_regen_sub', 
+                'session_name', 'source_file_path', 'ref_audio_path',
+                # MCCC: model_path is NOT here — it lives inside settings (engine-specific)
+                # and is restored automatically by the settings loop above.
+                'auto_regen_main', 'auto_regen_sub',
                 'auto_assemble_after_run', 'aggro_clean_on_parse',
                 'theme_name', 'theme_invert', 'window_geometry_hex'
             }
@@ -85,7 +86,8 @@ class ConfigService:
                 'session_name': app_state.session_name,
                 'source_file_path': app_state.source_file_path,
                 'ref_audio_path': app_state.ref_audio_path,
-                'model_path': app_state.model_path,
+                # MCCC: engine model paths are inside settings (model_path, moss_model_path)
+                # and serialised automatically by asdict(). Do NOT duplicate here.
                 'auto_regen_main': app_state.auto_regen_main,
                 'auto_regen_sub': app_state.auto_regen_sub,
                 'auto_assemble_after_run': app_state.auto_assemble_after_run,
