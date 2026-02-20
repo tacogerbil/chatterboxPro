@@ -86,9 +86,25 @@ def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', 
             _CURRENT_MODEL_PATH = model_path
             _CURRENT_DEVICE = device_str
             
-            whisper_device = torch.device(device_str if "cuda" in device_str and torch.cuda.is_available() else "cpu")
-            _WORKER_WHISPER_MODEL = whisper.load_model("base.en", device=whisper_device, download_root=str(Path.home() / ".cache" / "whisper"))
-            logging.info(f"[Worker-{pid}] {engine_name} engine loaded successfully on {device_str}.")
+            # --- MCCC: Upgraded to faster-whisper for 4x ASR speeds ---
+            from faster_whisper import WhisperModel
+            import torch
+            
+            w_device = "cuda" if "cuda" in device_str and torch.cuda.is_available() else "cpu"
+            # Extract specific GPU index if available (e.g., "cuda:1" -> [1])
+            w_device_index = [int(device_str.split(":")[-1])] if ":" in device_str else [0]
+            
+            compute_type = "float16" if w_device == "cuda" else "int8" # Auto-quantization
+            
+            # Note: We use the 'turbo' variant of faster-whisper which corresponds to Large-v3-Turbo
+            _WORKER_WHISPER_MODEL = WhisperModel(
+                "turbo", 
+                device=w_device, 
+                device_index=w_device_index,
+                compute_type=compute_type, 
+                download_root=str(Path.home() / ".cache" / "whisper")
+            )
+            logging.info(f"[Worker-{pid}] {engine_name} & Faster-Whisper loaded successfully on {device_str}.")
         except Exception as e:
             logging.critical(f"[Worker-{pid}] CRITICAL ERROR: Failed to initialize models: {e}", exc_info=True)
             _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL = None, None
@@ -424,19 +440,24 @@ def worker_process_chunk(task: WorkerTask):
         # --- ASR Validation Logic ---
         ratio = 0.0
         try:
-            # Get full result object to access confidence metrics
-            result = whisper_model.transcribe(temp_path_str, fp16=(whisper_model.device.type == 'cuda'))
-            transcribed = result['text']
+            # Faster-Whisper returns a generator for segments and an info object
+            segments, info = whisper_model.transcribe(
+                temp_path_str,
+                beam_size=5,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500)
+            )
+            
+            # Consume the generator to get the text and check segments
+            segment_list = list(segments)
+            transcribed = "".join([segment.text for segment in segment_list])
             
             # Early debug: Log what Whisper returned
             logging.warning(f"[DEBUG] Whisper returned for chunk #{sentence_number}, attempt {attempt_num+1}: '{transcribed}'")
             
-            # 1. Check for Non-Speech Artifacts (Balloon/Rubber/Static)
-            # Short TTS clips usually result in 1 segment. If any segment is highly confident "no speech", we reject.
-            # Use threshold 0.4 based on analysis (0.71 was observed for rubber noise).
-            # Whisper API change: segments are now dicts, not objects
-            max_no_speech_prob = max((s.get('no_speech_prob', 0.0) if isinstance(s, dict) else getattr(s, 'no_speech_prob', 0.0) 
-                                     for s in result.get('segments', [])), default=0.0)
+            # 1. Check for Non-Speech Artifacts using Info & Segments
+            # Because VAD is enabled, silence is mostly stripped before transcription.
+            max_no_speech_prob = max((s.no_speech_prob for s in segment_list), default=0.0)
             if max_no_speech_prob > 0.4:
                 logging.warning(f"ASR REJECTED: High No-Speech Probability ({max_no_speech_prob:.2f}) for chunk #{sentence_number}, attempt {attempt_num+1}")
                 # Treat as failure, do not even check text match
@@ -444,9 +465,8 @@ def worker_process_chunk(task: WorkerTask):
                 continue
 
             # 2. Check for Hallucination Loops (Screeching)
-            # High compression ratio (>2.0) indicates repetitive loops, common in screeching/hallucinated outputs.
-            max_compression_ratio = max((s.get('compression_ratio', 0.0) if isinstance(s, dict) else getattr(s, 'compression_ratio', 0.0)
-                                        for s in result.get('segments', [])), default=0.0)
+            # FasterWhisper segments have compression_ratio just like original whisper
+            max_compression_ratio = max((s.compression_ratio for s in segment_list), default=0.0)
             if max_compression_ratio > 2.0:
                 logging.warning(f"ASR REJECTED: High Compression Ratio ({max_compression_ratio:.2f}) for chunk #{sentence_number}, attempt {attempt_num+1}")
                 if Path(temp_path_str).exists(): os.remove(temp_path_str)

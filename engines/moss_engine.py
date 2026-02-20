@@ -87,23 +87,46 @@ class MossEngine(BaseTTSEngine):
                 load_path = snapshot_download(repo_id=self.repo_id)
                 logging.info(f"Resolved to local path: {load_path}")
             
+            load_kwargs = {
+                "trust_remote_code": True,
+                "attn_implementation": attn_impl,
+                "torch_dtype": self.dtype,
+            }
+            
+            if "cuda" in self.device:
+                try:
+                    gpu_id = int(self.device.split(":")[-1] if ":" in self.device else 0)
+                    total_mem = torch.cuda.get_device_properties(gpu_id).total_memory
+                    total_mem_gib = total_mem / (1024**3)
+                    
+                    # Need to reserve VRAM for Whisper (~1-1.5GB) + OS/Display (~1GB) + TTS Context/Cache (~1-1.5GB)
+                    # Safe to reserve ~4.0 GiB total to prevent CUDA OOM spikes during generation
+                    alloc_mem_gib = max(2.0, total_mem_gib - 4.0)
+                    
+                    load_kwargs["device_map"] = "auto"
+                    load_kwargs["max_memory"] = {gpu_id: f"{alloc_mem_gib:.1f}GiB", "cpu": "64GiB"}
+                    logging.info(f"OOM Protection: Limiting MOSS-TTS VRAM to {alloc_mem_gib:.1f}GiB on GPU {gpu_id}")
+                except Exception as e:
+                    logging.warning(f"Failed to configure max_memory offloading: {e}")
+                    load_kwargs["device_map"] = { "": self.device }
+            else:
+                 load_kwargs["device_map"] = { "": "cpu" }
+
             # 2. Load Processor
             self.processor = AutoProcessor.from_pretrained(
                 load_path, 
                 trust_remote_code=True
             )
             
-            # Move audio tokenizer to device if applicable (as per MOSS docs)
+            # Move audio tokenizer to device if applicable
             if hasattr(self.processor, 'audio_tokenizer'):
                  self.processor.audio_tokenizer = self.processor.audio_tokenizer.to(self.device)
 
             # 3. Load Model
             self.model = AutoModel.from_pretrained(
                 load_path,
-                trust_remote_code=True,
-                attn_implementation=attn_impl,
-                torch_dtype=self.dtype
-            ).to(self.device)
+                **load_kwargs
+            )
             
             self.model.eval()
             

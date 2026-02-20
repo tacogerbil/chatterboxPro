@@ -127,14 +127,39 @@ class ConfigView(QWidget):
         adv_group = QGroupBox("Advanced Engine Configuration")
         a_layout = QFormLayout(adv_group)
 
-        # GPU Device Handling
-        self.gpu_edit = QLineEdit(self.state.settings.target_gpus)
-        self.gpu_edit.setPlaceholderText("e.g. cuda:0 OR cuda:0,cuda:1")
-        self.gpu_edit.textChanged.connect(
-            lambda t: setattr(self.state.settings, 'target_gpus', t)
-        )
-        a_layout.addRow("Goal Device(s):", self.gpu_edit)
+        # GPU Device Handling (Dynamic Checkboxes)
+        import torch
+        self.gpu_checkboxes = []
+        gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
         
+        if gpu_count > 0:
+            gpu_group = QGroupBox("Target GPUs")
+            gpu_layout = QVBoxLayout(gpu_group)
+            
+            # Parse existing setting (e.g. "cuda:0,cuda:1")
+            current_gpus = [g.strip() for g in self.state.settings.target_gpus.split(',')]
+            
+            for i in range(gpu_count):
+                gpu_name = f"cuda:{i}"
+                prop_name = torch.cuda.get_device_name(i)
+                chk = QCheckBox(f"{gpu_name} ({prop_name})")
+                
+                # Check it if it's in the current settings string
+                if gpu_name in current_gpus:
+                    chk.setChecked(True)
+                
+                # Connect signal to update the settings string whenever a box is checked/unchecked
+                chk.stateChanged.connect(self._update_gpu_setting)
+                self.gpu_checkboxes.append((gpu_name, chk))
+                gpu_layout.addWidget(chk)
+                
+            a_layout.addRow(gpu_group)
+        else:
+            # Fallback for CPU-only systems
+            self.gpu_edit = QLineEdit("cpu")
+            self.gpu_edit.setReadOnly(True)
+            a_layout.addRow("Goal Device(s):", self.gpu_edit)
+            
         # Gen Order
         self.order_combo = QComboBox()
         self.order_combo.addItems(["linear", "random", "interleaved"])
@@ -216,6 +241,20 @@ class ConfigView(QWidget):
                 ThemeManager.apply_theme(app, theme_name)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Could not apply theme: {e}")
+
+    def _update_gpu_setting(self) -> None:
+        """Called when a GPU checkbox is toggled to rebuild the comma-separated string."""
+        selected_gpus = []
+        # Support dynamic checkboxes if they exist, otherwise fallback
+        if hasattr(self, 'gpu_checkboxes'):
+            for gpu_name, chk in self.gpu_checkboxes:
+                if chk.isChecked():
+                    selected_gpus.append(gpu_name)
+                    
+        # Update the state string (e.g., "cuda:0,cuda:1")
+        # If none selected, fallback to cpu to avoid breaking workers
+        final_str = ",".join(selected_gpus) if selected_gpus else "cpu"
+        setattr(self.state.settings, 'target_gpus', final_str)
 
     def update_setting(self, key: str, value: int) -> None:
         """Generic update for integer settings."""
