@@ -54,8 +54,15 @@ class MossEngine(BaseTTSEngine):
             # 1. Resolve Attention Implementation
             attn_impl = "eager"
             if "cuda" in self.device:
-                # Check for Flash Attention 2
-                has_fa2 = importlib.util.find_spec("flash_attn") is not None
+                # Check for Flash Attention 2 robustly (DLL load fails on Windows)
+                has_fa2 = False
+                try:
+                    import flash_attn
+                    import flash_attn_2_cuda
+                    has_fa2 = True
+                except ImportError:
+                    pass
+                    
                 if has_fa2 and self.dtype in {torch.float16, torch.bfloat16}:
                      major, _ = torch.cuda.get_device_capability()
                      if major >= 8:
@@ -193,7 +200,6 @@ class MossEngine(BaseTTSEngine):
                 "audio_top_p": params.get('top_p', 0.8),
                 "audio_top_k": 25, # Fixed default
                 "audio_repetition_penalty": 1.0, 
-                "do_sample": True,
             }
             
             # Isolation: Disable cuDNN SDPA for MOSS to prevent crashes

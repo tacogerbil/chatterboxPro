@@ -113,7 +113,7 @@ class PlaylistView(QWidget):
             self.lbl_asr.setText("--")
             return
             
-        full_data = self.model.get_item(indices[0])
+        full_data = self.app_state.sentences[indices[0]]
         if not full_data: return
         
         if full_data.get('is_pause'):
