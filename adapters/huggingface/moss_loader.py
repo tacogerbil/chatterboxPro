@@ -141,39 +141,11 @@ class MossLoader:
         if "cuda" in device:
             if combine_gpus:
                 logging.info(f"Multi-GPU Spanning Enabled. Treating all available GPUs as a single VRAM pool.")
-                
-                # MCCC Fix: Use CURRENTLY FREE memory, not total memory minus a static reserve.
-                # MOSS loads lazily (only on first generate() call). By then, Whisper is already
-                # resident on GPU 0, consuming 3-5GB. Using total_memory - reserve would lie to
-                # Transformers about how much space is actually available, causing OOM mid-load.
-                # torch.cuda.mem_get_info(i) returns (free_bytes, total_bytes) at this exact moment,
-                # so Whisper's footprint is automatically accounted for.
-                max_mem = {}
-                activation_headroom_gb = 3.0  # Reserve for forward-pass activations (MOSS 8B has large KV cache)
-                for i in range(torch.cuda.device_count()):
-                    free_bytes, total_bytes = torch.cuda.mem_get_info(i)
-                    free_gb = free_bytes / (1024**3)
-                    total_gb = total_bytes / (1024**3)
-                    usable_gb = max(1.0, free_gb - activation_headroom_gb)
-                    max_mem[i] = f"{usable_gb:.2f}GiB"
-                    logging.info(f"GPU {i}: {free_gb:.2f}GiB free / {total_gb:.2f}GiB total → allocating {usable_gb:.2f}GiB for MOSS weights.")
-                
-                # Guard: if available VRAM is too low, MOSS would silently offload layers to
-                # disk (meta device), making generation hang at 0% indefinitely. Fail fast instead.
-                # MOSS 8B @ bfloat16 = ~16GB. We need at least 14GB GPU VRAM to avoid disk offload.
-                MIN_GPU_VRAM_GB = 14.0
-                total_usable_gb = sum(float(v.replace("GiB", "")) for v in max_mem.values())
-                if total_usable_gb < MIN_GPU_VRAM_GB:
-                    raise RuntimeError(
-                        f"Insufficient GPU VRAM for MOSS in-memory inference: only {total_usable_gb:.1f}GiB "
-                        f"usable across all GPUs (need {MIN_GPU_VRAM_GB}GiB). GPU memory from a prior "
-                        f"failed attempt may still be allocated. Restart the application to reset GPU state."
-                    )
-
                 # "auto" fills GPU 0 first (now empty — Whisper is on GPU 1), then spills to GPU 1.
                 # More predictable than "balanced" and avoids fragmentation from split allocations.
+                # NOTE: max_memory is computed BELOW, after the processor/audio_tokenizer are loaded,
+                # so mem_get_info() captures the audio_tokenizer's ~2-3GB footprint on GPU 0.
                 load_kwargs["device_map"] = "auto"
-                load_kwargs["max_memory"] = max_mem
                 # Do NOT use 8-bit. We have enough combined VRAM to run native precision!
             else:
                 logging.info(f"Single-GPU Mode. Falling back to 8-bit quantization to prevent OOM on {device}.")
@@ -203,10 +175,40 @@ class MossLoader:
             else:
                 processor.audio_tokenizer = processor.audio_tokenizer.to(device)
 
+        # 5b. Deferred max_memory computation (combine_gpus only).
+        # CRITICAL: Must run AFTER processor.audio_tokenizer is moved to GPU 0 above.
+        # The audio_tokenizer (~2-3GB, 1600 weights) would otherwise be invisible to mem_get_info()
+        # when max_memory is set, causing Transformers to over-allocate on GPU 0 and OOM.
+        if combine_gpus and "cuda" in device:
+            max_mem = {}
+            activation_headroom_gb = 3.0  # Reserve for forward-pass activations (MOSS 8B has large KV cache)
+            for i in range(torch.cuda.device_count()):
+                free_bytes, total_bytes = torch.cuda.mem_get_info(i)
+                free_gb = free_bytes / (1024**3)
+                total_gb = total_bytes / (1024**3)
+                usable_gb = max(1.0, free_gb - activation_headroom_gb)
+                max_mem[i] = f"{usable_gb:.2f}GiB"
+                logging.info(f"GPU {i}: {free_gb:.2f}GiB free / {total_gb:.2f}GiB total → allocating {usable_gb:.2f}GiB for MOSS weights.")
+
+            # Guard: if available VRAM is too low, MOSS would silently offload layers to
+            # disk (meta device), making generation hang at 0% indefinitely. Fail fast instead.
+            # MOSS 8B @ bfloat16 = ~16GB. We need at least 14GB GPU VRAM to avoid disk offload.
+            MIN_GPU_VRAM_GB = 14.0
+            total_usable_gb = sum(float(v.replace("GiB", "")) for v in max_mem.values())
+            if total_usable_gb < MIN_GPU_VRAM_GB:
+                raise RuntimeError(
+                    f"Insufficient GPU VRAM for MOSS in-memory inference: only {total_usable_gb:.1f}GiB "
+                    f"usable across all GPUs (need {MIN_GPU_VRAM_GB}GiB). GPU memory from a prior "
+                    f"failed attempt may still be allocated. Restart the application to reset GPU state."
+                )
+            load_kwargs["max_memory"] = max_mem
+
         logging.info(f"Loading MOSS Weights... (kwargs: {list(load_kwargs.keys())})")
-        
+
         # Explicit VRAM defrag before massive load
         if "cuda" in device:
+            import gc
+            gc.collect()  # Break any reference cycles before cache flush
             torch.cuda.empty_cache()
             
         model = AutoModel.from_pretrained(

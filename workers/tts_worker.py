@@ -433,9 +433,13 @@ def worker_process_chunk(task: WorkerTask):
                 except OSError:
                     pass # Best effort cleanup
             
-            # GPU State Recovery: Reset CUDA state after crashes to prevent cascading errors
+            # GPU State Recovery: Reset CUDA state after crashes to prevent cascading errors.
+            # gc.collect() must run first — Python reference cycles in the exception traceback
+            # keep partial from_pretrained() tensors alive, so empty_cache() alone does nothing.
             if torch.cuda.is_available():
                 try:
+                    import gc
+                    gc.collect()              # Break reference cycles holding zombie CUDA tensors
                     torch.cuda.synchronize()  # Wait for all CUDA operations to complete
                     torch.cuda.empty_cache()  # Clear GPU memory cache
                     logging.info(f"GPU state reset after crash on chunk #{sentence_number}, attempt {attempt_num+1}")
