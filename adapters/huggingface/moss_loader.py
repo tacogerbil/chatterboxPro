@@ -166,12 +166,15 @@ class MossLoader:
             trust_remote_code=True
         )
         
-        # Audio tokenizer needs explicit movement if not using 'auto'
+        # Audio tokenizer needs explicit placement. It loads in float32 by default (~8GB),
+        # which eats most of GPU 0's VRAM before MOSS weights even start loading.
+        # Casting to bfloat16 halves it to ~4GB, freeing ~4GB on GPU 0 for MOSS layers.
+        # DAC/Encodec-style codecs work correctly in bfloat16.
         if hasattr(processor, 'audio_tokenizer'):
             if combine_gpus:
-                # 'auto' handles it, usually maps to first visible GPU
-                # But to be safe, we'll put it on cuda:0 since it's tiny
-                processor.audio_tokenizer = processor.audio_tokenizer.to("cuda:0")
+                processor.audio_tokenizer = (
+                    processor.audio_tokenizer.to(dtype=dtype).to("cuda:0")
+                )
             else:
                 processor.audio_tokenizer = processor.audio_tokenizer.to(device)
 
@@ -181,7 +184,10 @@ class MossLoader:
         # when max_memory is set, causing Transformers to over-allocate on GPU 0 and OOM.
         if combine_gpus and "cuda" in device:
             max_mem = {}
-            activation_headroom_gb = 3.0  # Reserve for forward-pass activations (MOSS 8B has large KV cache)
+            # 2GB per GPU is generous for MOSS 8B activations.
+            # KV cache at 1024 tokens ≈ 0.5GB; peak forward-pass activations ≈ 1-1.5GB.
+            # (Previously 3GB — was too conservative, killing our usable VRAM budget.)
+            activation_headroom_gb = 2.0
             for i in range(torch.cuda.device_count()):
                 free_bytes, total_bytes = torch.cuda.mem_get_info(i)
                 free_gb = free_bytes / (1024**3)
@@ -192,8 +198,9 @@ class MossLoader:
 
             # Guard: if available VRAM is too low, MOSS would silently offload layers to
             # disk (meta device), making generation hang at 0% indefinitely. Fail fast instead.
-            # MOSS 8B @ bfloat16 = ~16GB. We need at least 14GB GPU VRAM to avoid disk offload.
-            MIN_GPU_VRAM_GB = 14.0
+            # 12GB minimum allows up to 4GB CPU spillover, which accelerate handles fine.
+            # (Disk offload hangs; CPU offload is just slower — big difference.)
+            MIN_GPU_VRAM_GB = 12.0
             total_usable_gb = sum(float(v.replace("GiB", "")) for v in max_mem.values())
             if total_usable_gb < MIN_GPU_VRAM_GB:
                 raise RuntimeError(
