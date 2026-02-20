@@ -244,35 +244,13 @@ class SetupView(QWidget):
         
         c_layout.addLayout(reg_layout)
 
-        # Dual GPU Checkbox (Conditional)
-        # MCCC: Use centralized system capabilities
-        gpu_count = self.state.system_capabilities.get('gpu_count', 0)
-        gpu_names = self.state.system_capabilities.get('gpu_names', [])
-        
-        self.gpu_checkboxes = []
-        if gpu_count > 0:
-            gpu_group = QGroupBox("GPU Selection")
-            g_layout = QVBoxLayout(gpu_group)
-            
-            # Current Setting
-            current_targets = self.state.settings.target_gpus.split(',')
-            
-            for i, name in enumerate(gpu_names):
-                chk = QCheckBox(f"GPU {i}: {name}")
-                device_str = f"cuda:{i}"
-                
-                # Check if currently enabled
-                chk.setChecked(device_str in current_targets)
-                
-                # Connect
-                chk.stateChanged.connect(self.update_gpu_config)
-                
-                # Store ref
-                chk.setProperty("device_id", i) # Store logical ID
-                self.gpu_checkboxes.append(chk)
-                g_layout.addWidget(chk)
-                
-            c_layout.addWidget(gpu_group)
+        # GPU Status Display (Replaced Checkboxes per User Request)
+        self.lbl_gpu_status = QLabel("")
+        self.lbl_gpu_status.setAlignment(Qt.AlignCenter)
+        self.lbl_gpu_status.setTextFormat(Qt.RichText) 
+        self.lbl_gpu_status.setStyleSheet("color: #555; font-size: 10pt; margin: 10px 0;")
+        c_layout.addWidget(self.lbl_gpu_status)
+        self.refresh_gpu_status()
 
         # Generation Control Layout: [ Start ] [ Stop ]
         gen_layout = QHBoxLayout()
@@ -299,32 +277,38 @@ class SetupView(QWidget):
         
         layout.addWidget(ctrl_group)
 
-    def update_gpu_config(self) -> None:
-        """Rebuilds target_gpus string based on checked boxes."""
-        selected = []
-        indices = []
+    def refresh_gpu_status(self) -> None:
+        """Updates the GPU indicator matching the Chapters view."""
+        if not hasattr(self, 'lbl_gpu_status'): return
         
-        for chk in self.gpu_checkboxes:
-            if chk.isChecked():
-                device_id = chk.property("device_id")
-                selected.append(f"cuda:{device_id}")
-                indices.append(str(device_id))
+        caps = self.state.system_capabilities
+        gpu_names = caps.get('gpu_names', [])
+        targets = self.state.settings.target_gpus
         
-        # Safety: If none selected, default to cuda:0 and check the box
-        if not selected and self.gpu_checkboxes:
-            self.gpu_checkboxes[0].setChecked(True)
-            selected = ["cuda:0"]
-            indices = ["0"]
-        
-        # Update State
-        self.state.settings.target_gpus = ",".join(selected)
-        self.state.settings.gpu_devices = ",".join(indices)
-        
-        logging.info(f"GPU Config Updated: {self.state.settings.target_gpus}")
-        
-        # Sync UI
-        self.check_system()
-        self.refresh_params_display()
+        active_names = []
+        if "cuda:" in targets:
+            try:
+                parts = targets.split(',')
+                for p in parts:
+                    idx = int(p.split(':')[1])
+                    if idx < len(gpu_names):
+                        active_names.append(gpu_names[idx])
+            except: 
+                pass
+                
+        if active_names:
+            if len(active_names) > 1:
+                joined = "<br>".join([f"{n} ●" for n in active_names])
+                text = f"Active GPUs:<br>{joined}"
+                self.lbl_gpu_status.setText(text)
+                self.lbl_gpu_status.setStyleSheet("color: #00FF00; font-weight: bold; margin: 5px 0;")
+            else:
+                text = f"Active GPU:<br>{active_names[0]} ●"
+                self.lbl_gpu_status.setText(text)
+                self.lbl_gpu_status.setStyleSheet("color: #27AE60; font-weight: bold; margin: 5px 0;")
+            self.lbl_gpu_status.setVisible(True)
+        else:
+            self.lbl_gpu_status.setVisible(False)
 
     def refresh_values(self) -> None:
         """Updates UI based on state changes."""
@@ -333,6 +317,7 @@ class SetupView(QWidget):
             self.lbl_auto_reg_info.setText(f"(Max Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
         if hasattr(self, 'auto_reg_chk'):
             self.auto_reg_chk.setChecked(getattr(self.state, 'auto_regen_main', False))
+        self.refresh_gpu_status()
 
     def setup_system_check(self, layout: QVBoxLayout) -> None:
         sys_group = QGroupBox("System Check")
