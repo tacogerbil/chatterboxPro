@@ -122,7 +122,19 @@ class MossLoader:
         if "cuda" in device:
             if combine_gpus:
                 logging.info(f"Multi-GPU Spanning Enabled. Treating all available GPUs as a single VRAM pool.")
+                
+                # MCCC Fix: 'balanced' alone is too greedy; it will fill the 16GB card to 15.9GB with weights,
+                # leaving no room for generation activations (OOM). We MUST reserve 4GB overhead per GPU.
+                max_mem = {}
+                reserve_gb = 4.0 
+                for i in range(torch.cuda.device_count()):
+                    total_gb = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+                    usable_gb = max(1.0, total_gb - reserve_gb)
+                    max_mem[i] = f"{usable_gb:.2f}GiB"
+                    logging.info(f"GPU {i}: Reserving {usable_gb:.2f}GiB out of {total_gb:.2f}GiB for weights.")
+                
                 load_kwargs["device_map"] = "balanced"
+                load_kwargs["max_memory"] = max_mem
                 # Do NOT use 8-bit. We have enough combined VRAM to run native precision!
             else:
                 logging.info(f"Single-GPU Mode. Falling back to 8-bit quantization to prevent OOM on {device}.")
