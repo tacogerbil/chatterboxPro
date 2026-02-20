@@ -27,13 +27,16 @@ class MossEngine(BaseTTSEngine):
         
         Args:
             device: Device string (e.g., 'cuda', 'cpu')
-            **kwargs: Additional args (ignored)
+            **kwargs: Additional args like model_path
         """
         super().__init__(device)
         self.model = None
         self.processor = None
         self.sr = 24000 # MOSS-TTS usually outputs 24kHz
-        self.model_name = "OpenMOSS-Team/MOSS-TTS"
+        
+        # MCCC: Allow offline usage via model_path, fallback to HF repo
+        custom_path = kwargs.get('model_path', '')
+        self.model_name = custom_path if custom_path else "OpenMOSS-Team/MOSS-TTS"
         
         # Determine strict dtype based on device
         if "cuda" in self.device and torch.cuda.is_available():
@@ -65,9 +68,18 @@ class MossEngine(BaseTTSEngine):
             
             logging.info(f"MOSS-TTS Attention Implementation: {attn_impl}")
 
+            # Ensure we use a local path to bypass a bug in processing_moss_tts.py
+            # where it casts repo_id to pathlib.Path, turning "/" into "\\" on Windows.
+            load_path = self.model_name
+            if "/" in load_path and not os.path.exists(load_path):
+                from huggingface_hub import snapshot_download
+                logging.info(f"Downloading/Resolving {load_path} to local cache...")
+                load_path = snapshot_download(load_path)
+                logging.info(f"Resolved to local path: {load_path}")
+            
             # 2. Load Processor
             self.processor = AutoProcessor.from_pretrained(
-                self.model_name, 
+                load_path, 
                 trust_remote_code=True
             )
             
@@ -77,7 +89,7 @@ class MossEngine(BaseTTSEngine):
 
             # 3. Load Model
             self.model = AutoModel.from_pretrained(
-                self.model_name,
+                load_path,
                 trust_remote_code=True,
                 attn_implementation=attn_impl,
                 torch_dtype=self.dtype
