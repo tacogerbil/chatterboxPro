@@ -90,25 +90,44 @@ class MossLoader:
                 logging.error(f"Failed to dynamically patch MOSS-TTS architecture: {e}")
 
         # 2. Resolve Attention
+        # FA2 detection: `import flash_attn_2_cuda` is unreliable — the internal CUDA extension
+        # name changed across FA2 versions (2.4+) and throws OSError/RuntimeError on arch mismatch
+        # (e.g. Blackwell SM 12.x) rather than ImportError. We catch all exceptions and use the
+        # public flash_attn API instead. We also check the specific target GPU's compute capability.
         attn_impl = "eager"
         if "cuda" in device:
             has_fa2 = False
+            fa2_reason = "not checked"
             try:
                 import flash_attn
-                import flash_attn_2_cuda
-                has_fa2 = True
+                from flash_attn import flash_attn_func  # stable public API, exists in all FA2 builds
+                fa2_version = getattr(flash_attn, '__version__', '0')
+                if int(fa2_version.split('.')[0]) >= 2:
+                    has_fa2 = True
+                    fa2_reason = f"flash_attn {fa2_version} detected"
+                else:
+                    fa2_reason = f"flash_attn {fa2_version} is FA1, skipping"
             except ImportError:
-                pass
-                
+                fa2_reason = "flash_attn not installed"
+            except Exception as e:
+                # OSError = compiled for wrong CUDA arch; RuntimeError = CUDA init issue
+                fa2_reason = f"flash_attn import error ({type(e).__name__}: {e})"
+
             if has_fa2 and dtype in {torch.float16, torch.bfloat16}:
-                 major, _ = torch.cuda.get_device_capability()
-                 if major >= 8:
-                     attn_impl = "flash_attention_2"
-            
-            if attn_impl == "eager":
-                # Fallback to PyTorch SDPA 
-                attn_impl = "sdpa" 
-                
+                # Check the specific GPU being loaded to, not whatever is current device
+                device_idx = int(device.split(':')[-1]) if ':' in device else 0
+                major, minor = torch.cuda.get_device_capability(device_idx)
+                if major >= 8:
+                    attn_impl = "flash_attention_2"
+                else:
+                    fa2_reason += f" (GPU SM {major}.{minor} < 8.0, needs Ampere+)"
+
+            if attn_impl != "flash_attention_2":
+                attn_impl = "sdpa"
+                logging.info(f"FA2 unavailable ({fa2_reason}), using SDPA.")
+            else:
+                logging.info(f"FA2 enabled ({fa2_reason}).")
+
         logging.info(f"MOSS-TTS Attention Implementation: {attn_impl}")
 
         # 3. Base Kwargs
@@ -123,15 +142,21 @@ class MossLoader:
             if combine_gpus:
                 logging.info(f"Multi-GPU Spanning Enabled. Treating all available GPUs as a single VRAM pool.")
                 
-                # MCCC Fix: 'balanced' alone is too greedy; it will fill the 16GB card to 15.9GB with weights,
-                # leaving no room for generation activations (OOM). We MUST reserve 4GB overhead per GPU.
+                # MCCC Fix: Use CURRENTLY FREE memory, not total memory minus a static reserve.
+                # MOSS loads lazily (only on first generate() call). By then, Whisper is already
+                # resident on GPU 0, consuming 3-5GB. Using total_memory - reserve would lie to
+                # Transformers about how much space is actually available, causing OOM mid-load.
+                # torch.cuda.mem_get_info(i) returns (free_bytes, total_bytes) at this exact moment,
+                # so Whisper's footprint is automatically accounted for.
                 max_mem = {}
-                reserve_gb = 4.0 
+                activation_headroom_gb = 2.0  # Reserve for forward-pass activations during generation
                 for i in range(torch.cuda.device_count()):
-                    total_gb = torch.cuda.get_device_properties(i).total_memory / (1024**3)
-                    usable_gb = max(1.0, total_gb - reserve_gb)
+                    free_bytes, total_bytes = torch.cuda.mem_get_info(i)
+                    free_gb = free_bytes / (1024**3)
+                    total_gb = total_bytes / (1024**3)
+                    usable_gb = max(1.0, free_gb - activation_headroom_gb)
                     max_mem[i] = f"{usable_gb:.2f}GiB"
-                    logging.info(f"GPU {i}: Reserving {usable_gb:.2f}GiB out of {total_gb:.2f}GiB for weights.")
+                    logging.info(f"GPU {i}: {free_gb:.2f}GiB free / {total_gb:.2f}GiB total → allocating {usable_gb:.2f}GiB for MOSS weights.")
                 
                 load_kwargs["device_map"] = "balanced"
                 load_kwargs["max_memory"] = max_mem

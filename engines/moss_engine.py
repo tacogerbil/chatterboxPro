@@ -96,8 +96,12 @@ class MossEngine(BaseTTSEngine):
             # mode="generation" is specific to MOSS processor usage
             batch = self.processor([user_message], mode="generation")
             
-            input_ids = batch["input_ids"].to(self.device)
-            attention_mask = batch["attention_mask"].to(self.device)
+            # With device_map="balanced" the model is sharded across GPUs.
+            # self.device is just the init hint; the actual first layer may be on a different GPU.
+            # Use the model's true first-parameter device so inputs land in the right place.
+            model_first_device = next(self.model.parameters()).device
+            input_ids = batch["input_ids"].to(model_first_device)
+            attention_mask = batch["attention_mask"].to(model_first_device)
             
             # MOSS-TTS Recommended Hyperparameters (for 8B model)
             # audio_temperature: 1.7
