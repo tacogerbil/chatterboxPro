@@ -122,7 +122,7 @@ class MossLoader:
         if "cuda" in device:
             if combine_gpus:
                 logging.info(f"Multi-GPU Spanning Enabled. Treating all available GPUs as a single VRAM pool.")
-                load_kwargs["device_map"] = "auto"
+                load_kwargs["device_map"] = "balanced"
                 # Do NOT use 8-bit. We have enough combined VRAM to run native precision!
             else:
                 logging.info(f"Single-GPU Mode. Falling back to 8-bit quantization to prevent OOM on {device}.")
