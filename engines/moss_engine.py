@@ -35,8 +35,8 @@ class MossEngine(BaseTTSEngine):
         self.sr = 24000 # MOSS-TTS usually outputs 24kHz
         
         # MCCC: Allow offline usage via model_path, fallback to HF repo
-        custom_path = kwargs.get('model_path', '')
-        self.model_name = custom_path if custom_path else "OpenMOSS-Team/MOSS-TTS"
+        self.custom_model_path = kwargs.get('model_path', '').strip()
+        self.repo_id = "OpenMOSS-Team/MOSS-TTS"
         
         # Determine strict dtype based on device
         if "cuda" in self.device and torch.cuda.is_available():
@@ -49,7 +49,7 @@ class MossEngine(BaseTTSEngine):
         if self.model is not None:
             return
 
-        logging.info(f"Loading MOSS-TTS from {self.model_name} on {self.device}...")
+        logging.info(f"Loading MOSS-TTS ({self.repo_id}) on {self.device}...")
         try:
             # 1. Resolve Attention Implementation
             attn_impl = "eager"
@@ -68,13 +68,23 @@ class MossEngine(BaseTTSEngine):
             
             logging.info(f"MOSS-TTS Attention Implementation: {attn_impl}")
 
-            # Ensure we use a local path to bypass a bug in processing_moss_tts.py
-            # where it casts repo_id to pathlib.Path, turning "/" into "\\" on Windows.
-            load_path = self.model_name
-            if "/" in load_path and not os.path.exists(load_path):
+            load_path = self.repo_id
+
+            if self.custom_model_path:
+                # User specified a custom path. Let's check if it has the model files.
+                if not os.path.exists(os.path.join(self.custom_model_path, "config.json")):
+                    # Need to download it to this path
+                    from huggingface_hub import snapshot_download
+                    logging.info(f"Downloading MOSS-TTS to custom path: {self.custom_model_path}...")
+                    os.makedirs(self.custom_model_path, exist_ok=True)
+                    snapshot_download(repo_id=self.repo_id, local_dir=self.custom_model_path)
+                
+                load_path = self.custom_model_path
+            else:
+                # No custom path. Use default cache, but resolve to local path to avoid HF backslash bugs.
                 from huggingface_hub import snapshot_download
-                logging.info(f"Downloading/Resolving {load_path} to local cache...")
-                load_path = snapshot_download(load_path)
+                logging.info(f"Resolving {self.repo_id} to local HF cache...")
+                load_path = snapshot_download(repo_id=self.repo_id)
                 logging.info(f"Resolved to local path: {load_path}")
             
             # 2. Load Processor
