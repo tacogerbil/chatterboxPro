@@ -49,16 +49,20 @@ _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL = None, None
 _CURRENT_ENGINE_NAME = None
 _CURRENT_MODEL_PATH = None
 _CURRENT_DEVICE = None
+_CURRENT_COMBINE_GPUS = False
 
-def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', model_path: str = None):
+def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', model_path: str = None, combine_gpus: bool = False):
     """Initializes models once per worker process to save memory and time."""
-    global _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL, _CURRENT_ENGINE_NAME, _CURRENT_MODEL_PATH, _CURRENT_DEVICE
+    global _WORKER_TTS_ENGINE, _WORKER_WHISPER_MODEL, _CURRENT_ENGINE_NAME, _CURRENT_MODEL_PATH, _CURRENT_DEVICE, _CURRENT_COMBINE_GPUS
     pid = os.getpid()
     
     # Check if we need to switch engines OR switch model paths OR switch device
     config_changed = False
     if _WORKER_TTS_ENGINE is not None:
-        if _CURRENT_DEVICE != device_str:
+        if _CURRENT_COMBINE_GPUS != combine_gpus:
+             logging.info(f"[Worker-{pid}] Combine GPUs switch: {_CURRENT_COMBINE_GPUS} -> {combine_gpus}")
+             config_changed = True
+        elif _CURRENT_DEVICE != device_str:
              logging.info(f"[Worker-{pid}] Device switch: {_CURRENT_DEVICE} -> {device_str}")
              config_changed = True
         elif _CURRENT_ENGINE_NAME != engine_name:
@@ -81,10 +85,11 @@ def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', 
         try:
             from engines import get_engine
             # Pass model_path via kwargs
-            _WORKER_TTS_ENGINE = get_engine(engine_name, device_str, model_path=model_path)
+            _WORKER_TTS_ENGINE = get_engine(engine_name, device_str, model_path=model_path, combine_gpus=combine_gpus)
             _CURRENT_ENGINE_NAME = engine_name
             _CURRENT_MODEL_PATH = model_path
             _CURRENT_DEVICE = device_str
+            _CURRENT_COMBINE_GPUS = combine_gpus
             
             # --- MCCC: Upgraded to faster-whisper for 4x ASR speeds ---
             from faster_whisper import WhisperModel
@@ -230,6 +235,7 @@ def worker_process_chunk(task: WorkerTask):
     model_path = task.model_path
     auto_expression_enabled = task.auto_expression_enabled
     expression_sensitivity = task.expression_sensitivity
+    combine_gpus = task.combine_gpus
 
 
     pid = os.getpid()
@@ -237,7 +243,7 @@ def worker_process_chunk(task: WorkerTask):
 
     try:
         # Pass model_path to efficient initializer
-        tts_engine, whisper_model = get_or_init_worker_models(device_str, engine_name, model_path)
+        tts_engine, whisper_model = get_or_init_worker_models(device_str, engine_name, model_path, combine_gpus)
         if tts_engine is None or whisper_model is None:
             raise RuntimeError(f"Engine initialization failed for device {device_str}")
     except Exception as e_model_load:

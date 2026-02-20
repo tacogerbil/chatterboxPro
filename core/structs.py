@@ -36,6 +36,7 @@ class WorkerTask:
     asr_threshold: float
     speed: float
     tts_engine: str
+    combine_gpus: bool
     
     # Audio Effects
     pitch_shift: float

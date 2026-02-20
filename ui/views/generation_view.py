@@ -112,6 +112,15 @@ class GenerationView(QWidget):
         )
         form.addRow("TTS Engine:", self.engine_combo)
         
+        # MCCC: Multi-GPU Support Toggle
+        self.combine_gpus_cb = QCheckBox("Combine GPUs for Large Models (e.g. MOSS-TTS)")
+        self.combine_gpus_cb.setToolTip("Automatically splits massive AI models across all available GPUs to prevent Out-Of-Memory crashes.")
+        self.combine_gpus_cb.setChecked(getattr(self.state.settings, 'combine_gpus', False))
+        self.combine_gpus_cb.stateChanged.connect(
+            lambda state: setattr(self.state.settings, 'combine_gpus', state == 2)
+        )
+        form.addRow("", self.combine_gpus_cb)
+        
         path_layout = QHBoxLayout()
         # Init Label with current state
         lbl_text = self.state.model_path if self.state.model_path else "Default (system cache)"

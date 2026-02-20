@@ -10,6 +10,7 @@ class GenerationSettings:
     speed: float = 1.0
     items_per_page: int = 15
     target_gpus: str = "cuda:0"
+    combine_gpus: bool = False
     num_full_outputs: int = 1
     master_seed: int = 0
     num_candidates: int = 1

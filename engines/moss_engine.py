@@ -43,106 +43,25 @@ class MossEngine(BaseTTSEngine):
             self.dtype = torch.bfloat16
         else:
             self.dtype = torch.float32
+            
+        self.combine_gpus = kwargs.get('combine_gpus', False)
 
     def _ensure_loaded(self):
-        """Lazy load the model and processor."""
+        """Lazy load the model and processor using the clean adapter."""
         if self.model is not None:
             return
 
-        logging.info(f"Loading MOSS-TTS ({self.repo_id}) on {self.device}...")
+        logging.info(f"Loading MOSS-TTS ({self.repo_id}) on {self.device} via MossLoader...")
         try:
-            # 1. Resolve Attention Implementation
-            attn_impl = "eager"
-            if "cuda" in self.device:
-                # Check for Flash Attention 2 robustly (DLL load fails on Windows)
-                has_fa2 = False
-                try:
-                    import flash_attn
-                    import flash_attn_2_cuda
-                    has_fa2 = True
-                except ImportError:
-                    pass
-                    
-                if has_fa2 and self.dtype in {torch.float16, torch.bfloat16}:
-                     major, _ = torch.cuda.get_device_capability()
-                     if major >= 8:
-                         attn_impl = "flash_attention_2"
-                
-                if attn_impl == "eager":
-                    # Fallback to PyTorch SDPA (Scaled Dot Product Attention)
-                    # This is efficient and built-in to PyTorch 2.0+
-                    attn_impl = "sdpa" 
-            
-            logging.info(f"MOSS-TTS Attention Implementation: {attn_impl}")
-
-            load_path = self.repo_id
-
-            if self.custom_model_path:
-                # User specified a custom path. Let's check if it has the model files.
-                if not os.path.exists(os.path.join(self.custom_model_path, "config.json")):
-                    # Need to download it to this path
-                    from huggingface_hub import snapshot_download
-                    logging.info(f"Downloading MOSS-TTS to custom path: {self.custom_model_path}...")
-                    os.makedirs(self.custom_model_path, exist_ok=True)
-                    snapshot_download(repo_id=self.repo_id, local_dir=self.custom_model_path)
-                
-                load_path = self.custom_model_path
-            else:
-                # No custom path. Use default cache, but resolve to local path to avoid HF backslash bugs.
-                from huggingface_hub import snapshot_download
-                logging.info(f"Resolving {self.repo_id} to local HF cache...")
-                load_path = snapshot_download(repo_id=self.repo_id)
-                logging.info(f"Resolved to local path: {load_path}")
-            
-            load_kwargs = {
-                "trust_remote_code": True,
-                "attn_implementation": attn_impl,
-                "torch_dtype": self.dtype,
-            }
-            
-            if "cuda" in self.device:
-                try:
-                    from transformers import BitsAndBytesConfig
-                    
-                    # 8-bit Quantization instantly halves VRAM requirement from ~16GB to ~8GB
-                    # This allows the entire model to fit on a single 12GB or 16GB GPU without offloading
-                    quantization_config = BitsAndBytesConfig(
-                        load_in_8bit=True,
-                        llm_int8_has_fp16_weight=False,
-                    )
-                    load_kwargs["quantization_config"] = quantization_config
-                    load_kwargs["device_map"] = { "": self.device }
-                    logging.info(f"OOM Protection: Enabled 8-bit quantization. Loading MOSS-TTS fully on {self.device}.")
-                except Exception as e:
-                    logging.warning(f"Failed to configure 8-bit quantization (is bitsandbytes installed?): {e}")
-                    load_kwargs["device_map"] = { "": self.device }
-            else:
-                 load_kwargs["device_map"] = { "": "cpu" }
-
-            # 2. Load Processor
-            self.processor = AutoProcessor.from_pretrained(
-                load_path, 
-                trust_remote_code=True
+            from adapters.huggingface.moss_loader import MossLoader
+            self.model, self.processor, self.sr = MossLoader.load(
+                repo_id=self.repo_id,
+                custom_model_path=self.custom_model_path,
+                device=self.device,
+                dtype=self.dtype,
+                combine_gpus=self.combine_gpus
             )
-            
-            # Move audio tokenizer to device if applicable
-            if hasattr(self.processor, 'audio_tokenizer'):
-                 self.processor.audio_tokenizer = self.processor.audio_tokenizer.to(self.device)
-
-            # 3. Load Model
-            self.model = AutoModel.from_pretrained(
-                load_path,
-                **load_kwargs
-            )
-            
-            self.model.eval()
-            
-            # Update sample rate from config if possible
-            if hasattr(self.processor, 'model_config'):
-                 self.sr = getattr(self.processor.model_config, 'sampling_rate', 24000)
-            
-            logging.info(f"MOSS-TTS loaded successfully. SR={self.sr}")
-            
+            logging.info(f"MOSS-TTS loaded via adapter successfully. SR={self.sr}")
         except Exception as e:
             logging.critical(f"Failed to load MOSS-TTS: {e}")
             raise RuntimeError(f"MOSS-TTS Load Failed: {e}")
