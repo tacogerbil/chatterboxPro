@@ -1,3 +1,4 @@
+import glob
 import torch
 import logging
 import os
@@ -45,62 +46,85 @@ class MossLoader:
             logging.info(f"Resolving {repo_id} to local HF cache...")
             load_path = snapshot_download(repo_id=repo_id)
 
-        # MCCC VRAM Patch: MOSS-TTS natively hardcodes device=input_ids.device in generate()
-        # This breaks accelerate device_map="auto" spanning. We dynamically patch their architecture file.
+        # MCCC VRAM Patch: MOSS-TTS natively hardcodes device=input_ids.device in generate(),
+        # which breaks accelerate device_map="auto" spanning across multiple GPUs.
+        # We patch their architecture file in BOTH locations HuggingFace uses:
+        #   1. The hub snapshot (load_path) — source of truth for downloads
+        #   2. The transformers_modules cache — where trust_remote_code ACTUALLY IMPORTS FROM
+        # Both must be patched; patching only the hub snapshot has no effect on running code.
         if combine_gpus:
             try:
-                modeling_path = os.path.join(load_path, "modeling_moss_tts.py")
-                if os.path.exists(modeling_path):
-                    with open(modeling_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        
-                    needs_write = False
+                # Discover HF modules cache (cross-platform: ~/. on Linux, ~\AppData or ~/.cache on Windows)
+                try:
+                    from huggingface_hub.constants import HF_HOME
+                except ImportError:
+                    HF_HOME = os.path.expanduser("~/.cache/huggingface")
+                hf_modules_cache = os.environ.get(
+                    "HF_MODULES_CACHE",
+                    os.path.join(HF_HOME, "modules")
+                )
 
-                    # Patch 0: Fix deprecated torch_dtype= kwarg used in MOSS's internal sub-model calls.
-                    # MOSS passes torch_dtype= to from_pretrained() internally, triggering a
-                    # Transformers deprecation warning on every load. Replace with dtype= (new API).
-                    # Safe: config.torch_dtype attribute reads use dot notation, not torch_dtype=.
-                    if "torch_dtype=" in content:
-                        content = content.replace("torch_dtype=", "dtype=")
-                        needs_write = True
-                        logging.info("MCCC Patch 0: Replaced deprecated torch_dtype= with dtype= in MOSS model code.")
+                # Collect all copies of the MOSS modeling file
+                paths_to_patch = [os.path.join(load_path, "modeling_moss_tts.py")]
+                modules_copies = glob.glob(
+                    os.path.join(hf_modules_cache, "**", "modeling_moss_tts.py"),
+                    recursive=True
+                )
+                paths_to_patch.extend(modules_copies)
+                logging.info(f"MCCC: Found {len(paths_to_patch)} modeling_moss_tts.py file(s) to patch: {paths_to_patch}")
 
-                    # Patch 1: Multi-GPU device routing fix.
-                    if "MCCC Multi-GPU Patch" not in content:
-                        logging.info("Applying MCCC Multi-GPU Patch to MOSS-TTS architecture...")
+                for modeling_path in paths_to_patch:
+                    if not os.path.exists(modeling_path):
+                        continue
+                    try:
+                        with open(modeling_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
 
-                        # 1. Resolve true base device
-                        r1 = "        device = input_ids.device\n        \n        # MCCC Multi-GPU Patch: Find the true starting device where the embedding layer lives\n        model_device = next(self.parameters()).device\n"
-                        content = content.replace("        device = input_ids.device\n", r1)
+                        needs_write = False
 
-                        # 2. Push inputs to actual device, pull outputs back to mask tracking device
-                        target_call = (
-                            "            outputs = self(\n"
-                            "                input_ids=current_input_ids,\n"
-                            "                attention_mask=current_attention_mask,\n"
-                            "                past_key_values=past_key_values,\n"
-                            "                use_cache=True,\n"
-                            "            )"
-                        )
-                        patched_call = (
-                            "            outputs = self(\n"
-                            "                input_ids=current_input_ids.to(model_device),\n"
-                            "                attention_mask=current_attention_mask.to(model_device) if current_attention_mask is not None else None,\n"
-                            "                past_key_values=past_key_values,\n"
-                            "                use_cache=True,\n"
-                            "            )\n"
-                            "            # MCCC: Pull logits back to our tracker device so subsequent loop math works on matching devices\n"
-                            "            outputs.logits = [l.to(device) for l in outputs.logits]"
-                        )
-                        content = content.replace(target_call, patched_call)
-                        needs_write = True
+                        # Patch 0: Fix deprecated torch_dtype= kwarg in MOSS's internal sub-model calls.
+                        if "torch_dtype=" in content:
+                            content = content.replace("torch_dtype=", "dtype=")
+                            needs_write = True
+                            logging.info(f"MCCC Patch 0 (torch_dtype): applied to {modeling_path}")
 
-                    if needs_write:
-                        with open(modeling_path, 'w', encoding='utf-8') as f:
-                            f.write(content)
-                        logging.info("MOSS-TTS architecture patches written successfully.")
+                        # Patch 1: Multi-GPU device routing — route inputs to the true first-layer device.
+                        if "MCCC Multi-GPU Patch" not in content:
+                            r1 = "        device = input_ids.device\n        \n        # MCCC Multi-GPU Patch: Find the true starting device where the embedding layer lives\n        model_device = next(self.parameters()).device\n"
+                            content = content.replace("        device = input_ids.device\n", r1)
+
+                            target_call = (
+                                "            outputs = self(\n"
+                                "                input_ids=current_input_ids,\n"
+                                "                attention_mask=current_attention_mask,\n"
+                                "                past_key_values=past_key_values,\n"
+                                "                use_cache=True,\n"
+                                "            )"
+                            )
+                            patched_call = (
+                                "            outputs = self(\n"
+                                "                input_ids=current_input_ids.to(model_device),\n"
+                                "                attention_mask=current_attention_mask.to(model_device) if current_attention_mask is not None else None,\n"
+                                "                past_key_values=past_key_values,\n"
+                                "                use_cache=True,\n"
+                                "            )\n"
+                                "            # MCCC: Pull logits back to our tracker device so subsequent loop math works on matching devices\n"
+                                "            outputs.logits = [l.to(device) for l in outputs.logits]"
+                            )
+                            content = content.replace(target_call, patched_call)
+                            needs_write = True
+                            logging.info(f"MCCC Patch 1 (Multi-GPU): applied to {modeling_path}")
+
+                        if needs_write:
+                            with open(modeling_path, 'w', encoding='utf-8') as f:
+                                f.write(content)
+                            logging.info(f"MOSS-TTS patches written: {modeling_path}")
+                        else:
+                            logging.info(f"MOSS-TTS already fully patched: {modeling_path}")
+                    except Exception as e:
+                        logging.error(f"Failed to patch {modeling_path}: {e}")
             except Exception as e:
-                logging.error(f"Failed to dynamically patch MOSS-TTS architecture: {e}")
+                logging.error(f"MCCC patch discovery failed: {e}")
 
         # 2. Resolve Attention
         # FA2 detection: `import flash_attn_2_cuda` is unreliable — the internal CUDA extension
