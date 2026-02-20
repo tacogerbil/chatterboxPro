@@ -115,7 +115,7 @@ class MossLoader:
         load_kwargs = {
             "trust_remote_code": True,
             "attn_implementation": attn_impl,
-            "torch_dtype": dtype,
+            "dtype": dtype,
         }
 
         # 4. Hardware Allocation Strategy
