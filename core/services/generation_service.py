@@ -271,7 +271,7 @@ class GenerationService(QObject):
             ranges.append((start, end))
         return ranges
 
-    def _configure_workers(self, target_gpus: str) -> Tuple[List[str], int]:
+    def _configure_workers(self, target_gpus: str, combine_gpus: bool = False) -> Tuple[List[str], int]:
         """Determines devices and max_workers based on settings and hardware."""
         gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
         
@@ -279,6 +279,13 @@ class GenerationService(QObject):
             return ["cpu"], 1
             
         devices = [d.strip() for d in target_gpus.split(',') if d.strip()]
+        
+        # MCCC: Multi-GPU Fix - If using device_map='auto', we MUST restrict to 1 worker
+        # otherwise M workers will all try to load the model across M GPUs simultaneously, causing OOM.
+        if combine_gpus and len(devices) > 0:
+            logging.info("Combine GPUs enabled: Restricting GenerationService to 1 worker process.")
+            return [devices[0]], 1
+            
         return devices, len(devices)
 
     def _prepare_tasks(self, 
@@ -408,7 +415,7 @@ class GenerationService(QObject):
             return
 
         # 2. Configure Resources
-        devices, max_workers = self._configure_workers(s.target_gpus)
+        devices, max_workers = self._configure_workers(s.target_gpus, s.combine_gpus)
         
         # 3. Prepare Logic (Seed, etc)
         # MCCC Audit: Handle Multiple Full Outputs
@@ -565,7 +572,7 @@ class GenerationService(QObject):
         s = self.state.settings
         
         # Determine device
-        devices, _ = self._configure_workers(s.target_gpus)
+        devices, _ = self._configure_workers(s.target_gpus, s.combine_gpus)
         device = devices[0]
         
         # Create task object (MCCC: Explicit Interface)
