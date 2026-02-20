@@ -1,4 +1,5 @@
 import glob
+import sys
 import torch
 import logging
 import os
@@ -115,6 +116,28 @@ class MossLoader:
                             needs_write = True
                             logging.info(f"MCCC Patch 1 (Multi-GPU): applied to {modeling_path}")
 
+                        # Patch 2: Fix cross-device tensor add in get_input_embeddings().
+                        # Accelerate shards embedding layers across GPUs; inputs_embeds lands on cuda:0
+                        # but embed_layer[N] may live on cuda:1 — the add() then crashes.
+                        # Fix: route each input slice to its embed_layer's device, pull result back.
+                        if "MCCC Patch2 get_input_embeddings" not in content:
+                            p2_pattern = (
+                                r'(\s+)(inputs_embeds = inputs_embeds \+ embed_layer'
+                                r'\(input_ids\[\.\.\., i \+ 1\]\))'
+                            )
+                            p2_repl = (
+                                r'\1inputs_embeds = inputs_embeds + '
+                                r'embed_layer(input_ids[..., i + 1].to(next(embed_layer.parameters()).device))'
+                                r'.to(inputs_embeds.device)  # MCCC Patch2 get_input_embeddings'
+                            )
+                            new_content, count = re.subn(p2_pattern, p2_repl, content)
+                            if count > 0:
+                                content = new_content
+                                needs_write = True
+                                logging.info(f"MCCC Patch 2 (get_input_embeddings): applied to {modeling_path}")
+                            else:
+                                logging.warning(f"MCCC Patch 2: target pattern not found in {modeling_path}")
+
                         if needs_write:
                             with open(modeling_path, 'w', encoding='utf-8') as f:
                                 f.write(content)
@@ -123,6 +146,15 @@ class MossLoader:
                             logging.info(f"MOSS-TTS already fully patched: {modeling_path}")
                     except Exception as e:
                         logging.error(f"Failed to patch {modeling_path}: {e}")
+
+                # Invalidate stale cached imports so Python re-reads the patched files on next from_pretrained().
+                # Without this, even a correctly patched file on disk has no effect — Python reuses
+                # the old bytecode already loaded into sys.modules from the first import.
+                stale_keys = [k for k in sys.modules if 'MOSS' in k or 'moss_tts' in k.lower()]
+                for key in stale_keys:
+                    del sys.modules[key]
+                if stale_keys:
+                    logging.info(f"MCCC: Invalidated {len(stale_keys)} stale module cache entries: {stale_keys}")
             except Exception as e:
                 logging.error(f"MCCC patch discovery failed: {e}")
 
