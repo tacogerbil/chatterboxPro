@@ -54,14 +54,25 @@ class MossLoader:
                     with open(modeling_path, 'r', encoding='utf-8') as f:
                         content = f.read()
                         
-                    # Check if already patched to avoid redundant writes
+                    needs_write = False
+
+                    # Patch 0: Fix deprecated torch_dtype= kwarg used in MOSS's internal sub-model calls.
+                    # MOSS passes torch_dtype= to from_pretrained() internally, triggering a
+                    # Transformers deprecation warning on every load. Replace with dtype= (new API).
+                    # Safe: config.torch_dtype attribute reads use dot notation, not torch_dtype=.
+                    if "torch_dtype=" in content:
+                        content = content.replace("torch_dtype=", "dtype=")
+                        needs_write = True
+                        logging.info("MCCC Patch 0: Replaced deprecated torch_dtype= with dtype= in MOSS model code.")
+
+                    # Patch 1: Multi-GPU device routing fix.
                     if "MCCC Multi-GPU Patch" not in content:
                         logging.info("Applying MCCC Multi-GPU Patch to MOSS-TTS architecture...")
-                        
+
                         # 1. Resolve true base device
                         r1 = "        device = input_ids.device\n        \n        # MCCC Multi-GPU Patch: Find the true starting device where the embedding layer lives\n        model_device = next(self.parameters()).device\n"
                         content = content.replace("        device = input_ids.device\n", r1)
-                        
+
                         # 2. Push inputs to actual device, pull outputs back to mask tracking device
                         target_call = (
                             "            outputs = self(\n"
@@ -82,10 +93,12 @@ class MossLoader:
                             "            outputs.logits = [l.to(device) for l in outputs.logits]"
                         )
                         content = content.replace(target_call, patched_call)
-                        
+                        needs_write = True
+
+                    if needs_write:
                         with open(modeling_path, 'w', encoding='utf-8') as f:
                             f.write(content)
-                        logging.info("MOSS-TTS architecture successfully patched for Multi-GPU.")
+                        logging.info("MOSS-TTS architecture patches written successfully.")
             except Exception as e:
                 logging.error(f"Failed to dynamically patch MOSS-TTS architecture: {e}")
 
@@ -166,15 +179,16 @@ class MossLoader:
             trust_remote_code=True
         )
         
-        # Audio tokenizer needs explicit placement. It loads in float32 by default (~8GB),
-        # which eats most of GPU 0's VRAM before MOSS weights even start loading.
-        # Casting to bfloat16 halves it to ~4GB, freeing ~4GB on GPU 0 for MOSS layers.
-        # DAC/Encodec-style codecs work correctly in bfloat16.
+        # Audio tokenizer placement.
+        # When combining GPUs, keep the audio tokenizer on CPU (float32).
+        # It loads in float32 by default and consumes ~8GB of GPU VRAM.
+        # Offloading it to CPU:
+        #   - Frees the full 8GB on GPU 0 for MOSS transformer layers
+        #   - Avoids dtype mismatch (codec forward() receives float32 audio; bfloat16 weights crash)
+        #   - MOSS's batch_encode/decode on CPU is fast enough (small buffers, not the bottleneck)
         if hasattr(processor, 'audio_tokenizer'):
             if combine_gpus:
-                processor.audio_tokenizer = (
-                    processor.audio_tokenizer.to(dtype=dtype).to("cuda:0")
-                )
+                processor.audio_tokenizer = processor.audio_tokenizer.to("cpu")
             else:
                 processor.audio_tokenizer = processor.audio_tokenizer.to(device)
 
