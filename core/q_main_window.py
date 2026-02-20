@@ -203,6 +203,26 @@ class ChatterboxProQt(QMainWindow):
         # Wire Generation Start/Stop for UI Feedback
         self.gen_service.started.connect(self._on_generation_started)
         self.gen_service.stopped.connect(self._on_generation_stopped)
+        
+        # MCCC: Force UI Refresh on Tab Change to sync GPU display
+        if hasattr(self, 'tabs') and self.tabs is not None:
+             self.tabs.currentChanged.connect(self._on_tab_changed)
+
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Called whenever the main UI tab changes to force sync labels."""
+        if not self.tabs: return
+        widget = self.tabs.widget(index)
+        if hasattr(widget, 'refresh_values'):
+            try:
+                widget.refresh_values()
+            except Exception as e:
+                print(f"Error refreshing tab values: {e}")
+        if hasattr(widget, 'refresh_gpu_status'):
+             try:
+                 widget.refresh_gpu_status()
+             except Exception as e:
+                 print(f"Error refreshing tab GPU status: {e}")
 
 
     def on_chapter_jump(self, row_idx: int) -> None:
