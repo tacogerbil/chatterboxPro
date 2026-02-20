@@ -102,21 +102,19 @@ class MossEngine(BaseTTSEngine):
             
             if "cuda" in self.device:
                 try:
-                    gpu_id = int(self.device.split(":")[-1] if ":" in self.device else 0)
+                    from transformers import BitsAndBytesConfig
                     
-                    # Use ACTUAL free memory, not total, because Whisper and the OS are already using VRAM
-                    free_mem, total_mem = torch.cuda.mem_get_info(gpu_id)
-                    free_mem_gib = free_mem / (1024**3)
-                    
-                    # We need to reserve VRAM for TTS Context/Cache/Fragmentation spikes during generation
-                    # Leave a strict 3.0 GiB buffer of the CURRENTLY FREE memory.
-                    alloc_mem_gib = max(1.0, free_mem_gib - 3.0)
-                    
-                    load_kwargs["device_map"] = "auto"
-                    load_kwargs["max_memory"] = {gpu_id: f"{alloc_mem_gib:.1f}GiB", "cpu": "64GiB"}
-                    logging.info(f"OOM Protection: Limiting MOSS-TTS VRAM to {alloc_mem_gib:.1f}GiB on GPU {gpu_id} (Free: {free_mem_gib:.1f}GiB)")
+                    # 8-bit Quantization instantly halves VRAM requirement from ~16GB to ~8GB
+                    # This allows the entire model to fit on a single 12GB or 16GB GPU without offloading
+                    quantization_config = BitsAndBytesConfig(
+                        load_in_8bit=True,
+                        llm_int8_has_fp16_weight=False,
+                    )
+                    load_kwargs["quantization_config"] = quantization_config
+                    load_kwargs["device_map"] = { "": self.device }
+                    logging.info(f"OOM Protection: Enabled 8-bit quantization. Loading MOSS-TTS fully on {self.device}.")
                 except Exception as e:
-                    logging.warning(f"Failed to configure max_memory offloading: {e}")
+                    logging.warning(f"Failed to configure 8-bit quantization (is bitsandbytes installed?): {e}")
                     load_kwargs["device_map"] = { "": self.device }
             else:
                  load_kwargs["device_map"] = { "": "cpu" }
