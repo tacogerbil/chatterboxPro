@@ -74,7 +74,9 @@ class PlaylistModel(QAbstractListModel):
             return item.get('marked', False)
 
         elif role == self.ChapMarkRole:
-            return index.row() in self.app_state.chap_marked
+            row_uuid = item.get('uuid')
+            return bool(row_uuid and row_uuid in self.app_state.chap_marked)
+
             
         elif role == Qt.ToolTipRole:
             # MCCC: Format tooltip with HTML for word wrapping

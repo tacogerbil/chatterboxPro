@@ -440,27 +440,30 @@ class ChaptersView(QWidget):
     # ── Chapter Marking ───────────────────────────────────────────────────
 
     def _mark_word_matches(self) -> None:
-        """Find all sentences containing the search word and add to chap_marked."""
+        """Find all sentences containing the search word and store their UUIDs in chap_marked.
+
+        Storing UUIDs (not indices) ensures marks survive splits, inserts, and deletions.
+        """
         word = self.chap_word_edit.text().strip()
         if not word:
             return
         word_lower = word.lower()
         added = 0
-        for i, sentence in enumerate(self.app_state.sentences):
+        for sentence in self.app_state.sentences:
             text = sentence.get('original_sentence', '').lower()
-            if word_lower in text:
-                self.app_state.chap_marked.add(i)
+            uid = sentence.get('uuid')
+            if word_lower in text and uid:
+                self.app_state.chap_marked.add(uid)
                 added += 1
-        # Refresh playlist so amber highlight appears
-        from PySide6.QtWidgets import QApplication
-        for widget in QApplication.topLevelWidgets():
-            pv = widget.findChild(type(None).__class__, 'playlist_view')
-        # Simpler: emit a signal to whoever holds the playlist
         self._refresh_playlist()
-        print(f"[ChaptersView] Marked {added} sentences containing '{word}'.")
+        print(f"[ChaptersView] Marked {added} sentence(s) containing '{word}'.")
 
     def _convert_chap_marked(self) -> None:
-        """Convert all chap_marked sentence indices into chapter headings."""
+        """Convert all chap_marked sentences into chapter headings.
+
+        UUIDs are resolved to current indices at convert-time,
+        so splits or insertions before this call don't cause mismatches.
+        """
         if not self.app_state.chap_marked:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.information(self, "Nothing Marked",
@@ -471,10 +474,16 @@ class ChaptersView(QWidget):
             QMessageBox.warning(self, "Error", "Playlist service not connected.")
             return
 
-        # Process in reverse order so indices stay valid as items are replaced
-        indices = sorted(self.app_state.chap_marked, reverse=True)
+        # Resolve UUIDs → current live indices
+        uuid_to_idx: dict = {
+            s.get('uuid'): i
+            for i, s in enumerate(self.app_state.sentences)
+            if s.get('uuid') in self.app_state.chap_marked
+        }
+
+        # Process in reverse-index order so earlier splits don't shift later rows
         converted = 0
-        for idx in indices:
+        for uid, idx in sorted(uuid_to_idx.items(), key=lambda kv: kv[1], reverse=True):
             if self.playlist_service.convert_to_chapter(idx):
                 converted += 1
 
@@ -482,17 +491,16 @@ class ChaptersView(QWidget):
         self._refresh_playlist()
         self.model.refresh()
         self.structure_changed.emit()
-        print(f"[ChaptersView] Converted {converted} candidates to chapters.")
+        print(f"[ChaptersView] Converted {converted} candidate(s) to chapters.")
 
     def _unmark_chap_item(self, row: int) -> None:
-        """Remove a single sentence index from chap_marked."""
-        # Map chapter-list row → sentence start index
+        """Remove a chapter-list item's UUID from chap_marked (right-click Unmark)."""
+        # Get the sentence index for this chapter-list row
         sent_idx = self.model.get_chapter_index(row)
-        if sent_idx >= 0:
-            self.app_state.chap_marked.discard(sent_idx)
-        else:
-            # Fallback: remove by row if chapter mapping failed
-            self.app_state.chap_marked.discard(row)
+        if 0 <= sent_idx < len(self.app_state.sentences):
+            uid = self.app_state.sentences[sent_idx].get('uuid')
+            if uid:
+                self.app_state.chap_marked.discard(uid)
         self._refresh_playlist()
 
     def _show_context_menu(self, pos) -> None:
@@ -521,7 +529,7 @@ class ChaptersView(QWidget):
                 return  # First hit is enough; there's only one PlaylistModel
 
     def _unpin_selected(self) -> None:
-        """Remove currently selected playlist rows from chap_marked."""
+        """Remove UUID of currently selected playlist rows from chap_marked."""
         from PySide6.QtWidgets import QApplication
         from ui.views.playlist_view import PlaylistView
         app = QApplication.instance()
@@ -532,10 +540,14 @@ class ChaptersView(QWidget):
                 indices = pv.get_selected_indices()
                 if not indices:
                     return
+                removed = 0
                 for idx in indices:
-                    self.app_state.chap_marked.discard(idx)
+                    if idx < len(self.app_state.sentences):
+                        uid = self.app_state.sentences[idx].get('uuid')
+                        if uid and self.app_state.chap_marked.discard(uid) is None:
+                            removed += 1
                 self._refresh_playlist()
-                print(f"[ChaptersView] Unpinned {len(indices)} sentence(s) from chapter candidates.")
+                print(f"[ChaptersView] Unpinned {len(indices)} sentence(s).")
                 return
 
     # ─────────────────────────────────────────────────────────────────────

@@ -547,19 +547,25 @@ class ControlsView(QWidget):
             self.playlist.jump_to_row(next_idx)
 
     def _nav_chap_marked(self, direction: int) -> None:
-        """Navigate to the next/previous chapter-candidate marked sentence."""
-        marked = sorted(self.playlist_service.state.chap_marked)
-        if not marked:
+        """Navigate to the next/previous chapter-candidate marked sentence.
+
+        chap_marked holds UUIDs, so we resolve them to current live indices first.
+        This means navigation stays correct after splits or insertions.
+        """
+        # Resolve UUIDs → current indices
+        marked_indices = sorted(
+            i for i, s in enumerate(self.playlist_service.state.sentences)
+            if s.get('uuid') in self.playlist_service.state.chap_marked
+        )
+        if not marked_indices:
             return
         current = self._get_selected_index()
         if direction > 0:
-            # Forward: first index strictly after current
-            targets = [i for i in marked if i > current]
-            next_idx = targets[0] if targets else marked[0]  # wrap
+            targets = [i for i in marked_indices if i > current]
+            next_idx = targets[0] if targets else marked_indices[0]   # wrap
         else:
-            # Backward: last index strictly before current
-            targets = [i for i in reversed(marked) if i < current]
-            next_idx = targets[0] if targets else marked[-1]  # wrap
+            targets = [i for i in reversed(marked_indices) if i < current]
+            next_idx = targets[0] if targets else marked_indices[-1]  # wrap
         self.playlist.jump_to_row(next_idx)
 
 
