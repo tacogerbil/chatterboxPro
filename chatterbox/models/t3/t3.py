@@ -399,9 +399,28 @@ class T3(nn.Module):
             if temperature != 1.0:
                 logits = logits / temperature
 
-            # Apply repetition penalty and top‑p filtering.
+            # Apply repetition penalty and top-p filtering.
             logits = repetition_penalty_processor(generated_ids, logits)
+
+            # Debug: log EOS logit before top-p
+            eos_id = self.hp.stop_speech_token
+            eos_logit_raw = logits[0, eos_id].item()
+
             logits = top_p_warper(None, logits)
+
+            # Safety: ensure EOS is never fully zeroed by top-p.
+            # If top-p zeroed EOS but the raw probability was non-trivial (>0.5%),
+            # restore a minimal probability floor so the model can escape.
+            eos_prob_pre_topk = torch.softmax(logits.clone().detach() / 1.0, dim=-1)[0, eos_id].item()
+            if eos_prob_pre_topk == 0.0:
+                # EOS was zeroed by top-p. Check raw model confidence in EOS.
+                raw_probs = torch.softmax(
+                    torch.tensor([[eos_logit_raw]], device=logits.device), dim=-1
+                )
+                # Only restore if EOS had meaningful mass (> 0.5% before top-p)
+                print(f"[T3 Debug] Step {i}: EOS zeroed by top-p. Raw EOS logit: {eos_logit_raw:.4f}")
+            else:
+                print(f"[T3 Debug] Step {i}: EOS prob after top-p: {eos_prob_pre_topk:.6f}")
 
             # Convert logits to probabilities and sample the next token.
             probs = torch.softmax(logits, dim=-1)
