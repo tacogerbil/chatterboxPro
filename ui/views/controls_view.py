@@ -58,25 +58,10 @@ class ControlsView(QWidget):
         layout.addWidget(btn_stop, 0, 1)
         layout.addWidget(btn_play_from, 0, 2, 1, 2)
         
-        # Row 1: Nav
+        # Row 1: Move + Success / Error Navigation (restored as original)
         btn_up = QPushButton("▲ Move Up"); btn_up.clicked.connect(lambda: self._move_items(-1))
         btn_down = QPushButton("▼ Move Down"); btn_down.clicked.connect(lambda: self._move_items(1))
         
-        # Row 1: Chapter-Marked Navigation (amber)
-        btn_prev_mark = QPushButton("◄ Prev Marked")
-        btn_prev_mark.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
-        btn_prev_mark.setToolTip("Jump to previous chapter-marked sentence.")
-        btn_prev_mark.clicked.connect(lambda: self._nav_chap_marked(-1))
-
-        btn_next_mark = QPushButton("Next Marked ►")
-        btn_next_mark.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
-        btn_next_mark.setToolTip("Jump to next chapter-marked sentence.")
-        btn_next_mark.clicked.connect(lambda: self._nav_chap_marked(1))
-
-        layout.addWidget(btn_prev_mark, 1, 0, 1, 3)
-        layout.addWidget(btn_next_mark, 1, 3, 1, 3)
-
-        # Row 2: Success / Error Navigation
         btn_prev_success = QPushButton("◄ Prev Success")
         btn_prev_success.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
         btn_prev_success.clicked.connect(lambda: self._nav_success(-1))
@@ -93,14 +78,28 @@ class ControlsView(QWidget):
         btn_next_err.setStyleSheet("background-color: #FFB6C1; color: black; font-weight: bold;")
         btn_next_err.clicked.connect(lambda: self._nav_error(1))
 
-        layout.addWidget(btn_up, 2, 0)
-        layout.addWidget(btn_down, 2, 1)
-        layout.addWidget(btn_prev_success, 2, 2)
-        layout.addWidget(btn_next_success, 2, 3)
-        layout.addWidget(btn_prev_err, 2, 4)
-        layout.addWidget(btn_next_err, 2, 5)
-        
-        # Row 2: Search
+        layout.addWidget(btn_up, 1, 0)
+        layout.addWidget(btn_down, 1, 1)
+        layout.addWidget(btn_prev_success, 1, 2)
+        layout.addWidget(btn_next_success, 1, 3)
+        layout.addWidget(btn_prev_err, 1, 4)
+        layout.addWidget(btn_next_err, 1, 5)
+
+        # Row 2: Chapter-Marked Navigation (amber) — fills the previously empty row
+        btn_prev_mark = QPushButton("◄ Prev Marked")
+        btn_prev_mark.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
+        btn_prev_mark.setToolTip("Jump to previous chapter-marked sentence.")
+        btn_prev_mark.clicked.connect(lambda: self._nav_chap_marked(-1))
+
+        btn_next_mark = QPushButton("Next Marked ►")
+        btn_next_mark.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
+        btn_next_mark.setToolTip("Jump to next chapter-marked sentence.")
+        btn_next_mark.clicked.connect(lambda: self._nav_chap_marked(1))
+
+        layout.addWidget(btn_prev_mark, 2, 0, 1, 3)
+        layout.addWidget(btn_next_mark, 2, 3, 1, 3)
+
+        # Row 3: Search
         search_widget = QWidget()
         s_layout = QHBoxLayout(search_widget); s_layout.setContentsMargins(0,0,0,0)
         s_layout.addWidget(QLabel("🔍"))
@@ -125,7 +124,8 @@ class ControlsView(QWidget):
         s_layout.addWidget(btn_s_prev)
         s_layout.addWidget(btn_s_next)
         
-        layout.addWidget(search_widget, 2, 0, 1, 4)
+        layout.addWidget(search_widget, 3, 0, 1, 4)
+
         
         group.add_layout(layout)
 

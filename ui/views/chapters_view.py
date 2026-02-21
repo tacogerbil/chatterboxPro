@@ -210,6 +210,14 @@ class ChaptersView(QWidget):
         btn_mark_word.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
         btn_mark_word.clicked.connect(self._mark_word_matches)
 
+        btn_unpin = QPushButton("Unpin")
+        btn_unpin.setToolTip(
+            "Remove selected sentence from chapter candidates.\n"
+            "Select the sentence in the main playlist, then click Unpin."
+        )
+        btn_unpin.setStyleSheet("background-color: #5A2525; color: white; font-weight: bold;")
+        btn_unpin.clicked.connect(self._unpin_selected)
+
         btn_conv_chap = QPushButton("Conv Chap")
         btn_conv_chap.setToolTip("Convert all marked chapter candidates into proper chapter headings.")
         btn_conv_chap.setStyleSheet("background-color: #1A6B47; color: white; font-weight: bold;")
@@ -217,6 +225,7 @@ class ChaptersView(QWidget):
 
         header_layout.addWidget(self.chap_word_edit)
         header_layout.addWidget(btn_mark_word)
+        header_layout.addWidget(btn_unpin)
         header_layout.addWidget(btn_conv_chap)
         # ─────────────────────────────────────────────────────────────
 
@@ -499,16 +508,35 @@ class ChaptersView(QWidget):
             self._unmark_chap_item(idx.row())
 
     def _refresh_playlist(self) -> None:
-        """Asks the parent window to refresh the playlist model (chap_marked changed)."""
-        # Best-effort: find PlaylistView in app window hierarchy
+        """Refresh the PlaylistModel so chap_marked colours and icons update."""
         from PySide6.QtWidgets import QApplication
         from core.models.playlist_model import PlaylistModel
         app = QApplication.instance()
-        if app:
-            for widget in app.topLevelWidgets():
-                for child in widget.findChildren(type(PlaylistModel)):
-                    child.refresh()
+        if not app:
+            return
+        for widget in app.topLevelWidgets():
+            # findChildren(PlaylistModel) — NOT type(PlaylistModel) which is just `type`
+            for child in widget.findChildren(PlaylistModel):
+                child.refresh()
+                return  # First hit is enough; there's only one PlaylistModel
+
+    def _unpin_selected(self) -> None:
+        """Remove currently selected playlist rows from chap_marked."""
+        from PySide6.QtWidgets import QApplication
+        from ui.views.playlist_view import PlaylistView
+        app = QApplication.instance()
+        if not app:
+            return
+        for widget in app.topLevelWidgets():
+            for pv in widget.findChildren(PlaylistView):
+                indices = pv.get_selected_indices()
+                if not indices:
                     return
+                for idx in indices:
+                    self.app_state.chap_marked.discard(idx)
+                self._refresh_playlist()
+                print(f"[ChaptersView] Unpinned {len(indices)} sentence(s) from chapter candidates.")
+                return
 
     # ─────────────────────────────────────────────────────────────────────
 
