@@ -160,6 +160,7 @@ class ChatterboxProQt(QMainWindow):
 
         # Other Views
         self.chapters_view.set_generation_service(self.gen_service)
+        self.chapters_view.set_playlist_service(self.playlist_service)  # For Conv Chap
         self.finalize_view.set_audio_service(self.audio_service)
         self.finalize_view.set_assembly_service(self.assembly_service)
         
@@ -183,6 +184,9 @@ class ChatterboxProQt(QMainWindow):
         
         # Wire Controls Structure Change (Sync Chapter List)
         self.controls_view.structure_changed.connect(lambda: self.chapters_view.model.refresh())
+        # Wire ChaptersView Conv Chap (Sync Chapter List + Playlist)
+        self.chapters_view.structure_changed.connect(lambda: self.chapters_view.model.refresh())
+        self.chapters_view.structure_changed.connect(lambda: self.playlist_view.model.refresh())
         
         # Wire Chapter Jump (MCCC: Fixed Regression)
         self.chapters_view.jump_requested.connect(self.on_chapter_jump)

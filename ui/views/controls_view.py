@@ -62,30 +62,43 @@ class ControlsView(QWidget):
         btn_up = QPushButton("▲ Move Up"); btn_up.clicked.connect(lambda: self._move_items(-1))
         btn_down = QPushButton("▼ Move Down"); btn_down.clicked.connect(lambda: self._move_items(1))
         
-        # Success Navigation (Light Green)
+        # Row 1: Chapter-Marked Navigation (amber)
+        btn_prev_mark = QPushButton("◄ Prev Marked")
+        btn_prev_mark.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
+        btn_prev_mark.setToolTip("Jump to previous chapter-marked sentence.")
+        btn_prev_mark.clicked.connect(lambda: self._nav_chap_marked(-1))
+
+        btn_next_mark = QPushButton("Next Marked ►")
+        btn_next_mark.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
+        btn_next_mark.setToolTip("Jump to next chapter-marked sentence.")
+        btn_next_mark.clicked.connect(lambda: self._nav_chap_marked(1))
+
+        layout.addWidget(btn_prev_mark, 1, 0, 1, 3)
+        layout.addWidget(btn_next_mark, 1, 3, 1, 3)
+
+        # Row 2: Success / Error Navigation
         btn_prev_success = QPushButton("◄ Prev Success")
         btn_prev_success.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
         btn_prev_success.clicked.connect(lambda: self._nav_success(-1))
-        
+
         btn_next_success = QPushButton("Next Success ►")
         btn_next_success.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
         btn_next_success.clicked.connect(lambda: self._nav_success(1))
-        
-        # Error Navigation (Light Red)
+
         btn_prev_err = QPushButton("◄ Prev Error")
         btn_prev_err.setStyleSheet("background-color: #FFB6C1; color: black; font-weight: bold;")
         btn_prev_err.clicked.connect(lambda: self._nav_error(-1))
-        
+
         btn_next_err = QPushButton("Next Error ►")
         btn_next_err.setStyleSheet("background-color: #FFB6C1; color: black; font-weight: bold;")
         btn_next_err.clicked.connect(lambda: self._nav_error(1))
-        
-        layout.addWidget(btn_up, 1, 0)
-        layout.addWidget(btn_down, 1, 1)
-        layout.addWidget(btn_prev_success, 1, 2)
-        layout.addWidget(btn_next_success, 1, 3)
-        layout.addWidget(btn_prev_err, 1, 4)
-        layout.addWidget(btn_next_err, 1, 5)
+
+        layout.addWidget(btn_up, 2, 0)
+        layout.addWidget(btn_down, 2, 1)
+        layout.addWidget(btn_prev_success, 2, 2)
+        layout.addWidget(btn_next_success, 2, 3)
+        layout.addWidget(btn_prev_err, 2, 4)
+        layout.addWidget(btn_next_err, 2, 5)
         
         # Row 2: Search
         search_widget = QWidget()
@@ -156,9 +169,9 @@ class ControlsView(QWidget):
         layout.addWidget(btn_conv_chap, 0, 5)
         
         # Row 1: Markers, Status & Split
-        btn_mark = QPushButton("M Mark"); btn_mark.clicked.connect(self._mark_current)
+        btn_mark = QPushButton("⚑ Flag"); btn_mark.clicked.connect(self._mark_current)
         btn_mark.setProperty("class", "action")
-        btn_mark.setToolTip("Mark current item for regeneration.")
+        btn_mark.setToolTip("Toggle flag on selected item(s) — flagged items can be regenerated in batch.")
         
         btn_split = QPushButton("➗ Split"); btn_split.clicked.connect(self._split_chunk)
         btn_split.setProperty("class", "action")
@@ -525,13 +538,29 @@ class ControlsView(QWidget):
         next_idx = self.playlist_service.find_next_status(idx, direction, 'failed')
         if next_idx != -1:
             self.playlist.jump_to_row(next_idx)
-    
+
     def _nav_success(self, direction):
         """Navigate to next/previous successful chunk."""
         idx = self._get_selected_index()
         next_idx = self.playlist_service.find_next_status(idx, direction, 'yes')
         if next_idx != -1:
             self.playlist.jump_to_row(next_idx)
+
+    def _nav_chap_marked(self, direction: int) -> None:
+        """Navigate to the next/previous chapter-candidate marked sentence."""
+        marked = sorted(self.playlist_service.state.chap_marked)
+        if not marked:
+            return
+        current = self._get_selected_index()
+        if direction > 0:
+            # Forward: first index strictly after current
+            targets = [i for i in marked if i > current]
+            next_idx = targets[0] if targets else marked[0]  # wrap
+        else:
+            # Backward: last index strictly before current
+            targets = [i for i in reversed(marked) if i < current]
+            next_idx = targets[0] if targets else marked[-1]  # wrap
+        self.playlist.jump_to_row(next_idx)
 
 
     def _search(self):

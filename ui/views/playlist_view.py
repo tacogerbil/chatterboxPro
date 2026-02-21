@@ -17,10 +17,13 @@ class PlaylistDelegate(QStyledItemDelegate):
         # Get Status & Mark
         status = index.data(PlaylistModel.StatusRole)
         is_marked = index.data(PlaylistModel.MarkedRole)
+        is_chap_marked = index.data(PlaylistModel.ChapMarkRole)
         
         # Apply Status Colors (Modify background brush)
         if not (option.state & QStyle.State_Selected):
-            if status == "failed":
+            if is_chap_marked:
+                option.backgroundBrush = QBrush(QColor("#4A3F1A"))  # Amber/teal — chapter candidate
+            elif status == "failed":
                 option.backgroundBrush = QBrush(QColor("#543030")) # Darker Red
             elif status == "success":
                 option.backgroundBrush = QBrush(QColor("#2E4B2E")) # Darker Green

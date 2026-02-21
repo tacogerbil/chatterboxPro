@@ -9,6 +9,7 @@ class PlaylistModel(QAbstractListModel):
     """
     StatusRole = Qt.UserRole + 1
     MarkedRole = Qt.UserRole + 2
+    ChapMarkRole = Qt.UserRole + 3  # chapter-candidate mark (word-search)
     
     def __init__(self, app_state: AppState, parent=None):
         super().__init__(parent)
@@ -41,8 +42,9 @@ class PlaylistModel(QAbstractListModel):
             is_marked = item.get('marked', False)
             
             icon = ""
-            icon = ""
             if is_marked: icon += "🔷 "
+            is_chap_marked = row in self.app_state.chap_marked
+            if is_chap_marked: icon += "📌 "
             
             # Show Outlier Warning if present
             # User requested: "yellow diamond with an exclamation mark", then updated to "⚠️ is better"
@@ -70,6 +72,9 @@ class PlaylistModel(QAbstractListModel):
             
         elif role == self.MarkedRole:
             return item.get('marked', False)
+
+        elif role == self.ChapMarkRole:
+            return index.row() in self.app_state.chap_marked
             
         elif role == Qt.ToolTipRole:
             # MCCC: Format tooltip with HTML for word wrapping

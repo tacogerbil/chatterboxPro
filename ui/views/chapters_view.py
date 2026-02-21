@@ -174,25 +174,51 @@ class ChapterDelegate(QStyledItemDelegate):
 
 class ChaptersView(QWidget):
     jump_requested = Signal(int)
+    structure_changed = Signal()  # Emitted when chapters are committed
 
     def __init__(self, app_state: AppState, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.app_state = app_state
         self.logic = ChapterService()
         self.model = ChapterModel(app_state)
-        # Type hint for generation service (injected later)
         self.gen_service: Optional[GenerationService] = None
-        
+        self.playlist_service = None  # Injected later via set_playlist_service()
+
         self.setup_ui()
 
     def setup_ui(self) -> None:
         layout = QVBoxLayout(self)
-        
-        # Header: Title + Refresh
+
+        # Header row: word search | Mark | Conv Chap | Refresh
         header_layout = QHBoxLayout()
         header_layout.addWidget(QLabel("Detected Chapters (Double-click to Jump)"))
         header_layout.addStretch()
-        
+
+        # ── Word-search ──────────────────────────────────────────────
+        self.chap_word_edit = QLineEdit()
+        self.chap_word_edit.setPlaceholderText("Chapter word...")
+        self.chap_word_edit.setFixedWidth(130)
+        self.chap_word_edit.setToolTip(
+            "Type a word and click Mark to highlight all matching\n"
+            "sentences as chapter candidates (amber in playlist)."
+        )
+        self.chap_word_edit.returnPressed.connect(self._mark_word_matches)
+
+        btn_mark_word = QPushButton("Mark")
+        btn_mark_word.setToolTip("Mark all sentences containing this word as chapter candidates.")
+        btn_mark_word.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
+        btn_mark_word.clicked.connect(self._mark_word_matches)
+
+        btn_conv_chap = QPushButton("Conv Chap")
+        btn_conv_chap.setToolTip("Convert all marked chapter candidates into proper chapter headings.")
+        btn_conv_chap.setStyleSheet("background-color: #1A6B47; color: white; font-weight: bold;")
+        btn_conv_chap.clicked.connect(self._convert_chap_marked)
+
+        header_layout.addWidget(self.chap_word_edit)
+        header_layout.addWidget(btn_mark_word)
+        header_layout.addWidget(btn_conv_chap)
+        # ─────────────────────────────────────────────────────────────
+
         # Auto-loop Checkbox (Moved to Header)
         s = self.app_state.settings
         self.auto_loop_chk = QCheckBox("Auto-loop")
@@ -218,6 +244,8 @@ class ChaptersView(QWidget):
         self.list_view = QListView()
         self.list_view.setModel(self.model)
         self.list_view.setAlternatingRowColors(True)
+        self.list_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list_view.customContextMenuRequested.connect(self._show_context_menu)
         
 
         # Palette set in update_theme() called at end of setup
@@ -386,18 +414,102 @@ class ChaptersView(QWidget):
 
     def set_generation_service(self, gen_service: GenerationService) -> None:
         self.gen_service = gen_service
-        
-        # MCCC: Connect Progress Tracking Signals
         gen_service.progress_update.connect(self.progress_widget.update_progress)
         gen_service.stats_updated.connect(self.progress_widget.update_stats)
         gen_service.eta_updated.connect(self.progress_widget.update_eta)
         gen_service.started.connect(lambda: self.progress_widget.setVisible(True))
         gen_service.finished.connect(lambda: self.progress_widget.setVisible(False))
         gen_service.stopped.connect(lambda: self.progress_widget.setVisible(False))
-        
-        # MCCC: Handle batched updates to prevent UI freeze
         if hasattr(gen_service, 'items_updated'):
              gen_service.items_updated.connect(self.on_items_updated)
+
+    def set_playlist_service(self, playlist_service) -> None:
+        """Inject PlaylistService so Conv Chap can call convert_to_chapter()."""
+        self.playlist_service = playlist_service
+
+    # ── Chapter Marking ───────────────────────────────────────────────────
+
+    def _mark_word_matches(self) -> None:
+        """Find all sentences containing the search word and add to chap_marked."""
+        word = self.chap_word_edit.text().strip()
+        if not word:
+            return
+        word_lower = word.lower()
+        added = 0
+        for i, sentence in enumerate(self.app_state.sentences):
+            text = sentence.get('original_sentence', '').lower()
+            if word_lower in text:
+                self.app_state.chap_marked.add(i)
+                added += 1
+        # Refresh playlist so amber highlight appears
+        from PySide6.QtWidgets import QApplication
+        for widget in QApplication.topLevelWidgets():
+            pv = widget.findChild(type(None).__class__, 'playlist_view')
+        # Simpler: emit a signal to whoever holds the playlist
+        self._refresh_playlist()
+        print(f"[ChaptersView] Marked {added} sentences containing '{word}'.")
+
+    def _convert_chap_marked(self) -> None:
+        """Convert all chap_marked sentence indices into chapter headings."""
+        if not self.app_state.chap_marked:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(self, "Nothing Marked",
+                "No chapter candidates marked.\nUse the word search + Mark button first.")
+            return
+        if not self.playlist_service:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Error", "Playlist service not connected.")
+            return
+
+        # Process in reverse order so indices stay valid as items are replaced
+        indices = sorted(self.app_state.chap_marked, reverse=True)
+        converted = 0
+        for idx in indices:
+            if self.playlist_service.convert_to_chapter(idx):
+                converted += 1
+
+        self.app_state.chap_marked.clear()
+        self._refresh_playlist()
+        self.model.refresh()
+        self.structure_changed.emit()
+        print(f"[ChaptersView] Converted {converted} candidates to chapters.")
+
+    def _unmark_chap_item(self, row: int) -> None:
+        """Remove a single sentence index from chap_marked."""
+        # Map chapter-list row → sentence start index
+        sent_idx = self.model.get_chapter_index(row)
+        if sent_idx >= 0:
+            self.app_state.chap_marked.discard(sent_idx)
+        else:
+            # Fallback: remove by row if chapter mapping failed
+            self.app_state.chap_marked.discard(row)
+        self._refresh_playlist()
+
+    def _show_context_menu(self, pos) -> None:
+        """Right-click context menu on the chapter list."""
+        from PySide6.QtWidgets import QMenu
+        idx = self.list_view.indexAt(pos)
+        if not idx.isValid():
+            return
+        menu = QMenu(self)
+        unmark_action = menu.addAction("Unmark")
+        action = menu.exec(self.list_view.viewport().mapToGlobal(pos))
+        if action == unmark_action:
+            self._unmark_chap_item(idx.row())
+
+    def _refresh_playlist(self) -> None:
+        """Asks the parent window to refresh the playlist model (chap_marked changed)."""
+        # Best-effort: find PlaylistView in app window hierarchy
+        from PySide6.QtWidgets import QApplication
+        from core.models.playlist_model import PlaylistModel
+        app = QApplication.instance()
+        if app:
+            for widget in app.topLevelWidgets():
+                for child in widget.findChildren(type(PlaylistModel)):
+                    child.refresh()
+                    return
+
+    # ─────────────────────────────────────────────────────────────────────
 
     @Slot(list)
     def on_items_updated(self, indices: List[int]) -> None:
