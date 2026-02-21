@@ -196,11 +196,9 @@ class ChaptersView(QWidget):
         # Auto-loop Checkbox (Moved to Header)
         s = self.app_state.settings
         self.auto_loop_chk = QCheckBox("Auto-loop")
-        self.auto_loop_chk.setToolTip("Automatically regenerate until success")
+        self.auto_loop_chk.setToolTip("Reflects the 'Auto-loop' setting from Config → ASR Validation.\nChange the setting there.")
         self.auto_loop_chk.setChecked(getattr(self.app_state, 'auto_regen_main', False))
-        self.auto_loop_chk.stateChanged.connect(
-            lambda s: setattr(self.app_state, 'auto_regen_main', s == Qt.Checked or s == 2)
-        )
+        self.auto_loop_chk.setEnabled(False)  # Read-only reflection; canonical setting is in Config tab
         
         self.lbl_auto_loop_info = QLabel(f"(Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
         self.lbl_auto_loop_info.setStyleSheet("color: gray; font-size: 8pt; margin-right: 10px;")
@@ -357,7 +355,10 @@ class ChaptersView(QWidget):
         if hasattr(self, 'lbl_auto_loop_info'):
             self.lbl_auto_loop_info.setText(f"(Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
         if hasattr(self, 'auto_loop_chk'):
-             self.auto_loop_chk.setChecked(getattr(self.app_state, 'auto_regen_main', False))
+            # Block signals while syncing to avoid any unintended write
+            self.auto_loop_chk.blockSignals(True)
+            self.auto_loop_chk.setChecked(getattr(self.app_state, 'auto_regen_main', False))
+            self.auto_loop_chk.blockSignals(False)
             
 
     def select_all(self) -> None:

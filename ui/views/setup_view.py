@@ -229,9 +229,8 @@ class SetupView(QWidget):
         reg_layout = QHBoxLayout()
         self.auto_reg_chk = QCheckBox("Continue to Regenerate until all files pass")
         self.auto_reg_chk.setChecked(getattr(self.state, 'auto_regen_main', False))
-        self.auto_reg_chk.stateChanged.connect(
-            lambda s: setattr(self.state, 'auto_regen_main', s == Qt.Checked or s == 2)
-        )
+        self.auto_reg_chk.setEnabled(False)  # Read-only reflection; change setting in Config → ASR Validation
+        self.auto_reg_chk.setToolTip("Reflects the 'Auto-loop' setting from Config → ASR Validation.\nChange the setting there.")
         
         # ASR Info Label (User Request)
         s = self.state.settings
@@ -316,7 +315,9 @@ class SetupView(QWidget):
         if hasattr(self, 'lbl_auto_reg_info'):
             self.lbl_auto_reg_info.setText(f"(Max Retries: {s.max_attempts} | ASR: {int(s.asr_threshold*100)}%)")
         if hasattr(self, 'auto_reg_chk'):
+            self.auto_reg_chk.blockSignals(True)
             self.auto_reg_chk.setChecked(getattr(self.state, 'auto_regen_main', False))
+            self.auto_reg_chk.blockSignals(False)
         self.refresh_gpu_status()
 
     def setup_system_check(self, layout: QVBoxLayout) -> None:

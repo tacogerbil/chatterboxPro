@@ -5,104 +5,132 @@ Wraps the existing Chatterbox implementation to conform to BaseTTSEngine interfa
 """
 import torch
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from .base_engine import BaseTTSEngine
 from chatterbox.tts import ChatterboxTTS
+from huggingface_hub import hf_hub_download
 
-# MCCC: Version Pinning
-# To prevent future breakage, set this to the specific commit hash of the model you want to use.
-# Example: "a1b2c3d4..."
-# Leave as None to always use the latest version (Risk of drift).
-MODEL_REVISION = None # Back to Latest (SHA caused 404)
+REPO_ID = "ResembleAI/chatterbox"
+
+# Files that MUST be present for a valid Chatterbox installation
+_REQUIRED_FILES = ["ve.pt", "t3_cfg.pt", "s3gen.pt", "tokenizer.json"]
+_OPTIONAL_FILES = ["conds.pt"]
+
+# Fingerprint files that identify a WRONG engine living in the target folder.
+# MCCC: Adapter Boundary Law — detect contamination before loading.
+_WRONG_ENGINE_MARKERS: Dict[str, list] = {
+    "MOSS-TTS": ["modeling_moss_tts.py", "configuration_moss_tts.py"],
+    "F5-TTS":   ["F5TTS_Base_train.yaml"],
+    "XTTS":     ["config.json"],  # broad, only flagged when combined with below
+}
+# A definitive MOSS fingerprint (its Python module files never appear in Chatterbox)
+_DEFINITIVE_WRONG_MARKERS = [
+    "modeling_moss_tts.py",
+    "configuration_moss_tts.py",
+    "processing_moss_tts.py",
+]
+
+
+def _detect_wrong_engine(path: Path) -> Optional[str]:
+    """
+    Checks whether a directory contains model files from a different engine.
+
+    Returns the engine name string if foreign files are detected, else None.
+    MCCC: Pure function — no side effects.
+    """
+    for marker in _DEFINITIVE_WRONG_MARKERS:
+        if (path / marker).exists():
+            return "MOSS-TTS"
+    return None
+
+
+def _download_to_dir(target_dir: Path) -> None:
+    """
+    Downloads Chatterbox model files directly into target_dir using hf_hub.
+
+    Uses local_dir so files land flat in the user's chosen folder,
+    not inside the HuggingFace cache hierarchy.
+    MCCC: Single Responsibility — only handles download I/O.
+
+    Raises:
+        RuntimeError: If any required file fails to download.
+    """
+    target_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[ChatterboxEngine] Downloading Chatterbox model to: {target_dir}")
+
+    for fname in _REQUIRED_FILES + _OPTIONAL_FILES:
+        try:
+            hf_hub_download(
+                repo_id=REPO_ID,
+                filename=fname,
+                local_dir=str(target_dir),
+            )
+            print(f"[ChatterboxEngine] ✓ {fname}")
+        except Exception as e:
+            if fname in _OPTIONAL_FILES:
+                print(f"[ChatterboxEngine] Optional file '{fname}' not available: {e}")
+            else:
+                raise RuntimeError(
+                    f"Failed to download required Chatterbox file '{fname}': {e}"
+                )
+
+    print(f"[ChatterboxEngine] Download complete → {target_dir}")
+
 
 class ChatterboxEngine(BaseTTSEngine):
     """Adapter for Chatterbox TTS engine."""
-    
+
     def __init__(self, device: str, model_path: str = None, **kwargs):
         super().__init__(device)
         self.model = None
         self.sr = 24000  # Chatterbox sample rate
-        self.model_path = model_path
-    
-    def _ensure_model_loaded(self):
-        """Lazy load the model on first use."""
-        if self.model is None:
-            if self.model_path:
-                print(f"[ChatterboxEngine] Loading from local path: {self.model_path}")
-                
-                # Check for critical model file
-                model_file = Path(self.model_path) / "ve.pt"
-                if not model_file.exists():
-                    print(f"[ChatterboxEngine] Model file {model_file} not found.")
-                    
-                    found_in_cache = False
-                    try:
-                        import shutil
-                        import os
-                        
-                        # 0. Check Local Repo Source (Highest Priority)
-                        # If the user has the model inside the 'chatterbox' package in this repo
-                        repo_root = Path(__file__).parent.parent / "chatterbox"
-                        local_repo_ve = repo_root / "ve.pt"
-                        
-                        print(f"[ChatterboxEngine] Checking local repo at: {repo_root}")
-                        
-                        if local_repo_ve.exists():
-                             print(f"[ChatterboxEngine] Found model in local repo: {repo_root}")
-                             print(f"[ChatterboxEngine] Copying from Repo to Target: {self.model_path}...")
-                             # We Copy here (safe) or Move? Copy is safer for repo integrity, but user might want space.
-                             # Let's Copy to be safe, user can delete original if they want.
-                             for item in repo_root.iterdir():
-                                if item.name == "ve.pt" or item.name == "config.json" or item.suffix == ".bin":  # Copy known model files
-                                     shutil.copy2(item, self.model_path)
-                             print("[ChatterboxEngine] Transfer complete.")
-                             found_in_cache = True
-                        
-                        # 1. Try to find in Local HuggingFace Cache (Second Priority)
-                        elif not found_in_cache:
-                            user_home = Path.home()
-                            cache_search_path = user_home / ".cache" / "huggingface" / "hub"
-                            
-                            # Pattern: models--ResembleAI--chatterbox/snapshots/<hash>/ve.pt
-                            if cache_search_path.exists():
-                                print(f"[ChatterboxEngine] Searching local cache: {cache_search_path}")
-                                # Recursive glob to look deep in snapshots
-                                potential_model_files = list(cache_search_path.glob("models--ResembleAI--chatterbox/snapshots/*/ve.pt"))
-                                
-                                if potential_model_files:
-                                    source_ve = potential_model_files[0]
-                                    source_dir = source_ve.parent
-                                    print(f"[ChatterboxEngine] Found existing model in cache: {source_dir}")
-                                    print(f"[ChatterboxEngine] MOVING to {self.model_path} (Saving Space)...")
-                                    
-                                    # Move all files from source snapshot to target
-                                    for item in source_dir.iterdir():
-                                        if item.is_file() or item.is_dir():
-                                            shutil.move(str(item), str(self.model_path))
-                                            
-                                    print("[ChatterboxEngine] Transfer complete.")
-                                    found_in_cache = True
-                                
-                    except Exception as e:
-                        print(f"[ChatterboxEngine] Local transfer failed: {e}")
+        self.model_path = model_path or ""
 
-                    # 2. Strict Local Failure (No Auto-Download)
-                    if not found_in_cache:
-                        error_msg = (
-                            f"Model file 've.pt' not found in {self.model_path}.\n"
-                            f"Also could not find it in local repo ({repo_root}) or local cache.\n"
-                            "Please Ensure the Chatterbox model files are present in your installation."
-                        )
-                        print(f"[ChatterboxEngine] CRITICAL: {error_msg}")
-                        raise FileNotFoundError(error_msg)
-                
-                self.model = ChatterboxTTS.from_local(self.model_path, self.device)
+    def _ensure_model_loaded(self) -> None:
+        """
+        Lazy-loads the Chatterbox model on first use.
+
+        Load strategy (MCCC: Fail Fast Law applied at each gate):
+          1. Custom path set
+             a. Detect wrong engine files → raise immediately with clear message
+             b. Required files present   → load from path
+             c. Files absent             → download directly to path, then load
+          2. No custom path → from_pretrained() (downloads to HF cache)
+        """
+        if self.model is not None:
+            return
+
+        if self.model_path:
+            target = Path(self.model_path)
+
+            # Gate 1: Wrong engine detection
+            wrong = _detect_wrong_engine(target)
+            if wrong:
+                raise RuntimeError(
+                    f"[ChatterboxEngine] Wrong model detected in '{target}'.\n"
+                    f"Found {wrong} files. This folder belongs to a different engine.\n"
+                    "Please choose an empty folder or a valid Chatterbox model directory."
+                )
+
+            # Gate 2: Files present → load directly
+            if (target / "ve.pt").exists():
+                print(f"[ChatterboxEngine] Loading from local path: {target}")
+                self.model = ChatterboxTTS.from_local(str(target), self.device)
+
+            # Gate 3: Files absent → download to custom path, then load
             else:
-                print(f"[ChatterboxEngine] Loading from Hub (default)...")
-                self.model = ChatterboxTTS.from_pretrained(self.device)
-            self.sr = self.model.sr
-    
+                print(f"[ChatterboxEngine] Model not found at '{target}'. Downloading...")
+                _download_to_dir(target)
+                self.model = ChatterboxTTS.from_local(str(target), self.device)
+
+        else:
+            # No custom path — use HuggingFace cache (default behaviour)
+            print("[ChatterboxEngine] No custom path set. Loading from HF Hub (default cache)...")
+            self.model = ChatterboxTTS.from_pretrained(self.device)
+
+        self.sr = self.model.sr
+
     def generate(
         self, 
         text: str, 

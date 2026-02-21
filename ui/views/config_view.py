@@ -39,6 +39,7 @@ class ConfigView(QWidget):
         self.chk_asr.blockSignals(True)
         self.asr_thresh.blockSignals(True)
         self.chk_watermark.blockSignals(True)
+        self.auto_loop_chk.blockSignals(True)
         
         try:
             self.spin_buf_before.setValue(s.chapter_buffer_before_ms)
@@ -50,6 +51,7 @@ class ConfigView(QWidget):
             self.retries_spin.setValue(s.max_attempts)
             self.chk_asr.setChecked(s.asr_validation_enabled)
             self.asr_thresh.set_value(s.asr_threshold)
+            self.auto_loop_chk.setChecked(getattr(self.state, 'auto_regen_main', False))
             self.chk_watermark.setChecked(s.disable_watermark)
         finally:
             self.spin_buf_before.blockSignals(False)
@@ -61,6 +63,7 @@ class ConfigView(QWidget):
             self.retries_spin.blockSignals(False)
             self.chk_asr.blockSignals(False)
             self.asr_thresh.blockSignals(False)
+            self.auto_loop_chk.blockSignals(False)
             self.chk_watermark.blockSignals(False)
         
     def setup_ui(self) -> None:
@@ -213,6 +216,18 @@ class ConfigView(QWidget):
              lambda v: setattr(self.state.settings, 'asr_threshold', v)
         )
         asr_l.addRow(self.asr_thresh)
+
+        # Auto Loop — canonical location. All other views reflect this.
+        self.auto_loop_chk = QCheckBox("Auto-loop: continue regenerating until all chunks pass")
+        self.auto_loop_chk.setToolTip(
+            "When enabled, the generator keeps retrying failed chunks until they\n"
+            "pass ASR validation. Max attempts is controlled by 'ASR Max Retries' above."
+        )
+        self.auto_loop_chk.setChecked(getattr(self.state, 'auto_regen_main', False))
+        self.auto_loop_chk.stateChanged.connect(
+            lambda s: setattr(self.state, 'auto_regen_main', s == Qt.Checked or s == 2)
+        )
+        asr_l.addRow(self.auto_loop_chk)
         chk_layout.addWidget(self.chk_asr)
         
         self.chk_watermark = QCheckBox("Disable Perth Watermark")

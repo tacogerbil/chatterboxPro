@@ -241,28 +241,17 @@ def worker_process_chunk(task: WorkerTask):
     bass_boost = task.bass_boost
     treble_boost = task.treble_boost
     model_path = task.model_path
-    moss_model_path = getattr(task, 'moss_model_path', None)  # MCCC: may be absent in old tasks
     auto_expression_enabled = task.auto_expression_enabled
     expression_sensitivity = task.expression_sensitivity
     combine_gpus = task.combine_gpus
-
-    # MCCC: Engine-aware path resolution.
-    # Each engine has its own model path field. Resolve the correct one here,
-    # at the boundary, so get_or_init_worker_models stays engine-agnostic.
-    if engine_name == 'moss':
-        resolved_model_path = moss_model_path or ''
-    else:
-        resolved_model_path = model_path or ''
-    # Normalise empty string to None so engine adapters can use truthiness checks
-    resolved_model_path = resolved_model_path if resolved_model_path else None
 
 
     pid = os.getpid()
     logging.info(f"[Worker-{pid}] Starting chunk (Idx: {original_index}, #: {sentence_number}, UUID: {uuid[:8]}) on device {device_str}")
 
     try:
-        # MCCC: Pass resolved (engine-specific) model path to the initializer
-        tts_engine, whisper_model = get_or_init_worker_models(device_str, engine_name, resolved_model_path, combine_gpus)
+        # Pass model_path to efficient initializer
+        tts_engine, whisper_model = get_or_init_worker_models(device_str, engine_name, model_path, combine_gpus)
         if tts_engine is None or whisper_model is None:
             raise RuntimeError(f"Engine initialization failed for device {device_str}")
     except Exception as e_model_load:
@@ -378,52 +367,39 @@ def worker_process_chunk(task: WorkerTask):
             
             # --- Signal Processing Check (Pre-Whisper) ---
             is_valid_signal, signal_error = validate_audio_signal(wav_tensor.cpu(), tts_engine.sr)
-            
             if not is_valid_signal:
                 logging.warning(f"Signal Rejected inside worker chunk #{sentence_number}, attempt {attempt_num+1}: {signal_error}")
-                if Path(temp_path_str).exists(): os.remove(temp_path_str) # Cleanup if we wrote it (logic above wrote sf.write first)
+                if Path(temp_path_str).exists(): os.remove(temp_path_str)
                 continue
 
             # --- MCCC: Reference Fidelity Check (Pitch & Timbre) ---
-            # Gate 1: Pitch Validation (Gender/Tone Check)
+            # Gate 1: Pitch Validation
             ref_f0 = ref_features.get('f0_mean')
-            
-            # Efficiently extract candidate features (MFCC needs audio, so do it once)
             try:
-                # We can load Y/SR once for both checks if we modify extract_audio_features, 
-                # but for modularity let's just use the path which is safe.
                 cand_features = extract_audio_features(temp_path_str)
             except:
                 cand_features = {}
-                
-            if ref_f0 and ref_f0 > 50: 
+
+            if ref_f0 and ref_f0 > 50:
                 cand_f0 = cand_features.get('f0_mean', 0)
                 if cand_f0 > 50:
                     ratio = cand_f0 / ref_f0
-                    if ratio > 1.4: 
-                         logging.warning(f"FIDELITY REJECT: Pitch too high ({cand_f0:.0f}Hz) vs Ref ({ref_f0:.0f}Hz). Ratio: {ratio:.2f}")
-                         if Path(temp_path_str).exists(): os.remove(temp_path_str)
-                         continue
-                    if ratio < 0.6: 
-                         logging.warning(f"FIDELITY REJECT: Pitch too low ({cand_f0:.0f}Hz) vs Ref ({ref_f0:.0f}Hz). Ratio: {ratio:.2f}")
-                         if Path(temp_path_str).exists(): os.remove(temp_path_str)
-                         continue
-            
-            # Gate 2: Timbre Similarity (Accent/Speaker Identity Check)
+                    if ratio > 1.4:
+                        logging.warning(f"FIDELITY REJECT: Pitch too high ({cand_f0:.0f}Hz) vs Ref ({ref_f0:.0f}Hz). Ratio: {ratio:.2f}")
+                        if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                        continue
+                    if ratio < 0.6:
+                        logging.warning(f"FIDELITY REJECT: Pitch too low ({cand_f0:.0f}Hz) vs Ref ({ref_f0:.0f}Hz). Ratio: {ratio:.2f}")
+                        if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                        continue
+
+            # Gate 2: Timbre Similarity
             if ref_mfcc_profile is not None:
-                # Reuse 'y' if possible, or load fresh
                 cand_y = cand_features.get('y')
                 cand_sr = cand_features.get('sr')
                 cand_mfcc = extract_mfcc_profile(temp_path_str, y=cand_y, sr=cand_sr)
-                
                 timbre_score = calculate_timbre_similarity(ref_mfcc_profile, cand_mfcc)
-                
-                # Threshold Tuning:
-                # Same speaker typically > 0.9
-                # Slight accent drift might dip to 0.8
-                # Different speaker/Total collapse < 0.7
-                TIMBRE_THRESHOLD = 0.75 
-                
+                TIMBRE_THRESHOLD = 0.75
                 if timbre_score < TIMBRE_THRESHOLD:
                     logging.warning(f"FIDELITY REJECT: Timbre Mismatch (Score: {timbre_score:.2f} < {TIMBRE_THRESHOLD}). Possible accent drift.")
                     if Path(temp_path_str).exists(): os.remove(temp_path_str)
