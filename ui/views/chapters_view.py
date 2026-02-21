@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListView, 
-    QPushButton, QLabel, QMessageBox, QCheckBox, QStyledItemDelegate, QStyle, QApplication, QStyleOptionViewItem
+    QPushButton, QLabel, QMessageBox, QCheckBox, QLineEdit,
+    QStyledItemDelegate, QStyle, QApplication, QStyleOptionViewItem
 )
 from PySide6.QtGui import QColor, QBrush, QPalette
 from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QRect, QEvent, QAbstractListModel
