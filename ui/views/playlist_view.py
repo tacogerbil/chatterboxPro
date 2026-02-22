@@ -13,20 +13,27 @@ class PlaylistDelegate(QStyledItemDelegate):
     """
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
-        
-        # Get Status & Mark
+
+        # Fetch all display-relevant roles
         status = index.data(PlaylistModel.StatusRole)
-        is_marked = index.data(PlaylistModel.MarkedRole)
-        is_chap_marked = index.data(PlaylistModel.ChapMarkRole)
-        
-        # Apply Status Colors (Modify background brush)
+
+        # Check is_chapter_heading directly from model data
+        from PySide6.QtCore import Qt as _Qt
+        sentences = index.model().app_state.sentences
+        row = index.row()
+        is_chapter = (
+            0 <= row < len(sentences) and
+            sentences[row].get('is_chapter_heading', False)
+        )
+
+        # Apply background colours (priority: chapter > error/success)
         if not (option.state & QStyle.State_Selected):
-            if is_chap_marked:
-                option.backgroundBrush = QBrush(QColor("#4A3F1A"))  # Amber/teal — chapter candidate
+            if is_chapter:
+                option.backgroundBrush = QBrush(QColor("#1A2E4A"))  # Deep blue — committed chapter
             elif status == "failed":
-                option.backgroundBrush = QBrush(QColor("#543030")) # Darker Red
+                option.backgroundBrush = QBrush(QColor("#543030"))  # Darker red
             elif status == "success":
-                option.backgroundBrush = QBrush(QColor("#2E4B2E")) # Darker Green
+                option.backgroundBrush = QBrush(QColor("#2E4B2E"))  # Darker green
 
 
 class PlaylistView(QWidget):

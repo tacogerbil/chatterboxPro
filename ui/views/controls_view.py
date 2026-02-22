@@ -85,21 +85,7 @@ class ControlsView(QWidget):
         layout.addWidget(btn_prev_err, 1, 4)
         layout.addWidget(btn_next_err, 1, 5)
 
-        # Row 2: Chapter-Marked Navigation (amber) — fills the previously empty row
-        btn_prev_mark = QPushButton("◄ Prev Marked")
-        btn_prev_mark.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
-        btn_prev_mark.setToolTip("Jump to previous chapter-marked sentence.")
-        btn_prev_mark.clicked.connect(lambda: self._nav_chap_marked(-1))
-
-        btn_next_mark = QPushButton("Next Marked ►")
-        btn_next_mark.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
-        btn_next_mark.setToolTip("Jump to next chapter-marked sentence.")
-        btn_next_mark.clicked.connect(lambda: self._nav_chap_marked(1))
-
-        layout.addWidget(btn_prev_mark, 2, 0, 1, 3)
-        layout.addWidget(btn_next_mark, 2, 3, 1, 3)
-
-        # Row 3: Search
+        # Row 2: Search (moved up)
         search_widget = QWidget()
         s_layout = QHBoxLayout(search_widget); s_layout.setContentsMargins(0,0,0,0)
         s_layout.addWidget(QLabel("🔍"))
@@ -124,7 +110,7 @@ class ControlsView(QWidget):
         s_layout.addWidget(btn_s_prev)
         s_layout.addWidget(btn_s_next)
         
-        layout.addWidget(search_widget, 3, 0, 1, 4)
+        layout.addWidget(search_widget, 2, 0, 1, 4)
 
         
         group.add_layout(layout)
@@ -545,28 +531,6 @@ class ControlsView(QWidget):
         next_idx = self.playlist_service.find_next_status(idx, direction, 'yes')
         if next_idx != -1:
             self.playlist.jump_to_row(next_idx)
-
-    def _nav_chap_marked(self, direction: int) -> None:
-        """Navigate to the next/previous chapter-candidate marked sentence.
-
-        chap_marked holds UUIDs, so we resolve them to current live indices first.
-        This means navigation stays correct after splits or insertions.
-        """
-        # Resolve UUIDs → current indices
-        marked_indices = sorted(
-            i for i, s in enumerate(self.playlist_service.state.sentences)
-            if s.get('uuid') in self.playlist_service.state.chap_marked
-        )
-        if not marked_indices:
-            return
-        current = self._get_selected_index()
-        if direction > 0:
-            targets = [i for i in marked_indices if i > current]
-            next_idx = targets[0] if targets else marked_indices[0]   # wrap
-        else:
-            targets = [i for i in reversed(marked_indices) if i < current]
-            next_idx = targets[0] if targets else marked_indices[-1]  # wrap
-        self.playlist.jump_to_row(next_idx)
 
 
     def _search(self):

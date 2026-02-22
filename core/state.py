@@ -105,9 +105,6 @@ class AppState:
     
     # System Capabilities (MCCC: Hardware isolation)
     system_capabilities: Dict[str, Any] = field(default_factory=dict)
-    
-    # Chapter Marking (word-search candidates, not yet committed as chapters)
-    chap_marked: set = field(default_factory=set)  # Set[int] of sentence indices
 
     
     def update_settings(self, **kwargs):

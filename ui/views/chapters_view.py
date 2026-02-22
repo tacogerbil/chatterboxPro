@@ -38,7 +38,7 @@ class ChapterModel(QAbstractListModel):
         chapter = self._chapters[index.row()]
         
         if role == Qt.DisplayRole:
-            return f"{chapter['title']} (Sentences {chapter['start_idx']+1}-{chapter['end_idx']+1})"
+            return f"📑 {chapter['title']} (Sentences {chapter['start_idx']+1}-{chapter['end_idx']+1})"
             
         if role == Qt.CheckStateRole:
             # We map row index to check state.
@@ -195,40 +195,6 @@ class ChaptersView(QWidget):
         header_layout.addWidget(QLabel("Detected Chapters (Double-click to Jump)"))
         header_layout.addStretch()
 
-        # ── Word-search ──────────────────────────────────────────────
-        self.chap_word_edit = QLineEdit()
-        self.chap_word_edit.setPlaceholderText("Chapter word...")
-        self.chap_word_edit.setFixedWidth(130)
-        self.chap_word_edit.setToolTip(
-            "Type a word and click Mark to highlight all matching\n"
-            "sentences as chapter candidates (amber in playlist)."
-        )
-        self.chap_word_edit.returnPressed.connect(self._mark_word_matches)
-
-        btn_mark_word = QPushButton("Mark")
-        btn_mark_word.setToolTip("Mark all sentences containing this word as chapter candidates.")
-        btn_mark_word.setStyleSheet("background-color: #B8860B; color: white; font-weight: bold;")
-        btn_mark_word.clicked.connect(self._mark_word_matches)
-
-        btn_unpin = QPushButton("Unpin")
-        btn_unpin.setToolTip(
-            "Remove selected sentence from chapter candidates.\n"
-            "Select the sentence in the main playlist, then click Unpin."
-        )
-        btn_unpin.setStyleSheet("background-color: #5A2525; color: white; font-weight: bold;")
-        btn_unpin.clicked.connect(self._unpin_selected)
-
-        btn_conv_chap = QPushButton("Conv Chap")
-        btn_conv_chap.setToolTip("Convert all marked chapter candidates into proper chapter headings.")
-        btn_conv_chap.setStyleSheet("background-color: #1A6B47; color: white; font-weight: bold;")
-        btn_conv_chap.clicked.connect(self._convert_chap_marked)
-
-        header_layout.addWidget(self.chap_word_edit)
-        header_layout.addWidget(btn_mark_word)
-        header_layout.addWidget(btn_unpin)
-        header_layout.addWidget(btn_conv_chap)
-        # ─────────────────────────────────────────────────────────────
-
         # Auto-loop Checkbox (Moved to Header)
         s = self.app_state.settings
         self.auto_loop_chk = QCheckBox("Auto-loop")
@@ -254,8 +220,6 @@ class ChaptersView(QWidget):
         self.list_view = QListView()
         self.list_view.setModel(self.model)
         self.list_view.setAlternatingRowColors(True)
-        self.list_view.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.list_view.customContextMenuRequested.connect(self._show_context_menu)
         
 
         # Palette set in update_theme() called at end of setup
@@ -436,119 +400,6 @@ class ChaptersView(QWidget):
     def set_playlist_service(self, playlist_service) -> None:
         """Inject PlaylistService so Conv Chap can call convert_to_chapter()."""
         self.playlist_service = playlist_service
-
-    # ── Chapter Marking ───────────────────────────────────────────────────
-
-    def _mark_word_matches(self) -> None:
-        """Find all sentences containing the search word and store their UUIDs in chap_marked.
-
-        Storing UUIDs (not indices) ensures marks survive splits, inserts, and deletions.
-        """
-        word = self.chap_word_edit.text().strip()
-        if not word:
-            return
-        word_lower = word.lower()
-        added = 0
-        for sentence in self.app_state.sentences:
-            text = sentence.get('original_sentence', '').lower()
-            uid = sentence.get('uuid')
-            if word_lower in text and uid:
-                self.app_state.chap_marked.add(uid)
-                added += 1
-        self._refresh_playlist()
-        print(f"[ChaptersView] Marked {added} sentence(s) containing '{word}'.")
-
-    def _convert_chap_marked(self) -> None:
-        """Convert all chap_marked sentences into chapter headings.
-
-        UUIDs are resolved to current indices at convert-time,
-        so splits or insertions before this call don't cause mismatches.
-        """
-        if not self.app_state.chap_marked:
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.information(self, "Nothing Marked",
-                "No chapter candidates marked.\nUse the word search + Mark button first.")
-            return
-        if not self.playlist_service:
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Error", "Playlist service not connected.")
-            return
-
-        # Resolve UUIDs → current live indices
-        uuid_to_idx: dict = {
-            s.get('uuid'): i
-            for i, s in enumerate(self.app_state.sentences)
-            if s.get('uuid') in self.app_state.chap_marked
-        }
-
-        # Process in reverse-index order so earlier splits don't shift later rows
-        converted = 0
-        for uid, idx in sorted(uuid_to_idx.items(), key=lambda kv: kv[1], reverse=True):
-            if self.playlist_service.convert_to_chapter(idx):
-                converted += 1
-
-        self.app_state.chap_marked.clear()
-        self._refresh_playlist()
-        self.model.refresh()
-        self.structure_changed.emit()
-        print(f"[ChaptersView] Converted {converted} candidate(s) to chapters.")
-
-    def _unmark_chap_item(self, row: int) -> None:
-        """Remove a chapter-list item's UUID from chap_marked (right-click Unmark)."""
-        # Get the sentence index for this chapter-list row
-        sent_idx = self.model.get_chapter_index(row)
-        if 0 <= sent_idx < len(self.app_state.sentences):
-            uid = self.app_state.sentences[sent_idx].get('uuid')
-            if uid:
-                self.app_state.chap_marked.discard(uid)
-        self._refresh_playlist()
-
-    def _show_context_menu(self, pos) -> None:
-        """Right-click context menu on the chapter list."""
-        from PySide6.QtWidgets import QMenu
-        idx = self.list_view.indexAt(pos)
-        if not idx.isValid():
-            return
-        menu = QMenu(self)
-        unmark_action = menu.addAction("Unmark")
-        action = menu.exec(self.list_view.viewport().mapToGlobal(pos))
-        if action == unmark_action:
-            self._unmark_chap_item(idx.row())
-
-    def _refresh_playlist(self) -> None:
-        """Refresh the PlaylistModel so chap_marked colours and icons update."""
-        from PySide6.QtWidgets import QApplication
-        from core.models.playlist_model import PlaylistModel
-        app = QApplication.instance()
-        if not app:
-            return
-        for widget in app.topLevelWidgets():
-            # findChildren(PlaylistModel) — NOT type(PlaylistModel) which is just `type`
-            for child in widget.findChildren(PlaylistModel):
-                child.refresh()
-                return  # First hit is enough; there's only one PlaylistModel
-
-    def _unpin_selected(self) -> None:
-        """Remove UUID of currently selected playlist rows from chap_marked."""
-        from PySide6.QtWidgets import QApplication
-        from ui.views.playlist_view import PlaylistView
-        app = QApplication.instance()
-        if not app:
-            return
-        for widget in app.topLevelWidgets():
-            for pv in widget.findChildren(PlaylistView):
-                indices = pv.get_selected_indices()
-                if not indices:
-                    return
-                removed = 0
-                for idx in indices:
-                    if idx < len(self.app_state.sentences):
-                        uid = self.app_state.sentences[idx].get('uuid')
-                        if uid and self.app_state.chap_marked.discard(uid) is None:
-                            removed += 1
-                self._refresh_playlist()
-                print(f"[ChaptersView] Unpinned {len(indices)} sentence(s).")
-                return
 
     # ─────────────────────────────────────────────────────────────────────
 

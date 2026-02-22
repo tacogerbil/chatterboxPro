@@ -9,7 +9,6 @@ class PlaylistModel(QAbstractListModel):
     """
     StatusRole = Qt.UserRole + 1
     MarkedRole = Qt.UserRole + 2
-    ChapMarkRole = Qt.UserRole + 3  # chapter-candidate mark (word-search)
     
     def __init__(self, app_state: AppState, parent=None):
         super().__init__(parent)
@@ -37,30 +36,22 @@ class PlaylistModel(QAbstractListModel):
                 
             if len(text) > 80: text = text[:77] + "..."
             
-            # Add Status Icon
+            # Add Status Icon — order: chapter > chap-candidate > regen-flag > outlier > gen-status
             status = item.get('tts_generated', 'no')
             is_marked = item.get('marked', False)
-            
+            is_chapter = item.get('is_chapter_heading', False)
+
             icon = ""
-            if is_marked: icon += "🔷 "
-            is_chap_marked = row in self.app_state.chap_marked
-            if is_chap_marked: icon += "📌 "
-            
+            if is_chapter:     icon += "📑 "
+            if is_marked:      icon += "🚩 "
+
             # Show Outlier Warning if present
-            # User requested: "yellow diamond with an exclamation mark", then updated to "⚠️ is better"
             if item.get('outlier_reason'):
                 icon += "⚠️ "
-            
-            if status == 'yes': icon += "✅ "
+
+            if status == 'yes':    icon += "✅ "
             elif status == 'failed': icon += "❌ "
-            # elif status == 'no': icon = "⬜ " # User requested 'red x' for 'hadn't been generated', but ❌ is usually error.
-            # Let's stick to X for fail/pending if user insisted, but standard UX distinguishes.
-            # User said: "red x ... signify it hadn't been generated".
-            # Let's try:
-            # Success: ✅
-            # Failed: ❌
-            # Pending: (no icon) - reduces clutter.
-            
+
             return f"[{row+1}] {icon}{text}"
             
         elif role == self.StatusRole:
@@ -72,11 +63,6 @@ class PlaylistModel(QAbstractListModel):
             
         elif role == self.MarkedRole:
             return item.get('marked', False)
-
-        elif role == self.ChapMarkRole:
-            row_uuid = item.get('uuid')
-            return bool(row_uuid and row_uuid in self.app_state.chap_marked)
-
             
         elif role == Qt.ToolTipRole:
             # MCCC: Format tooltip with HTML for word wrapping

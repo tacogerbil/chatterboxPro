@@ -66,29 +66,35 @@ class PlaylistService:
     def split_chunk(self, index: int) -> bool:
         item = self.get_selected_item(index)
         if not item: return False
-        
+
+        was_chapter = item.get('is_chapter_heading', False)
+
         text = item.get('original_sentence', '')
         split_sentences = self.processor.splitter.split(text)
-        
+
         if len(split_sentences) <= 1:
-            return False # Cannot split
-            
+            return False  # Cannot split
+
         # Create new items
         new_items = []
-        for s in split_sentences:
+        for idx_s, s in enumerate(split_sentences):
             s_clean = s.strip()
             if not s_clean: continue
-            
+
+            # First child inherits is_chapter_heading from parent so the chapter
+            # heading is NOT silently deleted when a heading is split to clean it up.
+            is_ch = was_chapter if idx_s == 0 else bool(self.processor.chapter_regex.match(s_clean))
+
             new_item = {
                 "uuid": uuid.uuid4().hex,
                 "original_sentence": s_clean,
                 "paragraph": "no",
                 "tts_generated": "no",
                 "marked": True,
-                "is_chapter_heading": bool(self.processor.chapter_regex.match(s_clean))
+                "is_chapter_heading": is_ch,
             }
             new_items.append(new_item)
-            
+
         # Replace old item with new items
         self.state.sentences[index:index+1] = new_items
         self._renumber()
@@ -129,16 +135,20 @@ class PlaylistService:
                 item['marked'] = not current
                 
     def convert_to_chapter(self, index: int) -> bool:
-        """Converts an existing item into a Chapter Heading."""
+        """Converts an existing item into a Chapter Heading.
+
+        IMPORTANT: The item's `marked` flag is intentionally set to False.
+        Chapter headings must NOT be included in batch-mark workflows
+        (regen marked, reflow, split-all-marked) that scan the entire list.
+        Setting marked=True here was the root cause of chapters vanishing in
+        unrelated parts of the book during join/reflow operations.
+        """
         item = self.get_selected_item(index)
         if not item: return False
-        
+
         if not item.get('is_chapter_heading'):
             item['is_chapter_heading'] = True
-            # Ideally reset generation status? Or keeps audio but acts as header?
-            # Usually headers are skipped in generation or treated separately.
-            # Let's keep content but mark modified.
-            item['marked'] = True 
+            item['marked'] = False  # Never include chapters in batch-mark operations
             return True
         return False
 
@@ -222,34 +232,48 @@ class PlaylistService:
             item['sentence_number'] = str(i + 1)
 
     def merge_failed_down(self) -> int:
-        """Merges failed chunks into the chunk below them."""
-        # Ported from legacy controls_frame.py logic (inferred) / main_window.py
+        """Merges failed chunks into the chunk below them.
+
+        Chapter headings are never merged — they are skipped to preserve
+        the chapter structure that the user has established.
+        """
         merged_count = 0
         i = 0
         while i < len(self.state.sentences) - 1:
             curr = self.state.sentences[i]
+
+            # GUARD: never merge a chapter heading away, and never merge INTO one.
+            if curr.get('is_chapter_heading'):
+                i += 1
+                continue
+
             if curr.get('tts_generated') == 'failed':
-                next_item = self.state.sentences[i+1]
-                
+                next_item = self.state.sentences[i + 1]
+
+                # GUARD: don't merge into a chapter heading
+                if next_item.get('is_chapter_heading'):
+                    i += 1
+                    continue
+
                 # Merge text
                 merged_text = (curr.get('original_sentence', '') + " " + next_item.get('original_sentence', '')).strip()
                 next_item['original_sentence'] = merged_text
                 next_item['tts_generated'] = 'no'
                 next_item['marked'] = True
-                
-                # MCCC: Clear associated metrics and artifacts for the merged item
+
+                # Clear associated metrics and artifacts for the merged item
                 keys_to_clear = ['audio_path', 'asr_match', 'seed', 'ffmpeg_cmd']
                 for k in keys_to_clear:
                     if k in next_item:
                         del next_item[k]
-                
+
                 # Remove current
                 self.state.sentences.pop(i)
                 merged_count += 1
-                # Don't increment i, check this index again (which is now the next_item)
+                # Don't increment i — check this slot again (now holds next_item)
             else:
                 i += 1
-                
+
         if merged_count > 0:
             self._renumber()
         return merged_count
@@ -370,41 +394,43 @@ class PlaylistService:
         """
         Smart Merge: Finds contiguous blocks of marked items, concatenates their text,
         and re-chunks them respecting the max_chunk_chars setting.
+
+        Chapter headings are excluded from reflow — any group that contains a
+        chapter heading is skipped entirely so `is_chapter_heading` is never lost.
         """
         if not self.state.sentences: return 0
-        
-        # 1. Identify contiguous blocks of marked indices
+
         marked_indices = [i for i, s in enumerate(self.state.sentences) if s.get('marked')]
         if not marked_indices: return 0
-        
-        marked_indices = [i for i, s in enumerate(self.state.sentences) if s.get('marked')]
-        if not marked_indices: return 0
-        
+
         groups = []
         for k, g in groupby(enumerate(marked_indices), lambda ix: ix[0] - ix[1]):
             groups.append(list(map(itemgetter(1), g)))
-            
+
         # Process groups in reverse order to keep indices valid
         processed_count = 0
         max_chars = self.state.settings.max_chunk_chars
-        
+
         for group in reversed(groups):
             if not group: continue
-            
+
+            # GUARD: skip any group that contains a chapter heading.
+            # Reflowing merges text, which would silently destroy the heading flag.
+            if any(self.state.sentences[idx].get('is_chapter_heading') for idx in group):
+                logging.debug(f"[reflow] Skipping group {group} — contains chapter heading.")
+                continue
+
             start_idx = group[0]
-            # Collect text from all items in this group
             full_text = ""
             for idx in group:
                 full_text += " " + self.state.sentences[idx].get('original_sentence', '')
-            
+
             full_text = full_text.strip()
-            
-            # Re-split into sentences first (to get granular units)
-            # Create a localized list of dicts for group_sentences_into_chunks
-            # We use preprocess_text logic but just need raw sentences first
-            raw_sentences = self.processor.splitter.split(full_text) if self.processor.splitter else self.processor.simple_split_re.split(full_text)
-            
-            # Wrap as dicts for the grouper
+
+            raw_sentences = (self.processor.splitter.split(full_text)
+                             if self.processor.splitter
+                             else self.processor.simple_split_re.split(full_text))
+
             sentence_dicts = []
             for s in raw_sentences:
                 s_clean = s.strip()
@@ -413,27 +439,19 @@ class PlaylistService:
                     "original_sentence": s_clean,
                     "is_chapter_heading": bool(self.processor.chapter_regex.match(s_clean))
                 })
-                
-            # Now Group them
+
             new_chunks = self.processor.group_sentences_into_chunks(sentence_dicts, max_chars=max_chars)
-            
-            # Ensure new chunks have correct status
+
             for chunk in new_chunks:
                 chunk['tts_generated'] = 'no'
-            for chunk in new_chunks:
-                chunk['tts_generated'] = 'no'
-                chunk['marked'] = False # Unmark so user knows merge is complete
-                # User said "perform their tasks only on MARKED items". Usually resulting items are ready to gen.
-                # Let's keep them marked so they can be generated immediately with "Regen Marked".
-                
-            # Replace the old slice with new chunks
-            # Slice range: start_idx to start_idx + len(group)
-            self.state.sentences[start_idx : start_idx + len(group)] = new_chunks
+                chunk['marked'] = False
+
+            self.state.sentences[start_idx: start_idx + len(group)] = new_chunks
             processed_count += len(group)
-            
+
         if processed_count > 0:
             self._renumber()
-            
+
         return processed_count
 
     def split_all_marked(self) -> int:
@@ -442,6 +460,12 @@ class PlaylistService:
         i = 0
         while i < len(self.state.sentences):
             item = self.state.sentences[i]
+            
+            # GUARD: Do not batch-split chapter headings
+            if item.get('is_chapter_heading'):
+                i += 1
+                continue
+                
             if item.get('marked'):
                 text = item.get('original_sentence', '')
                 split_sentences = self.processor.splitter.split(text)
