@@ -550,9 +550,27 @@ class ControlsView(QWidget):
         self._show_search_match()
         
     def _show_search_match(self):
-        if not self.matches: return
-        target = self.matches[self.match_idx]
-        self.playlist.jump_to_row(target)
+        if not hasattr(self, 'matches') or not self.matches: return
+        
+        target_uuid = self.matches[self.match_idx]
+        
+        # MCCC: Resolve UUID continuously to survive splits/inserts that shift array indices
+        current_idx = -1
+        for i, s in enumerate(self.playlist_service.state.sentences):
+            if s.get('uuid') == target_uuid:
+                current_idx = i
+                break
+                
+        if current_idx != -1:
+            self.playlist.jump_to_row(current_idx)
+        else:
+            # Fallback if sentence was deleted — remove from matches and try next
+            self.matches.pop(self.match_idx)
+            if self.matches:
+                self.match_idx = self.match_idx % len(self.matches)
+                self._show_search_match()
+            else:
+                QMessageBox.information(self, "Search", "No more matches found (items deleted).")
 
     def _merge_failed(self):
         count = self.playlist_service.merge_failed_down()

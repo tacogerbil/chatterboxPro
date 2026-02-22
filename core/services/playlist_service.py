@@ -189,13 +189,15 @@ class PlaylistService:
             return sorted(list(new_indices))
         return indices
 
-    def search(self, query: str) -> List[int]:
+    def search(self, query: str) -> List[str]:
         if not query: return []
         matches = []
         q_lower = query.lower()
-        for i, s in enumerate(self.state.sentences):
+        for s in self.state.sentences:
             if q_lower in s.get('original_sentence', '').lower():
-                matches.append(i)
+                uid = s.get('uuid')
+                if uid:
+                    matches.append(uid)
         return matches
 
     def find_next_status(self, start_index: int, direction: int, status: str) -> int:
