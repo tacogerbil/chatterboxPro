@@ -507,7 +507,10 @@ class SetupView(QWidget):
                 else:
                     QMessageBox.information(self, "Loaded", msg)
             else:
-                QMessageBox.warning(self, "Error", "Failed to load session content (JSON missing or invalid).")
+                QMessageBox.warning(self, "Error", 
+                    "Failed to load session content.\n\n"
+                    "Please make sure you selected a specific Session Folder (e.g., 'Outputs_Pro/MyBook'), "
+                    "and not the parent 'Outputs_Pro' folder itself.")
 
     def manual_save_session(self) -> None:
         if not self.state.session_name:

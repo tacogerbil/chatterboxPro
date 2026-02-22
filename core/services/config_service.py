@@ -14,7 +14,13 @@ class ConfigService:
     - Explicit Interface: load_state / save_state.
     """
     def __init__(self, config_dir: str = "config", filename: str = "last_session.json"):
-        self.config_dir = Path(config_dir)
+        target = Path(config_dir)
+        if not target.is_absolute():
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            self.config_dir = base_dir / target
+        else:
+            self.config_dir = target
+            
         self.config_path = self.config_dir / filename
         self.config_dir.mkdir(parents=True, exist_ok=True)
 

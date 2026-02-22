@@ -13,7 +13,15 @@ class ProjectService:
     - Session management
     """
     def __init__(self, outputs_dir: str = "Outputs_Pro"):
-        self.outputs_dir = outputs_dir
+        # MCCC: Anchor 'Outputs_Pro' absolute to project root to survive CWD shifts
+        target = Path(outputs_dir)
+        if not target.is_absolute():
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            self.outputs_dir = base_dir / target
+        else:
+            self.outputs_dir = target
+            
+        self.outputs_dir.mkdir(parents=True, exist_ok=True)
 
     def get_audio_path(self, session_name: str, audio_filename: str) -> Path:
         """Construct the absolute path for an audio file."""

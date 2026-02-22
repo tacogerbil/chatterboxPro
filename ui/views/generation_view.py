@@ -637,17 +637,47 @@ class GenerationView(QWidget):
         self.ref_audio_edit.setText(self.state.ref_audio_path or "")
         self.ref_audio_edit.blockSignals(False)
         
+        # MCCC: Block slider signals to prevent programmatic loads from triggering the "Custom" voice auto-reset
+        if hasattr(self, 'exag_slider'): self.exag_slider.blockSignals(True)
+        if hasattr(self, 'speed_slider'): self.speed_slider.blockSignals(True)
+        if hasattr(self, 'temp_slider'): self.temp_slider.blockSignals(True)
+        if hasattr(self, 'cfg_slider'): self.cfg_slider.blockSignals(True)
+        if hasattr(self, 'pitch_slider'): self.pitch_slider.blockSignals(True)
+        if hasattr(self, 'timbre_slider'): self.timbre_slider.blockSignals(True)
+        if hasattr(self, 'gruffness_slider'): self.gruffness_slider.blockSignals(True)
+        if hasattr(self, 'bass_slider'): self.bass_slider.blockSignals(True)
+        if hasattr(self, 'treble_slider'): self.treble_slider.blockSignals(True)
+
         if hasattr(self, 'exag_slider'): self.exag_slider.set_value(s.exaggeration)
         if hasattr(self, 'speed_slider'): self.speed_slider.set_value(s.speed)
         if hasattr(self, 'temp_slider'): self.temp_slider.set_value(s.temperature)
         if hasattr(self, 'cfg_slider'): self.cfg_slider.set_value(s.cfg_weight)
-        
         if hasattr(self, 'pitch_slider'): self.pitch_slider.set_value(s.pitch_shift)
         if hasattr(self, 'timbre_slider'): self.timbre_slider.set_value(s.timbre_shift)
         if hasattr(self, 'gruffness_slider'): self.gruffness_slider.set_value(s.gruffness)
         if hasattr(self, 'bass_slider'): self.bass_slider.set_value(s.bass_boost)
         if hasattr(self, 'treble_slider'): self.treble_slider.set_value(s.treble_boost)
         
+        if hasattr(self, 'exag_slider'): self.exag_slider.blockSignals(False)
+        if hasattr(self, 'speed_slider'): self.speed_slider.blockSignals(False)
+        if hasattr(self, 'temp_slider'): self.temp_slider.blockSignals(False)
+        if hasattr(self, 'cfg_slider'): self.cfg_slider.blockSignals(False)
+        if hasattr(self, 'pitch_slider'): self.pitch_slider.blockSignals(False)
+        if hasattr(self, 'timbre_slider'): self.timbre_slider.blockSignals(False)
+        if hasattr(self, 'gruffness_slider'): self.gruffness_slider.blockSignals(False)
+        if hasattr(self, 'bass_slider'): self.bass_slider.blockSignals(False)
+        if hasattr(self, 'treble_slider'): self.treble_slider.blockSignals(False)
+
+        # Restore the specific preset text silently
+        if hasattr(s, 'voice_preset') and hasattr(self, 'preset_combo'):
+            self.preset_combo.blockSignals(True)
+            idx = self.preset_combo.findText(s.voice_preset)
+            if idx >= 0:
+                self.preset_combo.setCurrentIndex(idx)
+            else:
+                self.preset_combo.setCurrentText("Custom")
+            self.preset_combo.blockSignals(False)
+
         if hasattr(self, 'order_combo'): self.order_combo.setCurrentText(s.generation_order)
         if hasattr(self, 'outputs_spin'): self.outputs_spin.setValue(s.num_full_outputs)
         if hasattr(self, 'retries_spin'): self.retries_spin.setValue(s.max_attempts)

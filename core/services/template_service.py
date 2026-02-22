@@ -12,7 +12,15 @@ class TemplateService:
         Args:
             templates_dir: Path to templates directory relative to working directory.
         """
-        self.templates_dir = Path(templates_dir)
+        target = Path(templates_dir)
+        if not target.is_absolute():
+            # MCCC: Anchor to absolute project root (execution/chatterboxPro) 
+            # to survive QFileDialog CWD manipulation on Windows
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            self.templates_dir = base_dir / target
+        else:
+            self.templates_dir = target
+            
         self.templates_dir.mkdir(exist_ok=True, parents=True)
 
     def list_templates(self) -> List[str]:
