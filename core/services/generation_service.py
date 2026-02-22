@@ -72,13 +72,12 @@ class GenerationThread(QThread):
             logging.warning(f"Killing {len(pids)} worker processes: {pids}")
             for pid in pids:
                 try:
-                    # Windows: use taskkill /F /T to kill process tree (including child threads/ffmpeg)
+                    # Windows: use taskkill /F to kill process (No /T tree kill, no main app crash)
                     if os.name == 'nt':
                         subprocess.run(
-                            ["taskkill", "/F", "/T", "/PID", str(pid)], 
+                            ["taskkill", "/F", "/PID", str(pid)], 
                             stdout=subprocess.DEVNULL, 
-                            stderr=subprocess.DEVNULL,
-                            timeout=2
+                            stderr=subprocess.DEVNULL
                         )
                     else:
                         # Linux/Mac: SIGKILL
@@ -354,6 +353,10 @@ class GenerationService(QObject):
             logging.warning("Generation already running.")
             return
         
+        # MCCC: Initialize Auto-Fix State Machine Key if starting a brand new run
+        if self.auto_fix_stage == "NONE":
+            self.auto_fix_stage = "MAIN_INITIAL"
+        
         self.is_running = True  # MCCC: Set running state
         self.started.emit()
         
@@ -365,21 +368,6 @@ class GenerationService(QObject):
         self.state.chunks_completed = 0
         self.state.generation_start_time = time.time()
         self.state.chunk_status.clear()
-        
-        # MCCC: Smart WAV File Cleanup
-        # Delete WAV files for chunks that are NOT marked (gold star)
-        # This ensures a clean slate when regenerating unmarked chunks
-        for idx, sentence in enumerate(self.state.sentences):
-            # Only delete if chunk is NOT marked (user unmarked it manually)
-            if not sentence.get('marked', False):
-                audio_path = sentence.get('audio_path')
-                if audio_path and os.path.exists(audio_path):
-                    try:
-                        os.remove(audio_path)
-                        logging.info(f"🗑️ Cleaned up WAV file for unmarked chunk [{idx+1}]: {os.path.basename(audio_path)}")
-                        sentence['audio_path'] = None  # Clear the path reference
-                    except Exception as e:
-                        logging.warning(f"Failed to delete {audio_path}: {e}")
         
         # MCCC: Initialize Session Stats for Outlier Detection
         self.stats_history = {'rms': [], 'f0_mean': []}
@@ -414,6 +402,21 @@ class GenerationService(QObject):
             logging.info("No chunks need generation (or all were pauses).")
             self.finished.emit()
             return
+
+        # MCCC: Smart WAV File Cleanup (Targeted)
+        # ONLY delete WAV files for chunks that are actively scheduled to be regenerated!
+        # This prevents the system from permanently wiping successful chunks and breaking Playback logic
+        for idx in process_indices:
+            sentence = self.state.sentences[idx]
+            audio_path = sentence.get('audio_path')
+            if audio_path and os.path.exists(audio_path):
+                try:
+                    os.remove(audio_path)
+                    logging.info(f"🗑️ Cleaned up old WAV file for regenerating chunk [{idx+1}]: {os.path.basename(audio_path)}")
+                    sentence['audio_path'] = None  # Clear the path reference
+                    sentence['tts_generated'] = 'no' # Reset status to prevent ghostly 'yes' UI
+                except Exception as e:
+                    logging.warning(f"Failed to delete old WAV {audio_path}: {e}")
 
         # 2. Configure Resources
         devices, max_workers = self._configure_workers(s.target_gpus, s.combine_gpus)

@@ -237,17 +237,36 @@ class ChatterboxProQt(QMainWindow):
 
     def on_generation_finished(self) -> None:
         """Called when GenerationService finishes a run."""
-        # 1. Update UI Status
-        self.statusBar().showMessage("Generation Finished.")
+        # 1. Tally Pass/Fail Rates
+        total_chunks = len([s for s in self.app_state.sentences if not s.get('is_pause')])
+        failed_chunks = len([s for s in self.app_state.sentences if s.get('tts_generated') == 'failed' and not s.get('is_pause')])
+        passed_chunks = len([s for s in self.app_state.sentences if s.get('tts_generated') == 'yes' and not s.get('is_pause')])
         
-        # 2. Check for Auto-Assemble
+        # 2. Update UI Status Bar
+        status_msg = f"Generation Finished. (Passed: {passed_chunks}, Failed: {failed_chunks})"
+        self.statusBar().showMessage(status_msg)
+        
+        # 3. MCCC: Reset Start/Stop Buttons on Setup Tab
+        if hasattr(self.setup_view, 'start_btn'):
+            self.setup_view.start_btn.setEnabled(True)
+        if hasattr(self.setup_view, 'stop_btn'):
+            self.setup_view.stop_btn.setEnabled(False)
+        
+        # 4. Check for Auto-Assemble
         if self.app_state.auto_assemble_after_run:
-            self.statusBar().showMessage("Generation Finished. Starting Auto-Assembly...")
+            self.statusBar().showMessage(f"{status_msg} - Starting Auto-Assembly...")
             self.finalize_view.auto_assemble()
         else:
-            QMessageBox.information(self, "Generation Complete", 
-                                  "All tasks finished.\n\n"
-                                  "Go to the 'Finalize' tab to assemble your audiobook.")
+            if failed_chunks > 0:
+                 QMessageBox.warning(self, "Generation Finished with Errors", 
+                                      f"The generation run finished, but some chunks failed.\n\n"
+                                      f"✅ Passed: {passed_chunks}\n"
+                                      f"❌ Failed: {failed_chunks}\n\n"
+                                      f"You can review the failed items in the Playlist tab, or hit Start again to retry.")
+            else:
+                 QMessageBox.information(self, "Generation Complete", 
+                                      f"All {passed_chunks} tasks finished successfully!\n\n"
+                                      "Go to the 'Finalize' tab to assemble your audiobook.")
     
     def _on_generation_started(self) -> None:
         """Called when generation starts."""
