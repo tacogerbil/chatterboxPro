@@ -112,6 +112,29 @@ class ControlsView(QWidget):
         
         layout.addWidget(search_widget, 2, 0, 1, 4)
 
+        # Row 3: Replace
+        replace_widget = QWidget()
+        r_layout = QHBoxLayout(replace_widget); r_layout.setContentsMargins(0,0,0,0)
+        r_layout.addWidget(QLabel("📝"))
+        
+        self.replace_edit = QLineEdit(); self.replace_edit.setPlaceholderText("Replace with...")
+        self.replace_edit.setMinimumWidth(150)
+        self.replace_edit.setProperty("class", "search-box")
+        r_layout.addWidget(self.replace_edit)
+        
+        btn_replace = QPushButton("Replace")
+        btn_replace.clicked.connect(self._replace_current)
+        btn_replace.setToolTip("Replace text in the currently selected row and advance to next match.")
+        
+        btn_replace_all = QPushButton("Replace All")
+        btn_replace_all.clicked.connect(self._replace_all)
+        btn_replace_all.setToolTip("Replace text in all chunks across the entire session.")
+        
+        r_layout.addWidget(btn_replace)
+        r_layout.addWidget(btn_replace_all)
+        
+        layout.addWidget(replace_widget, 3, 0, 1, 5)
+
         
         group.add_layout(layout)
 
@@ -571,6 +594,47 @@ class ControlsView(QWidget):
                 self._show_search_match()
             else:
                 QMessageBox.information(self, "Search", "No more matches found (items deleted).")
+
+    def _replace_current(self):
+        """Replaces text in the selected row and auto-advances to the next search match."""
+        search_term = self.search_edit.text()
+        replace_term = self.replace_edit.text()
+        
+        if not search_term: return
+        
+        idx = self._get_selected_index()
+        if idx == -1: return
+
+        if self.playlist_service.replace_current(idx, search_term, replace_term):
+            self._refresh()
+            self.playlist.list_view.viewport().update()
+            
+        # Try to automatically advance to next match
+        self._search_next()
+
+    def _replace_all(self):
+        """Replaces text in all chunks across the entire session."""
+        search_term = self.search_edit.text()
+        replace_term = self.replace_edit.text()
+        
+        if not search_term: return
+        
+        reply = QMessageBox.question(self, "Replace All", 
+                                   f"Are you sure you want to replace all occurrences of '{search_term}' with '{replace_term}'?",
+                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                                   
+        if reply == QMessageBox.Yes:
+            count = self.playlist_service.replace_all(search_term, replace_term)
+            if count > 0:
+                self._refresh()
+                self.playlist.list_view.viewport().update()
+                
+                # Re-run search to clear out the matches (since they are now gone)
+                self._search()
+                
+                QMessageBox.information(self, "Replace All", f"Successfully updated {count} chunk(s).")
+            else:
+                QMessageBox.information(self, "Replace All", f"No exact matches for '{search_term}' were found.")
 
     def _merge_failed(self):
         count = self.playlist_service.merge_failed_down()

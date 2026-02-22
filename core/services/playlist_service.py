@@ -200,6 +200,39 @@ class PlaylistService:
                     matches.append(uid)
         return matches
 
+    def replace_current(self, index: int, search_term: str, replace_term: str) -> bool:
+        """Replaces text in a specific chunk if it contains the search term. Flags it for regeneration."""
+        if not search_term: return False
+        item = self.get_selected_item(index)
+        if not item: return False
+        
+        original = item.get('original_sentence', '')
+        if search_term in original:
+            new_text = original.replace(search_term, replace_term)
+            if new_text != original:
+                item['original_sentence'] = new_text
+                item['tts_generated'] = 'no' # Invalidate audio
+                item['marked'] = True
+                return True
+        return False
+
+    def replace_all(self, search_term: str, replace_term: str) -> int:
+        """Iterates through all chunks and replaces text, flagging modified chunks for regeneration."""
+        if not search_term: return 0
+        replaced_count = 0
+        
+        for s in self.state.sentences:
+            original = s.get('original_sentence', '')
+            if search_term in original:
+                new_text = original.replace(search_term, replace_term)
+                if new_text != original:
+                    s['original_sentence'] = new_text
+                    s['tts_generated'] = 'no' # Invalidate audio
+                    s['marked'] = True
+                    replaced_count += 1
+                    
+        return replaced_count
+
     def find_next_status(self, start_index: int, direction: int, status: str) -> int:
         """Finds next item with specific status (e.g. 'failed')."""
         count = len(self.state.sentences)
