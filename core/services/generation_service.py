@@ -453,6 +453,31 @@ class GenerationService(QObject):
         
         self.worker_thread.start()
 
+    def _journal_path(self) -> Optional[Path]:
+        """Returns the active session's progress journal path, or None if no session is loaded."""
+        if not self.state.session_name:
+            return None
+        from pathlib import Path
+        return Path("Outputs_Pro") / self.state.session_name / "generation_progress.jsonl"
+
+    def _append_to_journal(self, result: Dict[str, Any], sentence: Dict[str, Any]) -> None:
+        """Appends a single completed chunk record to the crash-safe progress journal."""
+        journal_path = self._journal_path()
+        if not journal_path:
+            return
+        try:
+            journal_path.parent.mkdir(parents=True, exist_ok=True)
+            record = {
+                "uuid": sentence.get("uuid", ""),
+                "index": result.get("original_index"),
+                "status": result.get("status", "error"),
+                "path": result.get("path", ""),
+            }
+            with open(journal_path, "a", encoding="utf-8") as f:
+                f.write(__import__('json').dumps(record) + "\n")
+        except Exception as e:
+            logging.warning(f"Progress journal write failed: {e}")
+
     @Slot(list)
     def _on_batch_complete(self, results: List[Dict[str, Any]]) -> None:
         """Called on Main Thread when a BATCH of chunks finishes."""
@@ -504,7 +529,9 @@ class GenerationService(QObject):
                 self.state.sentences[original_idx]['marked'] = True
                 error_msg = result.get('error_message', 'Unknown Error')
                 logging.warning(f"❌ Chunk [{original_idx+1}] FAILED: {error_msg} (ASR={asr*100:.1f}%)")
-        
+
+            # Persist this result to the crash-safe progress journal immediately
+            self._append_to_journal(result, self.state.sentences[original_idx])
         # Emit Aggregated Signals (Once per batch)
         
         # 1. Stats

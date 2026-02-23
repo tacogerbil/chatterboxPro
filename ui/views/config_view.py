@@ -16,9 +16,10 @@ class ConfigView(QWidget):
     Tab 5: Configuration
     Allows changing UI themes and global application settings.
     """
-    def __init__(self, parent: Optional[QWidget] = None, app_state = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None, app_state=None, project_service=None) -> None:
         super().__init__(parent)
         self.state = app_state
+        self.project_service = project_service
         self.setup_ui()
 
     # UI refreshes should be signal-driven, not event-driven
@@ -239,6 +240,28 @@ class ConfigView(QWidget):
         a_layout.addRow(chk_layout)
         
         layout.addWidget(adv_group)
+
+        # --- Group 4: Session Recovery ---
+        recovery_group = QGroupBox("Session Recovery")
+        r_layout = QVBoxLayout(recovery_group)
+
+        r_label = QLabel(
+            "If the application crashed mid-generation, use this to restore progress\n"
+            "from the crash-safe progress journal written during generation."
+        )
+        r_label.setWordWrap(True)
+        r_layout.addWidget(r_label)
+
+        btn_recover = QPushButton("🔄 Recover Session from Progress Journal")
+        btn_recover.setToolTip(
+            "Reads generation_progress.jsonl from the session folder and\n"
+            "re-links completed chunks. Successes are marked green; failures red."
+        )
+        btn_recover.clicked.connect(self._recover_session)
+        r_layout.addWidget(btn_recover)
+
+        layout.addWidget(recovery_group)
+
         layout.addStretch()
         
     def on_theme_changed(self, theme_name: str) -> None:
@@ -289,3 +312,55 @@ class ConfigView(QWidget):
                 QMessageBox.information(self, "Success", f"Custom theme loaded from:\n{path}")
             except Exception as e:
                 QMessageBox.critical(self, "Import Failed", f"Invalid theme file:\n{e}")
+
+    def _recover_session(self) -> None:
+        """Triggers journal-based session recovery and reports results to the user."""
+        if not self.project_service:
+            QMessageBox.warning(self, "Unavailable", "Project service is not connected.")
+            return
+
+        if not self.state or not self.state.session_name:
+            QMessageBox.warning(self, "No Session", "Please load a session before recovering.")
+            return
+
+        journal_path = self.project_service.get_progress_journal_path(self.state.session_name)
+        if not journal_path.exists():
+            QMessageBox.warning(
+                self,
+                "No Journal Found",
+                f"No progress journal was found for session '{self.state.session_name}'.\n\n"
+                f"Expected location:\n{journal_path}\n\n"
+                "A journal is only created if generation has been run at least once on this session."
+            )
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Recover Session",
+            f"This will re-link completed chunks for session:\n'{self.state.session_name}'\n\n"
+            "Successes will be marked green. Failures will stay red for regeneration.\n"
+            "The session will be saved automatically after recovery.\n\nProceed?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        try:
+            stats = self.project_service.recover_from_journal(self.state)
+
+            # Save the recovered session back to disk
+            self.project_service.save_current_session(self.state)
+
+            QMessageBox.information(
+                self,
+                "Recovery Complete",
+                f"Session recovery finished for '{self.state.session_name}':\n\n"
+                f"  ✅  Re-linked as success : {stats['matched']}\n"
+                f"  🔴  Kept as failed       : {stats['failed_kept']}\n"
+                f"  ⚪  Already linked       : {stats['already_linked']}\n"
+                f"  ⬜  No journal entry     : {stats['no_entry']}\n\n"
+                "Reload the Playlist tab to see the updated statuses."
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Recovery Failed", f"An error occurred during recovery:\n{e}")

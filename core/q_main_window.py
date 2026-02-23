@@ -128,7 +128,7 @@ class ChatterboxProQt(QMainWindow):
         self.tabs.addTab(self.chapters_view, "Chapters")
         self.tabs.addTab(self.finalize_view, "Finalize & Export")
         
-        self.config_view = ConfigView(app_state=self.app_state)
+        self.config_view = ConfigView(app_state=self.app_state, project_service=self.project_service)
         self.tabs.addTab(self.config_view, "Config")
         
         # Logs Tab

@@ -162,3 +162,87 @@ class ProjectService:
         except Exception as e:
             logging.error(f"Failed to load session from {json_path}: {e}")
             return None
+
+    def get_progress_journal_path(self, session_name: str) -> Path:
+        """Returns the path to the crash-safe progress journal for a given session."""
+        return Path(self.outputs_dir) / session_name / "generation_progress.jsonl"
+
+    def recover_from_journal(self, app_state: Any) -> Dict[str, int]:
+        """
+        Re-links session sentences to their WAV files by reading the crash-safe
+        progress journal. Only entries with status 'success' are marked as done.
+        Failed placeholder entries are explicitly kept as failed so they get re-queued.
+
+        Returns stats: matched, already_linked, failed_kept, no_entry.
+        """
+        stats = {"matched": 0, "already_linked": 0, "failed_kept": 0, "no_entry": 0}
+
+        if not app_state.session_name or not app_state.sentences:
+            logging.warning("recover_from_journal: No active session or empty sentence list.")
+            return stats
+
+        journal_path = self.get_progress_journal_path(app_state.session_name)
+        if not journal_path.exists():
+            logging.warning(f"No progress journal found at: {journal_path}")
+            return stats
+
+        # Parse journal into a uuid -> record dict (last entry wins on UUID collision)
+        journal: Dict[str, Dict] = {}
+        with open(journal_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                    uid = record.get("uuid")
+                    if uid:
+                        journal[uid] = record
+                except json.JSONDecodeError:
+                    pass  # Skip malformed lines written during a crash
+
+        logging.info(f"Journal loaded: {len(journal)} entries for session '{app_state.session_name}'.")
+
+        # Back up session JSON before modifying
+        self.save_current_session(app_state)
+
+        for sentence in app_state.sentences:
+            if sentence.get("is_pause") or sentence.get("is_chapter_heading"):
+                continue
+
+            uid = sentence.get("uuid", "")
+            if not uid:
+                continue
+
+            # If already correctly linked, skip
+            if sentence.get("tts_generated") == "yes":
+                existing = sentence.get("audio_path", "")
+                if existing and Path(existing).exists():
+                    stats["already_linked"] += 1
+                    continue
+
+            record = journal.get(uid)
+            if not record:
+                stats["no_entry"] += 1
+                continue
+
+            status = record.get("status", "")
+            wav_path = record.get("path", "")
+
+            if status == "success" and wav_path and Path(wav_path).exists():
+                sentence["tts_generated"] = "yes"
+                sentence["audio_path"] = wav_path
+                sentence["marked"] = False
+                stats["matched"] += 1
+            else:
+                # Explicit failure or missing file — keep as failed so it reruns
+                sentence["tts_generated"] = "failed"
+                sentence["marked"] = True
+                stats["failed_kept"] += 1
+
+        logging.info(
+            f"Recovery complete: matched={stats['matched']}, "
+            f"already_linked={stats['already_linked']}, "
+            f"failed_kept={stats['failed_kept']}, no_entry={stats['no_entry']}"
+        )
+        return stats

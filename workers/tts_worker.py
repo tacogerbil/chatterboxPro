@@ -575,9 +575,9 @@ def worker_process_chunk(task: WorkerTask):
     wavs_folder = "Sentence_wavs"
     if run_idx > 0:
         wavs_folder = f"Sentence_wavs_run_{run_idx+1}"
-        
-    final_wav_path = Path(output_dir_str) / session_name / wavs_folder / f"audio_{uuid}.wav"
-    final_wav_path.parent.mkdir(exist_ok=True, parents=True)
+
+    wav_dir = Path(output_dir_str) / session_name / wavs_folder
+    wav_dir.mkdir(exist_ok=True, parents=True)
     
     chosen_candidate = None
     status = "error"
@@ -595,6 +595,11 @@ def worker_process_chunk(task: WorkerTask):
     
     # --- Finalize and Cleanup ---
     if chosen_candidate:
+        # Determine final filename: failed placeholder files get a _failed suffix
+        # so they are identifiable on disk even if the progress journal is incomplete.
+        wav_suffix = "_failed" if status == "failed_placeholder" else ""
+        final_wav_path = wav_dir / f"audio_{uuid}{wav_suffix}.wav"
+
         # Move the chosen file to the final destination with retry logic for file locks
         if Path(chosen_candidate['path']).exists():
             # Windows file lock handling: retry with delays
