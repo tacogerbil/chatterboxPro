@@ -422,18 +422,15 @@ class ControlsView(QWidget):
 
             print(f"DEBUG: Item Found. is_pause={item.get('is_pause')}", flush=True)
             
-            # Check if Pause - Use Duration Editor
+            # Pause items get the dedicated quick-insert dialog
             if item.get('is_pause'):
-                print("DEBUG: Attempting QInputDialog for Pause...", flush=True)
+                from ui.dialogs.pause_dialog import PauseDialog
                 old_dur = item.get('duration', 500)
-                # Correct arguments: parent, title, label, value, min, max, step
-                new_dur, ok = QInputDialog.getInt(self, "Edit Pause", "Duration (ms):", old_dur, 100, 10000, 50)
-                print(f"DEBUG: QInputDialog returned: ok={ok}, val={new_dur}", flush=True)
-                if ok and new_dur != old_dur:
+                new_dur = PauseDialog.get_duration(initial_ms=old_dur, parent=self)
+                if new_dur is not None and new_dur != old_dur:
                     logging.info(f"Updating pause duration to {new_dur}")
                     if self.playlist_service.edit_pause(idx, new_dur):
                         self._refresh()
-                        # Force playlist repaint
                         self.playlist.list_view.viewport().update()
                 return
 
@@ -479,12 +476,12 @@ class ControlsView(QWidget):
 
     def _insert_pause(self):
         idx = self._get_selected_index()
-        # Fix: positional args (parent, title, label, value, min, max, step)
-        dur, ok = QInputDialog.getInt(self, "Insert Pause", "Duration (ms):", 500, 100, 10000, 50)
-        if ok:
-             self.playlist_service.insert_item(idx, "[PAUSE]", is_pause=True, duration=dur)
-             self._refresh()
-             self.structure_changed.emit()
+        from ui.dialogs.pause_dialog import PauseDialog
+        dur = PauseDialog.get_duration(initial_ms=500, parent=self)
+        if dur is not None:
+            self.playlist_service.insert_item(idx, "[PAUSE]", is_pause=True, duration=dur)
+            self._refresh()
+            self.structure_changed.emit()
 
     def _insert_chapter(self):
         idx = self._get_selected_index()

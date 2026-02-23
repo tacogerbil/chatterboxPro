@@ -155,6 +155,11 @@ class ProjectService:
         try:
             with open(json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+
+            # Heal legacy pause records that predate the is_pause flag
+            healed = self._heal_pause_records(data.get('sentences', []))
+            if healed:
+                logging.info(f"Healed {healed} legacy pause record(s) in session '{path.name}'.")
             
             # Enrich with determined name
             data['session_name'] = path.name
@@ -162,6 +167,27 @@ class ProjectService:
         except Exception as e:
             logging.error(f"Failed to load session from {json_path}: {e}")
             return None
+
+    @staticmethod
+    def _heal_pause_records(sentences: list) -> int:
+        """
+        Fixes legacy pause items that have original_sentence='[PAUSE]' but are
+        missing the is_pause flag or the duration field.
+        Returns the count of items healed.
+        """
+        import re
+        healed = 0
+        for item in sentences:
+            text = item.get('original_sentence', '')
+            if not item.get('is_pause') and str(text).strip().startswith('[PAUSE'):
+                item['is_pause'] = True
+                item['tts_generated'] = 'n/a'
+                # Try to parse duration from [PAUSE : 1500ms] or [PAUSE: 1500ms]
+                if not item.get('duration'):
+                    m = re.search(r'(\d+)\s*ms', text)
+                    item['duration'] = int(m.group(1)) if m else 500
+                healed += 1
+        return healed
 
     def get_progress_journal_path(self, session_name: str) -> Path:
         """Returns the path to the crash-safe progress journal for a given session."""
