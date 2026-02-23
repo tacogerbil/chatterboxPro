@@ -18,10 +18,9 @@ import uuid
 
 from ui.playlist import PlaylistFrame
 # from ui.controls_frame import ControlsFrame # Legacy
-from ui.views.controls_view import ControlsView # New MCCC View
+from ui.views.controls_view import ControlsView # New 
 from ui.tabs.setup_tab import SetupTab
 
-# MCCC: Import Core Services for Injection
 from core.services.audio_service import AudioService
 from core.services.playlist_service import PlaylistService
 from core.services.generation_service import GenerationService
@@ -409,7 +408,7 @@ class ChatterboxProGUI(ctk.CTk):
             session_path.mkdir(parents=True)
             self.session_name.set(name)
             self.source_file_path, self.sentences = "", []
-            self.app_state.sentences = self.sentences # MCCC: Sync State
+            self.app_state.sentences = self.sentences
             self.source_file_label.configure(text="No file selected.")
             self.playlist_frame.load_data(self.sentences)
             self.update_progress_display(0,0,0)
@@ -429,7 +428,7 @@ class ChatterboxProGUI(ctk.CTk):
             self.source_file_path = data.get("source_file_path", "")
             self.source_file_label.configure(text=os.path.basename(self.source_file_path) or "No file selected.")
             self.sentences = data.get("sentences", [])
-            self.app_state.sentences = self.sentences # MCCC: Sync State
+            self.app_state.sentences = self.sentences
             
             if any('uuid' not in s for s in self.sentences):
                 for s in self.sentences: s.setdefault('uuid', uuid.uuid4().hex)
@@ -533,7 +532,7 @@ class ChatterboxProGUI(ctk.CTk):
             else:
                 self.sentences = processed_sentences
             
-            self.app_state.sentences = self.sentences # MCCC: Sync State
+            self.app_state.sentences = self.sentences
             
             for item in self.sentences:
                 item.setdefault('uuid', uuid.uuid4().hex)
@@ -1276,12 +1275,10 @@ class ChatterboxProGUI(ctk.CTk):
         self.finalize_tab = FinalizeTab(self.tabview.add("4. Finalize"), self); self.finalize_tab.pack(fill="both", expand=True)
         self.advanced_tab = AdvancedTab(self.tabview.add("5. Advanced"), self); self.advanced_tab.pack(fill="both", expand=True)
 
-        # MCCC: Initialize Core Services Sharing AppState
         self.audio_service = AudioService()
         self.playlist_service = PlaylistService(self.app_state)
         self.generation_service = GenerationService(self.app_state)
         
-        # MCCC: Wire Signals
         # When generation updates an item (stats/path), refresh the UI row
         self.generation_service.item_updated.connect(lambda idx: self.playlist_frame.update_item(idx))
 
@@ -1291,7 +1288,6 @@ class ChatterboxProGUI(ctk.CTk):
         self.playlist_frame = PlaylistFrame(master=right_frame, app_instance=self, fg_color=self.colors["tab_bg"])
         self.playlist_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=(0,5))
         
-        # MCCC: Deploy ControlsView (The Classy Way)
         services_dict = {
             'audio': self.audio_service,
             'playlist': self.playlist_service,

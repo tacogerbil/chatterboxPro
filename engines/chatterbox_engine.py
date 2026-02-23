@@ -18,7 +18,6 @@ _REQUIRED_FILES = ["ve.pt", "t3_cfg.pt", "s3gen.pt", "tokenizer.json"]
 _OPTIONAL_FILES = ["conds.pt"]
 
 # Fingerprint files that identify a WRONG engine living in the target folder.
-# MCCC: Adapter Boundary Law — detect contamination before loading.
 _WRONG_ENGINE_MARKERS: Dict[str, list] = {
     "MOSS-TTS": ["modeling_moss_tts.py", "configuration_moss_tts.py"],
     "F5-TTS":   ["F5TTS_Base_train.yaml"],
@@ -37,7 +36,7 @@ def _detect_wrong_engine(path: Path) -> Optional[str]:
     Checks whether a directory contains model files from a different engine.
 
     Returns the engine name string if foreign files are detected, else None.
-    MCCC: Pure function — no side effects.
+    
     """
     for marker in _DEFINITIVE_WRONG_MARKERS:
         if (path / marker).exists():
@@ -51,7 +50,7 @@ def _download_to_dir(target_dir: Path) -> None:
 
     Uses local_dir so files land flat in the user's chosen folder,
     not inside the HuggingFace cache hierarchy.
-    MCCC: Single Responsibility — only handles download I/O.
+    
 
     Raises:
         RuntimeError: If any required file fails to download.
@@ -91,7 +90,7 @@ class ChatterboxEngine(BaseTTSEngine):
         """
         Lazy-loads the Chatterbox model on first use.
 
-        Load strategy (MCCC: Fail Fast Law applied at each gate):
+        Load strategy (
           1. Custom path set
              a. Detect wrong engine files → raise immediately with clear message
              b. Required files present   → load from path

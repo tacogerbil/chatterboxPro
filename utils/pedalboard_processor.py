@@ -7,8 +7,6 @@ import uuid
 import shutil
 from pathlib import Path
 
-# MCCC: Modularity - Isolation of Audio Processing Logic
-# MCCC: Side-Effect Isolation - File I/O isolated here
 
 # Try to import pedalboard
 print(f"[DEBUG] Attempting to import pedalboard...", flush=True)
@@ -29,7 +27,7 @@ except Exception as e:
 def _apply_speed_ffmpeg(input_path: str, output_path: str, speed: float) -> bool:
     """
     Helper to apply speed change using FFmpeg.
-    Separated for MCCC Single Responsibility.
+    Separated for 
     """
     try:
         cmd = [
@@ -111,7 +109,7 @@ def _build_grit_chain(
     """
     Constructs the parallel distorted octave layer for Batman-style gravel.
     
-    MCCC: Single Responsibility - Each effect serves one clear purpose:
+    
     - Highpass: Remove sub-bass rumble (wind artifact prevention)
     - Octave Down: Create deep undertone
     - Soft Saturation: Add harmonic richness without harsh static
@@ -128,16 +126,13 @@ def _build_grit_chain(
     board_effects = []
     
     # 1. Highpass Filter (Wind Artifact Prevention)
-    # MCCC: Explicit Intent - Remove true sub-bass (<40Hz)
     board_effects.append(HighpassFilter(cutoff_frequency_hz=40.0))
     
     # 2. Octave Down (The Beast)
-    # MCCC: Clear Purpose - Shifts voice down 18 semitones (1.5 octaves)
     # Pushed lower to remove intelligibility, creating pure sub-bass rumble
     board_effects.append(PitchShift(semitones=-18.0))
     
     # 3. Soft Saturation (REFINED - No More Static!)
-    # MCCC: Explicit Intent - Use Compressor + Gain instead of harsh Distortion
     # Distortion creates high-frequency aliasing → "static" artifacts
     # Compression + Gain creates smooth harmonic saturation → "gravel" without static
     
@@ -150,13 +145,11 @@ def _build_grit_chain(
     board_effects.append(Gain(gain_db=gain_boost))
     
     # 4. Lowpass Filter (Intelligibility Removal)
-    # MCCC: Explicit Intent - Confine grit to pure sub-bass (120-180Hz)
     # Lowered further to eliminate ANY chance of static leaking through
     cutoff = 120.0 + (gruffness * 60.0)  # 120Hz - 180Hz range
     board_effects.append(LowpassFilter(cutoff_frequency_hz=get_safe_nyquist_clamp(cutoff, sample_rate)))
     
     # 5. Final Compression (Rumble Leveling)
-    # MCCC: Clear Purpose - Even out dynamics of the saturated signal
     board_effects.append(Compressor(threshold_db=-20.0, ratio=8.0, attack_ms=1.0, release_ms=30.0))
     
     return Pedalboard(board_effects)
@@ -255,7 +248,6 @@ def apply_pedalboard_effects(
             audio_grit = grit_board(audio, sr)
             
             # Blend Logic - REFINED (Smooth Ramp)
-            # MCCC: Explicit Range - Reduced from 40% to 25% max
             # Lower mix prevents overpowering, creates subtle integration
             # Quadratic curve for smoother ramp-up (prevents sudden jump at low values)
             grit_mix = min((gruffness ** 1.5) * 0.25, 0.25) 
@@ -287,7 +279,7 @@ def apply_pedalboard_effects(
             print("[PEDALBOARD DEBUG] !!! Processed Audio is NaN !!! - Aborting save.", flush=True)
             return False
 
-        # 7. Write Output to Temp File (MCCC: I/O Hygiene)
+        # 7. Write Output to Temp File (
         temp_output_path = str(output_path).replace('.wav', f'_temp_{uuid.uuid4().hex[:8]}.wav')
         
         with AudioFile(temp_output_path, "w", sr, final_audio.shape[0]) as f:
@@ -308,7 +300,6 @@ def apply_pedalboard_effects(
                 pass
         return False
     finally:
-        # MCCC: Cleanup side effects (temp files)
         if temp_speed_path and os.path.exists(temp_speed_path):
             try:
                 os.remove(temp_speed_path)

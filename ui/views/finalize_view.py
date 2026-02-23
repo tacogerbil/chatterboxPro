@@ -211,7 +211,7 @@ class FinalizeView(QWidget):
         self.assembly_service.export_by_chapter(path)
 
     def auto_assemble(self):
-        """MCCC: Non-interactive assembly for 'Auto-Assemble' feature."""
+        """"""
         import os
         # Default to session dir
         # Outputs_Pro/SessionName/SessionName.mp3

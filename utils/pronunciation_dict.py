@@ -7,7 +7,7 @@ Allows users to define custom pronunciations for words that TTS might mispronoun
 - Foreign words
 - Brand names
 
-MCCC: Pure data structures and simple replacement logic, fully testable.
+
 """
 
 import json

@@ -1,6 +1,6 @@
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex
 from core.state import AppState
-import html  # MCCC: Move import out of hot path
+import html
 from typing import List
 
 class PlaylistModel(QAbstractListModel):
@@ -26,7 +26,6 @@ class PlaylistModel(QAbstractListModel):
         
         if role == Qt.DisplayRole:
             # Show index + snippet
-            # MCCC: Strict adherence to data model (original_sentence)
             text = item.get('original_sentence', '')
             
             # Format Pause Items
@@ -65,7 +64,6 @@ class PlaylistModel(QAbstractListModel):
             return item.get('marked', False)
             
         elif role == Qt.ToolTipRole:
-            # MCCC: Format tooltip with HTML for word wrapping
             raw_text = item.get('original_sentence', '')
             safe_text = html.escape(raw_text)
             # Use styling to limit width and force wrap
@@ -79,13 +77,13 @@ class PlaylistModel(QAbstractListModel):
         self.endResetModel()
 
     def update_row(self, row_index: int):
-        """MCCC: granular update to avoid list reset."""
+        """"""
         idx = self.index(row_index, 0)
         if idx.isValid():
             self.dataChanged.emit(idx, idx, [Qt.DisplayRole, self.StatusRole])
 
     def update_rows(self, row_indices: List[int]):
-        """MCCC: Batched update for efficiency."""
+        """"""
         if not row_indices: return
         
         # Determine range (assuming somewhat contiguous for efficiency)

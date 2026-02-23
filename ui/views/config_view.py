@@ -21,7 +21,6 @@ class ConfigView(QWidget):
         self.state = app_state
         self.setup_ui()
 
-    # MCCC FIX: Removed showEvent() handler that was blocking main thread on tab switches
     # UI refreshes should be signal-driven, not event-driven
     
     def refresh_ui(self) -> None:

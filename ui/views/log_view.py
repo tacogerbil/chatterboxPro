@@ -45,14 +45,13 @@ class LogView(QWidget):
         # Create Handler
         self.handler = QtLogHandler(self.emitter)
         self.handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        self.handler.setLevel(logging.DEBUG)  # MCCC: Capture all log levels
+        self.handler.setLevel(logging.DEBUG)
         
         # Add to Root Logger
         root_logger = logging.getLogger()
         root_logger.addHandler(self.handler)
-        root_logger.setLevel(logging.DEBUG)  # MCCC: Ensure root logger captures DEBUG+
+        root_logger.setLevel(logging.DEBUG)
         
-        # MCCC: Safety Guard - Prevent DEBUG flood in file logs
         # Setting root to DEBUG affects all handlers. We must clamp file handlers.
         for h in root_logger.handlers:
             if isinstance(h, logging.FileHandler):
@@ -69,7 +68,6 @@ class LogView(QWidget):
                 except Exception as e:
                     print(f"Failed to adjust log handler {h}: {e}")
 
-        # MCCC: Silence noisy third-party libraries that spam DEBUG logs
         for lib in ["numba", "llvmlite", "matplotlib", "PIL", "urllib3"]:
             logging.getLogger(lib).setLevel(logging.WARNING)
 

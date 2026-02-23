@@ -28,7 +28,7 @@ class SetupView(QWidget):
         parent: Optional[QWidget] = None
     ) -> None:
         """
-        MCCC: Proper dependency injection - services are injected, not created.
+        
         
         Args:
             app_state: Application state
@@ -40,7 +40,6 @@ class SetupView(QWidget):
         self.state = app_state
         self.processor = TextPreprocessor()
         
-        # MCCC: Injected dependencies (not self-instantiated)
         self.project_service = project_service
         self.template_service = template_service
         self.gen_service: Optional[Any] = None # Injected later
@@ -187,10 +186,8 @@ class SetupView(QWidget):
         else:
             self.lbl_auto_expression.setText("Disabled")
             
-        # MCCC: Ensure labels are updated
         pass
 
-    # MCCC FIX: Removed showEvent() handler that was blocking main thread on tab switches
     # UI refreshes should be signal-driven, not event-driven
     
     def setup_voice_controls(self, layout: QVBoxLayout) -> None:
@@ -269,7 +266,6 @@ class SetupView(QWidget):
         
         c_layout.addLayout(gen_layout)
         
-        # MCCC: Progress Tracking Widget (Restored to correct scope)
         self.progress_widget = ProgressWidget()
         self.progress_widget.setVisible(False)  # Hidden until generation starts
         layout.addWidget(self.progress_widget)
@@ -342,7 +338,6 @@ class SetupView(QWidget):
         self.lbl_auto.setText("Found" if ae else "Not Found (Optional)")
         self.lbl_auto.setStyleSheet("color: green" if ae else "color: orange")
 
-        # MCCC: Hardware Isolation - Read from State
         caps = self.state.system_capabilities
         if caps.get('cuda_available', False):
             count = caps.get('gpu_count', 0)
@@ -611,7 +606,6 @@ class SetupView(QWidget):
     def set_generation_service(self, service: Any) -> None:
         self.gen_service = service
         
-        # MCCC: Connect Progress Tracking Signals
         service.progress_update.connect(self.progress_widget.update_progress)
         service.stats_updated.connect(self.progress_widget.update_stats)
         service.eta_updated.connect(self.progress_widget.update_eta)

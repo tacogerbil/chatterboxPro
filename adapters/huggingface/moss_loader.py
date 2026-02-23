@@ -9,7 +9,7 @@ from transformers import AutoModel, AutoProcessor
 class MossLoader:
     """
     Adapter for instantiating the MOSS-TTS Hugging Face model.
-    MCCC: Single Responsibility - Hardware mapping and model materialization.
+    
     """
     
     @staticmethod
@@ -47,7 +47,6 @@ class MossLoader:
             logging.info(f"Resolving {repo_id} to local HF cache...")
             load_path = snapshot_download(repo_id=repo_id)
 
-        # MCCC VRAM Patch: MOSS-TTS natively hardcodes device=input_ids.device in generate(),
         # which breaks accelerate device_map="auto" spanning across multiple GPUs.
         # We patch their architecture file in BOTH locations HuggingFace uses:
         #   1. The hub snapshot (load_path) — source of truth for downloads
@@ -72,7 +71,7 @@ class MossLoader:
                     recursive=True
                 )
                 paths_to_patch.extend(modules_copies)
-                logging.info(f"MCCC: Found {len(paths_to_patch)} modeling_moss_tts.py file(s) to patch: {paths_to_patch}")
+                logging.info(f"
 
                 for modeling_path in paths_to_patch:
                     if not os.path.exists(modeling_path):
@@ -87,11 +86,11 @@ class MossLoader:
                         if "torch_dtype=" in content:
                             content = content.replace("torch_dtype=", "dtype=")
                             needs_write = True
-                            logging.info(f"MCCC Patch 0 (torch_dtype): applied to {modeling_path}")
+                            logging.info(f"
 
                         # Patch 1: Multi-GPU device routing — route inputs to the true first-layer device.
-                        if "MCCC Multi-GPU Patch" not in content:
-                            r1 = "        device = input_ids.device\n        \n        # MCCC Multi-GPU Patch: Find the true starting device where the embedding layer lives\n        model_device = next(self.parameters()).device\n"
+                        if "
+                            r1 = "        device = input_ids.device\n        \n
                             content = content.replace("        device = input_ids.device\n", r1)
 
                             target_call = (
@@ -109,18 +108,18 @@ class MossLoader:
                                 "                past_key_values=past_key_values,\n"
                                 "                use_cache=True,\n"
                                 "            )\n"
-                                "            # MCCC: Pull logits back to our tracker device so subsequent loop math works on matching devices\n"
+                                "
                                 "            outputs.logits = [l.to(device) for l in outputs.logits]"
                             )
                             content = content.replace(target_call, patched_call)
                             needs_write = True
-                            logging.info(f"MCCC Patch 1 (Multi-GPU): applied to {modeling_path}")
+                            logging.info(f"
 
                         # Patch 2: Fix cross-device tensor add in get_input_embeddings().
                         # Accelerate shards embedding layers across GPUs; inputs_embeds lands on cuda:0
                         # but embed_layer[N] may live on cuda:1 — the add() then crashes.
                         # Fix: route each input slice to its embed_layer's device, pull result back.
-                        if "MCCC Patch2 get_input_embeddings" not in content:
+                        if "
                             p2_pattern = (
                                 r'(\s+)(inputs_embeds = inputs_embeds \+ embed_layer'
                                 r'\(input_ids\[\.\.\., i \+ 1\]\))'
@@ -128,15 +127,15 @@ class MossLoader:
                             p2_repl = (
                                 r'\1inputs_embeds = inputs_embeds + '
                                 r'embed_layer(input_ids[..., i + 1].to(next(embed_layer.parameters()).device))'
-                                r'.to(inputs_embeds.device)  # MCCC Patch2 get_input_embeddings'
+                                r'.to(inputs_embeds.device)
                             )
                             new_content, count = re.subn(p2_pattern, p2_repl, content)
                             if count > 0:
                                 content = new_content
                                 needs_write = True
-                                logging.info(f"MCCC Patch 2 (get_input_embeddings): applied to {modeling_path}")
+                                logging.info(f"
                             else:
-                                logging.warning(f"MCCC Patch 2: target pattern not found in {modeling_path}")
+                                logging.warning(f"
 
                         if needs_write:
                             with open(modeling_path, 'w', encoding='utf-8') as f:
@@ -154,9 +153,9 @@ class MossLoader:
                 for key in stale_keys:
                     del sys.modules[key]
                 if stale_keys:
-                    logging.info(f"MCCC: Invalidated {len(stale_keys)} stale module cache entries: {stale_keys}")
+                    logging.info(f"
             except Exception as e:
-                logging.error(f"MCCC patch discovery failed: {e}")
+                logging.error(f"
 
         # 2. Resolve Attention
         # FA2 detection: `import flash_attn_2_cuda` is unreliable — the internal CUDA extension

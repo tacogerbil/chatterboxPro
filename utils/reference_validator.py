@@ -9,7 +9,7 @@ Checks for common issues that degrade Chatterbox TTS quality:
 - Excessive silence (> 30%)
 - Clipping/distortion
 
-MCCC: Pure validation functions, no side effects, fully testable.
+
 """
 
 from pathlib import Path

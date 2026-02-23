@@ -9,7 +9,7 @@ from core.state import AppState
 class ConfigService:
     """
     Manages persistent application configuration.
-    Follows MCCC:
+    Follows 
     - Separation of Concerns: Isolated I/O for settings.
     - Explicit Interface: load_state / save_state.
     """
@@ -37,7 +37,6 @@ class ConfigService:
             # 1. Restore Generation Settings
             if 'settings' in data:
                 settings_data = data['settings']
-                # MCCC: Robust Typed Loading
                 # Inspect dataclass fields to convert JSON types (e.g. str -> float) if necessary
                 from dataclasses import fields
                 type_map = {f.name: f.type for f in fields(app_state.settings)}
@@ -65,7 +64,6 @@ class ConfigService:
             # Whitelist of safe fields to restore
             safe_globals = {
                 'session_name', 'source_file_path', 'ref_audio_path',
-                # MCCC: model_path is NOT here — it lives inside settings (engine-specific)
                 # and is restored automatically by the settings loop above.
                 'auto_regen_main', 'auto_regen_sub',
                 'auto_assemble_after_run', 'aggro_clean_on_parse',
@@ -92,7 +90,6 @@ class ConfigService:
                 'session_name': app_state.session_name,
                 'source_file_path': app_state.source_file_path,
                 'ref_audio_path': app_state.ref_audio_path,
-                # MCCC: engine model paths are inside settings (model_path, moss_model_path)
                 # and serialised automatically by asdict(). Do NOT duplicate here.
                 'auto_regen_main': app_state.auto_regen_main,
                 'auto_regen_sub': app_state.auto_regen_sub,

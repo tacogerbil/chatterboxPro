@@ -6,7 +6,7 @@ import multiprocessing.connection
 import time
 import os
 import signal
-import subprocess # MCCC: For taskkill
+import subprocess
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Dict, Any, Tuple, Optional, Union
@@ -30,7 +30,6 @@ class GenerationThread(QThread):
     """
     # Signals to communicate back to the Service (which runs on Main Thread)
     progress_update = Signal(int, int) # completed, total
-    # MCCC: Batch signal instead of single item to prevent event loop flooding
     batch_complete = Signal(list) # list of result dicts
     finished = Signal()
     error_occurred = Signal(str)
@@ -102,20 +101,20 @@ class GenerationThread(QThread):
             self.progress_update.emit(0, total_tasks)
 
             ctx = multiprocessing.get_context('spawn')
-            with ProcessPoolExecutor(max_workers=self.max_workers, mp_context=ctx) as executor:
-                self.executor = executor
-                # Map future -> task info (index 1 is original_index)
+            executor = ProcessPoolExecutor(max_workers=self.max_workers, mp_context=ctx)
+            self.executor = executor
+            
+            try:
+                # Map future -> task info
                 futures = {executor.submit(worker_process_chunk, task): task for task in self.tasks}
                 
-                # MCCC: Batching Buffer
                 result_batch = []
                 last_emit_time = time.time()
                 
                 for future in as_completed(futures):
                     if self.stop_requested.is_set():
-                         # Clean shutdown handled by request_stop, just exit loop
-                         self.stopped.emit()
-                         return
+                         # Clean shutdown handled by request_stop
+                         break
 
                     try:
                         result = future.result()
@@ -127,8 +126,6 @@ class GenerationThread(QThread):
                     
                     completed_count += 1
                     
-                    # MCCC: Dynamic Batch Emission (Throttle to ~10fps max)
-                    # Emit if batch is large OR time has passed
                     current_time = time.time()
                     if len(result_batch) >= 10 or (current_time - last_emit_time) > 0.1:
                         if result_batch:
@@ -137,10 +134,18 @@ class GenerationThread(QThread):
                         self.progress_update.emit(completed_count, total_tasks)
                         last_emit_time = current_time
                 
-                # Flush remaining
-                if result_batch:
+                # Flush remaining if we didn't stop
+                if result_batch and not self.stop_requested.is_set():
                      self.batch_complete.emit(result_batch)
                      self.progress_update.emit(completed_count, total_tasks)
+                     
+            finally:
+                if self.stop_requested.is_set():
+                    # We killed the processes, so don't wait for them! 
+                    executor.shutdown(wait=False, cancel_futures=True)
+                else:
+                    # Clean exit
+                    executor.shutdown(wait=True)
             
             self._cleanup_memory()
             
@@ -158,18 +163,18 @@ class GenerationService(QObject):
     Handles the multi-process TTS generation.
     Decoupled from UI, uses Signals for updates.
     Manages a QThread to keep UI responsive.
-    MCCC Compliant: SRP, Explicit Interfaces.
+    
     """
     
     # Signals
     progress_update = Signal(int, int) # completed, total
-    items_updated = Signal(list) # list of indices of updated items (MCCC: Batched)
+    items_updated = Signal(list) # list of indices of updated items (
     started = Signal()
     finished = Signal()
     stopped = Signal()
     error_occurred = Signal(str)
     
-    # Progress Tracking Signals (MCCC: Explicit Statistics Interface)
+    # Progress Tracking Signals (
     stats_updated = Signal(int, int, int)  # total, passed, failed
     eta_updated = Signal(float)  # seconds remaining
     
@@ -183,7 +188,7 @@ class GenerationService(QObject):
         self.playlist_service: Optional[Any] = None # Injected dependency
         self.auto_fix_stage: str = "NONE" 
         self._loop_iteration: int = 0
-        self.is_running: bool = False  # MCCC: Track generation state
+        self.is_running: bool = False
 
     def set_playlist_service(self, service: Any) -> None:
         self.playlist_service = service
@@ -279,7 +284,6 @@ class GenerationService(QObject):
             
         devices = [d.strip() for d in target_gpus.split(',') if d.strip()]
         
-        # MCCC: Multi-GPU Fix - If using device_map='auto', we MUST restrict to 1 worker
         # otherwise M workers will all try to load the model across M GPUs simultaneously, causing OOM.
         if combine_gpus and len(devices) > 0:
             logging.info("Combine GPUs enabled: Restricting GenerationService to 1 worker process.")
@@ -353,14 +357,12 @@ class GenerationService(QObject):
             logging.warning("Generation already running.")
             return
         
-        # MCCC: Initialize Auto-Fix State Machine Key if starting a brand new run
         if self.auto_fix_stage == "NONE":
             self.auto_fix_stage = "MAIN_INITIAL"
         
-        self.is_running = True  # MCCC: Set running state
+        self.is_running = True
         self.started.emit()
         
-        # MCCC: Reset Progress Statistics
         import time
         import os
         self.state.chunks_passed = 0
@@ -369,7 +371,6 @@ class GenerationService(QObject):
         self.state.generation_start_time = time.time()
         self.state.chunk_status.clear()
         
-        # MCCC: Initialize Session Stats for Outlier Detection
         self.stats_history = {'rms': [], 'f0_mean': []}
         
         s = self.state.settings
@@ -378,11 +379,10 @@ class GenerationService(QObject):
         # 1. Determine Scope
         if indices_to_process is not None:
              # Explicit list (e.g. retry or selected chapters)
-             # MCCC: Must filter out pauses here too!
              process_indices = [
                  i for i in indices_to_process 
                  if not self.state.sentences[i].get('is_pause')
-                 and self.state.sentences[i].get('uuid') # MCCC: Safety check
+                 and self.state.sentences[i].get('uuid')
              ]
         else:
              # Full run (filter not-done items)
@@ -403,7 +403,6 @@ class GenerationService(QObject):
             self.finished.emit()
             return
 
-        # MCCC: Smart WAV File Cleanup (Targeted)
         # ONLY delete WAV files for chunks that are actively scheduled to be regenerated!
         # This prevents the system from permanently wiping successful chunks and breaking Playback logic
         for idx in process_indices:
@@ -422,7 +421,6 @@ class GenerationService(QObject):
         devices, max_workers = self._configure_workers(s.target_gpus, s.combine_gpus)
         
         # 3. Prepare Logic (Seed, etc)
-        # MCCC Audit: Handle Multiple Full Outputs
         num_runs = 1
         if indices_to_process is None: # Only for full runs
              num_runs = max(1, s.num_full_outputs)
@@ -441,7 +439,6 @@ class GenerationService(QObject):
             
             tasks.extend(run_tasks)
             
-        # MCCC: Set total chunks for progress tracking
         self.state.total_chunks = len(process_indices)  # Unique chunks, not tasks (which may include multiple runs)
         self.stats_updated.emit(self.state.total_chunks, 0, 0)  # Initial stats
             
@@ -449,7 +446,6 @@ class GenerationService(QObject):
         self.worker_thread = GenerationThread(tasks, max_workers, outputs_dir)
         
         self.worker_thread.progress_update.connect(self.progress_update)
-        # MCCC: Connect updated batch signal
         self.worker_thread.batch_complete.connect(self._on_batch_complete)
         self.worker_thread.finished.connect(self._on_finished)
         self.worker_thread.stopped.connect(self._on_stopped)
@@ -474,14 +470,12 @@ class GenerationService(QObject):
             self.state.sentences[original_idx]['generation_seed'] = result.get('seed')
             self.state.sentences[original_idx]['similarity_ratio'] = result.get('similarity_ratio')
             
-            # MCCC: Store audio path for playback
             if result.get('path'):
                 self.state.sentences[original_idx]['audio_path'] = result.get('path')
             
             status = result.get('status')
             asr = result.get('similarity_ratio', 0.0)
             
-            # MCCC: Track Statistics (Dynamic - Handles Regeneration)
             old_status = self.state.chunk_status.get(original_idx)
             new_status = 'passed' if status == 'success' else 'failed'
             
@@ -540,13 +534,13 @@ class GenerationService(QObject):
         else:
              self.finished.emit()
         self.worker_thread = None
-        self.is_running = False  # MCCC: Reset running state
+        self.is_running = False
 
     @Slot()
     def _on_stopped(self) -> None:
         self.stopped.emit()
         self.worker_thread = None
-        self.is_running = False  # MCCC: Reset running state
+        self.is_running = False
 
     # --- Preview Logic ---
     preview_ready = Signal(str) # audio_file_path
@@ -579,7 +573,7 @@ class GenerationService(QObject):
         devices, _ = self._configure_workers(s.target_gpus, s.combine_gpus)
         device = devices[0]
         
-        # Create task object (MCCC: Explicit Interface)
+        # Create task object (
         # Note: Index -1 indicates this is a transient preview
         task = WorkerTask(
             task_index=-1,

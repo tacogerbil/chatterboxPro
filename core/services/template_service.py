@@ -14,7 +14,6 @@ class TemplateService:
         """
         target = Path(templates_dir)
         if not target.is_absolute():
-            # MCCC: Anchor to absolute project root (execution/chatterboxPro) 
             # to survive QFileDialog CWD manipulation on Windows
             base_dir = Path(__file__).resolve().parent.parent.parent
             self.templates_dir = base_dir / target

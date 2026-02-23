@@ -4,7 +4,7 @@ Exaggeration Presets for Chatterbox TTS
 Provides pre-configured temperature and exaggeration settings optimized for different content types.
 Users can quickly switch between presets instead of manually tuning parameters.
 
-MCCC: Pure data structures and simple functions, no side effects.
+
 """
 
 from dataclasses import dataclass

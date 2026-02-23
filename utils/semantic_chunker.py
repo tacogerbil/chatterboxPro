@@ -7,7 +7,7 @@ Improved chunking strategy that:
 - Targets 400 chars for optimal Chatterbox prosody
 - Maintains minimum 200 chars for context
 
-MCCC: Pure function, no side effects, fully testable.
+
 """
 
 from typing import List, Dict, Any

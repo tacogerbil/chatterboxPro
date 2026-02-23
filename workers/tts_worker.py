@@ -16,7 +16,7 @@ import soundfile as sf
 # Chatterbox-specific imports
 from chatterbox.tts import ChatterboxTTS
 import whisper
-from utils.pedalboard_processor import apply_pedalboard_effects # MCCC: Use external processor
+from utils.pedalboard_processor import apply_pedalboard_effects
 from utils.artifact_detector import (
     detect_audio_artifacts, 
     get_artifact_description, 
@@ -24,7 +24,7 @@ from utils.artifact_detector import (
     extract_mfcc_profile,
     calculate_timbre_similarity
 )
-from utils.text_processor import normalize_numbers # MCCC: Extracted utility
+from utils.text_processor import normalize_numbers
 print(f"\n[DEBUG] Python executable: {sys.executable}")
 ffmpeg_location = shutil.which("ffmpeg")
 if ffmpeg_location:
@@ -91,7 +91,7 @@ def get_or_init_worker_models(device_str: str, engine_name: str = 'chatterbox', 
             _CURRENT_DEVICE = device_str
             _CURRENT_COMBINE_GPUS = combine_gpus
             
-            # --- MCCC: Upgraded to faster-whisper for 4x ASR speeds ---
+            # --- 
             from faster_whisper import WhisperModel
             import torch
 
@@ -193,7 +193,7 @@ def validate_audio_signal(wav_tensor, sr):
     return True, "OK"
 
 
-from utils.text_processor import normalize_numbers # MCCC: Extracted utility
+from utils.text_processor import normalize_numbers
 
 def get_similarity_ratio(text1, text2):
     # Normalize numbers first (convert "one" → "1", etc.)
@@ -206,14 +206,13 @@ def get_similarity_ratio(text1, text2):
     if not norm1 or not norm2: return 0.0
     return difflib.SequenceMatcher(None, norm1, norm2).ratio()
 
-# apply_voice_effects removed. Logic moved to utils/pedalboard_processor.py (MCCC: Separation of Concerns)
+# apply_voice_effects removed. Logic moved to utils/pedalboard_processor.py (
 
 from core.structs import WorkerTask
 
 def worker_process_chunk(task: WorkerTask):
     """The main function executed by each worker process to generate a single audio chunk."""
     # Unpack from explicit dataclass for local usage
-    # MCCC: Explicit Interface
     task_index = task.task_index
     original_index = task.original_index
     sentence_number = task.sentence_number
@@ -269,7 +268,6 @@ def worker_process_chunk(task: WorkerTask):
         logging.error(f"[Worker-{pid}] Failed to prepare reference for chunk {sentence_number}: {e}", exc_info=True)
         return {"original_index": original_index, "status": "error", "error_message": f"Reference Prep Fail: {e}"}
 
-    # MCCC: Analyze Reference Audio ONCE if present to use as Ground Truth
     ref_features = {}
     ref_mfcc_profile = None
     
@@ -372,7 +370,7 @@ def worker_process_chunk(task: WorkerTask):
                 if Path(temp_path_str).exists(): os.remove(temp_path_str)
                 continue
 
-            # --- MCCC: Reference Fidelity Check (Pitch & Timbre) ---
+            # --- 
             # Gate 1: Pitch Validation
             ref_f0 = ref_features.get('f0_mean')
             try:
@@ -574,7 +572,6 @@ def worker_process_chunk(task: WorkerTask):
 
     # --- Final Selection Logic ---
     # --- Final Selection Logic ---
-    # MCCC: Respect run_idx for multiple output support
     wavs_folder = "Sentence_wavs"
     if run_idx > 0:
         wavs_folder = f"Sentence_wavs_run_{run_idx+1}"
@@ -593,7 +590,6 @@ def worker_process_chunk(task: WorkerTask):
         ratio_str = f"{best_failed_candidate.get('similarity_ratio', 0.0):.2f}"
         logging.warning(f"No candidates passed. Using best failure (Sim: {ratio_str}) as placeholder.")
         chosen_candidate = best_failed_candidate
-        # MCCC: Explicitly report ASR failure reason so UI can show it
         return_payload["error_message"] = f"ASR Failed (Best Sim: {float(ratio_str)*100:.1f}%)"
         status = "failed_placeholder"
     
@@ -625,7 +621,6 @@ def worker_process_chunk(task: WorkerTask):
             # Apply voice effects if needed (Pedalboard post-processing)
             if any([speed != 1.0, pitch_shift != 0.0, timbre_shift != 0.0, gruffness > 0.0, bass_boost != 0.0, treble_boost != 0.0]):
                 try:
-                    # MCCC: Delegated to utils/pedalboard_processor.py
                     apply_pedalboard_effects(
                         str(final_wav_path), str(final_wav_path),
                         pitch_semitones=pitch_shift,
@@ -650,7 +645,6 @@ def worker_process_chunk(task: WorkerTask):
         return_payload.update(chosen_candidate)
         return_payload["status"] = status
         
-        # MCCC: Extract Audio Features for Outlier Detection (Volume/Pitch)
         # Done here to distribute CPU load to worker process
         try:
             audio_stats = extract_audio_features(str(final_wav_path))

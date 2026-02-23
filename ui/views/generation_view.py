@@ -12,7 +12,7 @@ from ui.components.q_labeled_slider import QLabeledSlider
 from ui.components.collapsible_frame import CollapsibleFrame
 from core.services.generation_service import GenerationService
 from core.services.template_service import TemplateService
-from engines import list_engines # MCCC: Dynamic Engine Loading
+from engines import list_engines
 from PySide6.QtWidgets import QInputDialog, QFileDialog
 
 # Worker thread wrapper for GenerationService
@@ -84,7 +84,6 @@ class GenerationView(QWidget):
         self.setup_sliders(layout)
         # Advanced Settings moved to ConfigView
         
-        # MCCC: Logic Swap - Test Voice (Preview) moved ABOVE Voice Save
         self.setup_preview(layout)
         # Voice Save moved to bottom
         self.setup_voice_save(layout)
@@ -99,20 +98,18 @@ class GenerationView(QWidget):
         header.setFont(font)
         layout.addWidget(header)
 
-        # MCCC: Collapsible Engine Configuration
         engine_collapsible = CollapsibleFrame("Engine Configuration", start_open=True)
         
         form = QFormLayout()
         
         self.engine_combo = QComboBox()
-        self.engine_combo.addItems(list_engines()) # MCCC: Dynamic Source of Truth
+        self.engine_combo.addItems(list_engines())
         self.engine_combo.setCurrentText(self.state.settings.tts_engine)
         self.engine_combo.currentTextChanged.connect(
             lambda t: setattr(self.state.settings, 'tts_engine', t)
         )
         form.addRow("TTS Engine:", self.engine_combo)
         
-        # MCCC: Multi-GPU Support Toggle
         self.combine_gpus_cb = QCheckBox("Combine GPUs for Large Models (e.g. MOSS-TTS)")
         self.combine_gpus_cb.setToolTip("Automatically splits massive AI models across all available GPUs to prevent Out-Of-Memory crashes.")
         self.combine_gpus_cb.setChecked(getattr(self.state.settings, 'combine_gpus', False))
@@ -145,7 +142,7 @@ class GenerationView(QWidget):
         """
         Engine-aware model path lookup.
         Returns the stored path for whichever engine is currently selected.
-        MCCC: Pure accessor — no side effects.
+        
         """
         engine = self.state.settings.tts_engine
         if engine == 'moss':
@@ -162,7 +159,6 @@ class GenerationView(QWidget):
         if engine == 'moss':
             self.state.settings.moss_model_path = path
         else:
-            # MCCC: Chatterbox (and any future engine) writes to model_path
             self.state.settings.model_path = path
 
         self.path_label.setText(path)
@@ -170,7 +166,6 @@ class GenerationView(QWidget):
         self.path_label.setStyleSheet("color: #27AE60; font-weight: bold;")
 
     def setup_sliders(self, layout: QVBoxLayout) -> None:
-        # MCCC: Collapsible Voice Settings
         voice_collapsible = CollapsibleFrame("Voice Settings", start_open=True)
         v_layout = QVBoxLayout()
         v_layout.setSpacing(5)
@@ -286,7 +281,6 @@ class GenerationView(QWidget):
         voice_collapsible.add_layout(v_layout)
         layout.addWidget(voice_collapsible)
         
-        # MCCC: Collapsible Voice Effects (Advanced - Start Collapsed)
         fx_collapsible = CollapsibleFrame("Voice Effects (Post-Process)", start_open=False)
         f_layout = QVBoxLayout()
         f_layout.setSpacing(5)
@@ -540,7 +534,6 @@ class GenerationView(QWidget):
         import dataclasses
         all_settings = dataclasses.asdict(self.state.settings)
         
-        # MCCC Logic: Separation of Concerns
         # Voice Template should ONLY contain Voice Design params.
         # It should NOT contain Session Config (GPU, Retries, ASR thresholds).
         voice_keys = [
@@ -548,7 +541,6 @@ class GenerationView(QWidget):
             'timbre_shift', 'gruffness', 'bass_boost', 'treble_boost',
             'cfg_weight', 'tts_engine', 'auto_expression_enabled',
             'expression_sensitivity'
-            # MCCC: model_path / moss_model_path intentionally omitted.
             # They are infrastructure config, not voice design parameters.
         ]
         
@@ -574,7 +566,6 @@ class GenerationView(QWidget):
              QMessageBox.critical(self, "Error", "Failed to save voice.")
 
     def setup_preview(self, layout: QVBoxLayout) -> None:
-        # MCCC: Collapsible Test Voice Settings
         preview_collapsible = CollapsibleFrame("Test Voice Settings", start_open=True)
         p_layout = QVBoxLayout()
         p_layout.setSpacing(5)
@@ -619,7 +610,6 @@ class GenerationView(QWidget):
         """Updates UI elements to match current AppState settings."""
         s = self.state.settings
         
-        # MCCC: Engine-aware path display — each engine has its own field
         current_path = self._get_current_engine_path()
         if current_path:
              self.path_label.setText(current_path)
@@ -637,7 +627,6 @@ class GenerationView(QWidget):
         self.ref_audio_edit.setText(self.state.ref_audio_path or "")
         self.ref_audio_edit.blockSignals(False)
         
-        # MCCC: Block slider signals to prevent programmatic loads from triggering the "Custom" voice auto-reset
         if hasattr(self, 'exag_slider'): self.exag_slider.blockSignals(True)
         if hasattr(self, 'speed_slider'): self.speed_slider.blockSignals(True)
         if hasattr(self, 'temp_slider'): self.temp_slider.blockSignals(True)

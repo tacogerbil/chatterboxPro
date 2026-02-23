@@ -1,7 +1,7 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTabWidget, QSplitter, QMessageBox
 from typing import Optional, Dict, Any
-import torch # MCCC: For initialization of hardware capabilities
+import torch
 
 from core.state import AppState
 
@@ -41,7 +41,6 @@ class ChatterboxProQt(QMainWindow):
             # If we created it fresh, load state now
             self.config_service.load_state(self.app_state)
             
-        # MCCC: Initialize System Capabilities (Hardware Isolation)
         try:
             cuda_available = torch.cuda.is_available()
             gpu_count = torch.cuda.device_count()
@@ -112,7 +111,6 @@ class ChatterboxProQt(QMainWindow):
     def _setup_tabs(self) -> None:
         self.tabs = QTabWidget()
         
-        # MCCC: Proper dependency injection - pass services to SetupView
         from core.services.template_service import TemplateService
         template_service = TemplateService()
         self.setup_view = SetupView(
@@ -142,7 +140,7 @@ class ChatterboxProQt(QMainWindow):
         services: Dict[str, Any] = {
             'playlist': self.playlist_service,
             'generation': self.gen_service,
-            'audio': self.audio_service  # MCCC: Inject AudioService
+            'audio': self.audio_service
         }
         
         self.playlist_view = PlaylistView(self.app_state)
@@ -189,13 +187,12 @@ class ChatterboxProQt(QMainWindow):
         self.chapters_view.structure_changed.connect(lambda: self.chapters_view.model.refresh())
         self.chapters_view.structure_changed.connect(lambda: self.playlist_view.model.refresh())
         
-        # Wire Chapter Jump (MCCC: Fixed Regression)
+        # Wire Chapter Jump (
         self.chapters_view.jump_requested.connect(self.on_chapter_jump)
         
-        # Wire Generation Finished (MCCC: Fixed Regression)
+        # Wire Generation Finished (
         self.gen_service.finished.connect(self.on_generation_finished)
         
-        # MCCC: Wire Item Update for Real-Time Stats (Batched)
         if hasattr(self.gen_service, 'items_updated'):
              self.gen_service.items_updated.connect(lambda indices: self.playlist_view.model.update_rows(indices))
         else:
@@ -209,7 +206,6 @@ class ChatterboxProQt(QMainWindow):
         self.gen_service.started.connect(self._on_generation_started)
         self.gen_service.stopped.connect(self._on_generation_stopped)
         
-        # MCCC: Force UI Refresh on Tab Change to sync GPU display
         if hasattr(self, 'tabs') and self.tabs is not None:
              self.tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -246,7 +242,7 @@ class ChatterboxProQt(QMainWindow):
         status_msg = f"Generation Finished. (Passed: {passed_chunks}, Failed: {failed_chunks})"
         self.statusBar().showMessage(status_msg)
         
-        # 3. MCCC: Reset Start/Stop Buttons on Setup Tab
+        # 3. 
         if hasattr(self.setup_view, 'start_btn'):
             self.setup_view.start_btn.setEnabled(True)
         if hasattr(self.setup_view, 'stop_btn'):
@@ -315,7 +311,6 @@ def launch_qt_app() -> None:
     # Create the Application
     app = QApplication(sys.argv)
     
-    # MCCC: Bootstrap State & Config BEFORE Window Creation
     from core.state import AppState
     from core.services.config_service import ConfigService
     from ui.theme_manager import ThemeManager

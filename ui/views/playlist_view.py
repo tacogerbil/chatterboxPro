@@ -8,7 +8,7 @@ from core.models.playlist_model import PlaylistModel
 class PlaylistDelegate(QStyledItemDelegate):
     """
     Renders playlist items with color coding based on status/type.
-    MCCC Compliance: Uses initStyleOption to modify background, 
+    
     letting super().paint() handle text rendering for CSS compatibility.
     """
     def initStyleOption(self, option, index):
@@ -127,7 +127,7 @@ class PlaylistView(QWidget):
         if not full_data: return
         
         if full_data.get('is_pause'):
-             # Pause Item Handling (MCCC: Distinct UX)
+             # Pause Item Handling (
              duration = full_data.get('duration', self.app_state.settings.silence_duration)
              self.lbl_status.setText(f"PAUSE ({duration}ms)")
              self.lbl_seed.setText("--")
@@ -152,7 +152,7 @@ class PlaylistView(QWidget):
         return valid_indices
 
     def jump_to_row(self, row_index: int) -> None:
-        """MCCC: Handles navigation request from other components."""
+        """"""
         idx = self.model.index(row_index, 0)
         if idx.isValid():
             self.list_view.clearSelection()

@@ -182,7 +182,7 @@ class TextPreprocessor:
         """
         Splits very long sentences at natural pause points (commas, semicolons).
         
-        MCCC: Single Responsibility - Handles only long sentence splitting.
+        
         
         Args:
             sentence: The sentence to potentially split
@@ -383,7 +383,6 @@ class TextPreprocessor:
 
             is_chapter_heading = bool(self.chapter_regex.match(clean_sentence))
 
-            # MCCC: Smart Split - Handle sentences >400 chars
             # Split at natural pause points to improve TTS/ASR accuracy
             if len(clean_sentence) > 400 and not is_chapter_heading:
                 sub_sentences = self.smart_split_long_sentence(clean_sentence, max_chars=400)
@@ -464,7 +463,6 @@ class TextPreprocessor:
             # Return original on error
             return current_sentences
 
-# MCCC Refactor: Extracted from workers/tts_worker.py
 def _parse_compound_number(text, ones, teens, tens):
     """Helper to parse complex compound numbers like 'two thousand twenty-four'."""
     total = 0

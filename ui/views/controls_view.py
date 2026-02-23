@@ -91,7 +91,6 @@ class ControlsView(QWidget):
         s_layout.addWidget(QLabel("🔍"))
 
         self.search_edit = QLineEdit(); self.search_edit.setPlaceholderText("Search text...")
-        # MCCC: Force visible size and style to prevent red-box/rendering artifacts
         self.search_edit.setMinimumWidth(150)
         self.search_edit.setProperty("class", "search-box")
         self.search_edit.returnPressed.connect(self._search)
@@ -309,7 +308,6 @@ class ControlsView(QWidget):
                   print(f"DEBUG: Fallback search failed. Checked: {candidates}", flush=True)
 
         if not path or not os.path.exists(path):
-            # MCCC: Path Resolution Fallback
             # The app might be running from a subdir (e.g. execution/chatterboxPro), 
             # while the path is relative to Project Root (Outputs_Pro).
             # We search up to 3 levels up.
@@ -332,7 +330,7 @@ class ControlsView(QWidget):
                 QMessageBox.warning(self, "Playback Error", f"File not found:\n{path}\n\nCWD: {cwd}")
                 return
             
-        # Ensure absolute path for QUrl compatibility (MCCC: Explicit Resolution)
+        # Ensure absolute path for QUrl compatibility (
         abs_path = os.path.abspath(path)
         print(f"DEBUG: Playing file (Absolute): {abs_path}", flush=True) # Debug
         
@@ -577,7 +575,6 @@ class ControlsView(QWidget):
         
         target_uuid = self.matches[self.match_idx]
         
-        # MCCC: Resolve UUID continuously to survive splits/inserts that shift array indices
         current_idx = -1
         for i, s in enumerate(self.playlist_service.state.sentences):
             if s.get('uuid') == target_uuid:

@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Any
 class WorkerTask:
     """
     Explicit contract for data passed to the TTS worker process.
-    Follows MCCC Law 7 (Explicit Interfaces) and eliminates brittle tuple unpacking.
+    Follows 
     """
     # Task Metadata
     task_index: int

@@ -1,7 +1,7 @@
 """
 Constants for ChatterboxPro
 
-MCCC Compliance: All magic numbers extracted to named constants with documentation.
+
 """
 
 # ============================================================================

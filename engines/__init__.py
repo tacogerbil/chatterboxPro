@@ -7,7 +7,6 @@ from .chatterbox_engine import ChatterboxEngine
 from .moss_engine import MossEngine
 
 # Engine registry
-# MCCC: Only Chatterbox and MOSS are supported as per user request.
 AVAILABLE_ENGINES = {
     'chatterbox': ChatterboxEngine,
     'moss': MossEngine,

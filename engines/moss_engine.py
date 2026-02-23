@@ -34,7 +34,6 @@ class MossEngine(BaseTTSEngine):
         self.processor = None
         self.sr = 24000 # MOSS-TTS usually outputs 24kHz
         
-        # MCCC: Allow offline usage via model_path, fallback to HF repo
         self.custom_model_path = kwargs.get('model_path', '').strip()
         self.repo_id = "OpenMOSS-Team/MOSS-TTS"
         

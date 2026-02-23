@@ -88,14 +88,14 @@ class AppState:
     auto_assemble_after_run: bool = False
     aggro_clean_on_parse: bool = False
     
-    # UI Theme State (MCCC: Consolidated Config)
+    # UI Theme State (
     theme_name: str = "dark_teal.xml"
     theme_invert: bool = False
     
     # Window State
     window_geometry_hex: str = ""
     
-    # Progress Tracking (MCCC: Centralized Statistics)
+    # Progress Tracking (
     total_chunks: int = 0
     chunks_passed: int = 0
     chunks_failed: int = 0
@@ -103,7 +103,7 @@ class AppState:
     generation_start_time: float = 0.0  # timestamp
     chunk_status: Dict[int, str] = field(default_factory=dict)  # {index: 'passed'|'failed'}
     
-    # System Capabilities (MCCC: Hardware isolation)
+    # System Capabilities (
     system_capabilities: Dict[str, Any] = field(default_factory=dict)
 
     

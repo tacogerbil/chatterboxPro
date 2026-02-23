@@ -4,7 +4,7 @@ from typing import Optional
 
 class ProgressWidget(QWidget):
     """
-    MCCC: Reusable progress display component for generation tracking.
+    
     Displays progress bar, ETA, and chapter statistics (Total/Passed/Failed).
     """
     def __init__(self, parent: Optional[QWidget] = None) -> None:

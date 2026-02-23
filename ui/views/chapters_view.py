@@ -241,7 +241,6 @@ class ChaptersView(QWidget):
 
         self.update_theme(self.app_state.theme_name)
         
-        # MCCC Audit: Restore "No Chapters Detected" Placeholder
         self.empty_label = QLabel("No chapters detected.\n\nUse 'Insert Chapter' in the Editing panel\nor re-process text.")
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setStyleSheet("color: gray; font-size: 14px; padding: 20px;")
@@ -317,7 +316,6 @@ class ChaptersView(QWidget):
         
         layout.addLayout(footer_layout)
         
-        # MCCC: Progress Tracking Widget
         self.progress_widget = ProgressWidget()
         self.progress_widget.setVisible(False)  # Hidden until generation starts
         layout.addWidget(self.progress_widget)
@@ -326,14 +324,14 @@ class ChaptersView(QWidget):
         self.refresh_gpu_status()
 
     def showEvent(self, event) -> None:
-        """MCCC: Refresh status when tab becomes visible."""
+        """"""
         self.refresh_gpu_status()
         super().showEvent(event)
 
     def update_theme(self, theme_name: str) -> None:
         """
         Updates the list palette based on whether the theme is dark or light.
-        MCCC: Isolates visual logic.
+        
         """
         is_dark = "light" not in theme_name.lower()
         
@@ -459,7 +457,7 @@ class ChaptersView(QWidget):
             self.jump_requested.emit(real_idx)
             
     def _update_empty_state(self, *args) -> None:
-        """MCCC: Toggles between ListView and EmptyLabel based on content."""
+        """"""
         has_items = self.model.rowCount() > 0
         self.list_view.setVisible(has_items)
         self.empty_label.setVisible(not has_items)

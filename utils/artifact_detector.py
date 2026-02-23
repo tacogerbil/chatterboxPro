@@ -6,7 +6,7 @@ Detects audio artifacts that ASR validation might miss:
 - Clicks/pops (excessive zero-crossing rate)
 - Muffled audio (poor spectral rolloff)
 
-MCCC: Pure function module, no side effects, fully testable.
+
 """
 
 import numpy as np

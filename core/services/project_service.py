@@ -13,7 +13,6 @@ class ProjectService:
     - Session management
     """
     def __init__(self, outputs_dir: str = "Outputs_Pro"):
-        # MCCC: Anchor 'Outputs_Pro' absolute to project root to survive CWD shifts
         target = Path(outputs_dir)
         if not target.is_absolute():
             base_dir = Path(__file__).resolve().parent.parent.parent

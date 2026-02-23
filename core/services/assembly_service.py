@@ -68,7 +68,6 @@ class AssemblyService(QObject):
         self.assembly_started.emit()
         app = self.state # Alias for easier porting
         
-        # MCCC: Validate settings before processing
         is_valid, error_msg = self._validate_settings()
         if not is_valid:
             self.assembly_error.emit(f"Invalid settings: {error_msg}")
@@ -156,7 +155,6 @@ class AssemblyService(QObject):
             if app.settings.silence_removal_enabled:
                 logging.info("Step 2: Running Auto-Editor for silence removal...")
                 
-                # MCCC: Unique filename to prevent conflicts
                 unique_id = uuid.uuid4().hex[:8]
                 ae_out = temp_dir / f"silence_removed_{unique_id}.wav"
                 
@@ -201,12 +199,10 @@ class AssemblyService(QObject):
             if app.settings.norm_enabled:
                 logging.info(f"Step 3: Normalizing to {app.settings.norm_level} LUFS...")
                 
-                # MCCC: Unique filename to prevent conflicts
                 unique_id = uuid.uuid4().hex[:8]
                 norm_out = temp_dir / f"normalized_{unique_id}.wav"
                 
                 try:
-                    # MCCC: Use constants for magic numbers
                     from core.constants import EBU_R128_TRUE_PEAK_MAX, EBU_R128_LOUDNESS_RANGE, DEFAULT_SAMPLE_RATE
                     
                     target_i = app.settings.norm_level

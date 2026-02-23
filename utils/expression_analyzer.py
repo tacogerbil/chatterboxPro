@@ -8,7 +8,7 @@ Automatically detects expression levels in text and suggests parameter adjustmen
 - Detects ALL CAPS (shouting)
 - Detects ellipsis (trailing off)
 
-MCCC: Pure analysis functions, no side effects, fully testable.
+
 """
 
 import re

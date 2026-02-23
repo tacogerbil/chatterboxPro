@@ -20,7 +20,6 @@ class ThemeManager:
             from qt_material import apply_stylesheet
             from PySide6.QtWidgets import QStyleFactory
             
-            # MCCC: Ensure Consistent Base Style (Fusion)
             # This provides correct native heuristics, disabled states, and contrast rules
             # before we apply our custom palette and spreadsheet.
             if "Fusion" in QStyleFactory.keys():
@@ -37,7 +36,6 @@ class ThemeManager:
                     apply_stylesheet(app, theme=theme_name, **extra)
                     ThemeManager._sync_palette(app, theme_name, extra)
                     
-            # MCCC: Apply Custom Overrides (The Classy Way)
             # This loads our defined classes (.success, .danger) so we don't hardcode CSS.
             try:
                 import os
@@ -66,7 +64,7 @@ class ThemeManager:
     @staticmethod
     def _sync_palette(app: QApplication, theme_name: str, extra: dict):
         """
-        MCCC Compliance: Synchronizes the QPalette with the qt-material config using Canonical Qt Roles.
+        
         Crucial for QStyledItemDelegates, placeholders, and unstyled widgets.
         """
         try:
@@ -90,7 +88,7 @@ class ThemeManager:
             placeholder_color = QColor(text_color)
             placeholder_color.setAlpha(128) # 50% opacity
             
-            # 3. Map to Canonical Roles (User Specified MCCC)
+            # 3. Map to Canonical Roles (User Specified 
             
             # Window / Backgrounds
             palette.setColor(QPalette.Window, secondary_color)
