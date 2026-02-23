@@ -90,7 +90,7 @@ class PlaylistService:
                 "original_sentence": s_clean,
                 "paragraph": "no",
                 "tts_generated": "no",
-                "marked": True,
+                "marked": False,
                 "is_chapter_heading": is_ch,
             }
             new_items.append(new_item)
@@ -106,7 +106,7 @@ class PlaylistService:
             "original_sentence": text,
             "paragraph": "no",
             "tts_generated": "n/a" if is_pause else "no",
-            "marked": True,
+            "marked": False,
             "is_chapter_heading": is_chapter,
             "is_pause": is_pause
         }
@@ -294,7 +294,7 @@ class PlaylistService:
                 merged_text = (curr.get('original_sentence', '') + " " + next_item.get('original_sentence', '')).strip()
                 next_item['original_sentence'] = merged_text
                 next_item['tts_generated'] = 'no'
-                next_item['marked'] = True
+                next_item['marked'] = False
 
                 # Clear associated metrics and artifacts for the merged item
                 keys_to_clear = ['audio_path', 'asr_match', 'seed', 'ffmpeg_cmd']
@@ -358,7 +358,7 @@ class PlaylistService:
                 if cleaned != text:
                     item['original_sentence'] = cleaned
                     item['tts_generated'] = 'no'
-                    item['marked'] = True
+                    item['marked'] = False
                     count += 1
         return count
 
