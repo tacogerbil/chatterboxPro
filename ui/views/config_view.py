@@ -66,9 +66,36 @@ class ConfigView(QWidget):
             self.auto_loop_chk.blockSignals(False)
             self.chk_watermark.blockSignals(False)
         
+    @staticmethod
+    def _make_collapsible(group: 'QGroupBox', expanded: bool = True) -> None:
+        """Makes a QGroupBox collapse/expand when its title checkbox is toggled."""
+        group.setCheckable(True)
+        group.setChecked(expanded)
+
+        def _toggle(checked: bool) -> None:
+            for child in group.findChildren(QWidget):
+                child.setVisible(checked)
+
+        group.toggled.connect(_toggle)
+
     def setup_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Scrollable container so content never clips off-screen
+        from PySide6.QtWidgets import QScrollArea
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(scroll.Shape.NoFrame)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        scroll.setWidget(container)
+        outer_layout.addWidget(scroll)
+
         # --- Header ---
         header = QLabel("Application Configuration")
         font = header.font()
@@ -78,8 +105,9 @@ class ConfigView(QWidget):
         layout.addWidget(header)
         
         # --- Theme Settings ---
-        theme_group = QGroupBox("Interface Personalization")
+        theme_group = QGroupBox("▾ Interface Personalization")
         t_layout = QFormLayout(theme_group)
+        self._make_collapsible(theme_group)
         
         # Theme Selector
         self.theme_combo = QComboBox()
@@ -104,8 +132,9 @@ class ConfigView(QWidget):
         layout.addWidget(theme_group)
         
         # --- Group 2: Generation Defaults ---
-        gen_group = QGroupBox("Generation Defaults")
+        gen_group = QGroupBox("▾ Generation Defaults")
         g_layout = QFormLayout(gen_group)
+        self._make_collapsible(gen_group)
         
         self.spin_buf_before = QSpinBox()
         self.spin_buf_before.setRange(0, 10000)
@@ -126,9 +155,10 @@ class ConfigView(QWidget):
         
         layout.addWidget(gen_group)
         
-        # --- Group 3: Advanced Generation Configuration (Was in Gen View) ---
-        adv_group = QGroupBox("Advanced Engine Configuration")
+        # --- Group 3: Advanced Engine Configuration ---
+        adv_group = QGroupBox("▾ Advanced Engine Configuration")
         a_layout = QFormLayout(adv_group)
+        self._make_collapsible(adv_group, expanded=False)
 
         # GPU Device Handling (Dynamic Checkboxes)
         import torch
