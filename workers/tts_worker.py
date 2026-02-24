@@ -289,6 +289,7 @@ def worker_process_chunk(task: WorkerTask):
 
     passed_candidates = []
     best_failed_candidate = None
+    best_fidelity_reject = None  # Last resort: best candidate that failed pitch/timbre gates
     
     for attempt_num in range(max_attempts):
         if len(passed_candidates) >= num_candidates:
@@ -384,11 +385,17 @@ def worker_process_chunk(task: WorkerTask):
                     ratio = cand_f0 / ref_f0
                     if ratio > 1.4:
                         logging.warning(f"FIDELITY REJECT: Pitch too high ({cand_f0:.0f}Hz) vs Ref ({ref_f0:.0f}Hz). Ratio: {ratio:.2f}")
-                        if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                        if best_fidelity_reject is None:
+                            best_fidelity_reject = {"path": temp_path_str, "duration": duration, "seed": seed, "similarity_ratio": None}
+                        elif Path(temp_path_str).exists():
+                            os.remove(temp_path_str)
                         continue
                     if ratio < 0.6:
                         logging.warning(f"FIDELITY REJECT: Pitch too low ({cand_f0:.0f}Hz) vs Ref ({ref_f0:.0f}Hz). Ratio: {ratio:.2f}")
-                        if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                        if best_fidelity_reject is None:
+                            best_fidelity_reject = {"path": temp_path_str, "duration": duration, "seed": seed, "similarity_ratio": None}
+                        elif Path(temp_path_str).exists():
+                            os.remove(temp_path_str)
                         continue
 
             # Gate 2: Timbre Similarity
@@ -400,7 +407,10 @@ def worker_process_chunk(task: WorkerTask):
                 TIMBRE_THRESHOLD = 0.75
                 if timbre_score < TIMBRE_THRESHOLD:
                     logging.warning(f"FIDELITY REJECT: Timbre Mismatch (Score: {timbre_score:.2f} < {TIMBRE_THRESHOLD}). Possible accent drift.")
-                    if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                    if best_fidelity_reject is None:
+                        best_fidelity_reject = {"path": temp_path_str, "duration": duration, "seed": seed, "similarity_ratio": None}
+                    elif Path(temp_path_str).exists():
+                        os.remove(temp_path_str)
                     continue
                 else:
                     logging.info(f"Fidelity Passed: Pitch OK, Timbre Score {timbre_score:.2f}")
@@ -592,7 +602,12 @@ def worker_process_chunk(task: WorkerTask):
         chosen_candidate = best_failed_candidate
         return_payload["error_message"] = f"ASR Failed (Best Sim: {float(ratio_str)*100:.1f}%)"
         status = "failed_placeholder"
-    
+    elif best_fidelity_reject:
+        logging.warning("All attempts rejected by fidelity gates. Using best fidelity-rejected candidate as placeholder.")
+        chosen_candidate = best_fidelity_reject
+        return_payload["error_message"] = "Fidelity gates failed (pitch/timbre mismatch — check reference audio or adjust thresholds)"
+        status = "failed_placeholder"
+
     # --- Finalize and Cleanup ---
     if chosen_candidate:
         # Determine final filename: failed placeholder files get a _failed suffix

@@ -82,6 +82,13 @@ def punc_norm(text: str) -> str:
     # 2. Replace remaining colons (e.g. "Note: Text") with commas
     text = text.replace(":", ",")
 
+    # ALL_CAPS normalisation: words of 4+ consecutive uppercase letters are
+    # almost certainly not acronyms — they are regular words the source text
+    # happened to print in caps.  Title-case them so the TTS model reads the
+    # word naturally instead of spelling it out letter by letter.
+    # (1-3 letter caps — FBI, DNA, OK, HA — are left untouched.)
+    text = re.sub(r'\b([A-Z]{4,})\b', lambda m: m.group(1).title(), text)
+
     # Add full stop if no ending punc
     text = text.rstrip()
     sentence_enders = {".", "!", "?", "-", ","}
@@ -89,6 +96,7 @@ def punc_norm(text: str) -> str:
         text += "."
 
     return text
+
 
 class TextPreprocessor:
     """Handles all text extraction and splitting logic."""
