@@ -66,8 +66,7 @@ class ConfigView(QWidget):
             self.auto_loop_chk.blockSignals(False)
             self.chk_watermark.blockSignals(False)
         
-    @staticmethod
-    def _make_collapsible(group: 'QGroupBox', expanded: bool = True) -> None:
+    def _make_collapsible(self, group: 'QGroupBox', expanded: bool = True, state_key: str = None) -> None:
         """Makes a QGroupBox collapse/expand when its title checkbox is toggled."""
         group.setCheckable(True)
         group.setChecked(expanded)
@@ -75,8 +74,11 @@ class ConfigView(QWidget):
         def _toggle(checked: bool) -> None:
             for child in group.findChildren(QWidget):
                 child.setVisible(checked)
+            if state_key and hasattr(self.state, state_key):
+                setattr(self.state, state_key, checked)
 
         group.toggled.connect(_toggle)
+        _toggle(expanded)
 
     def setup_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
@@ -107,7 +109,7 @@ class ConfigView(QWidget):
         # --- Theme Settings ---
         theme_group = QGroupBox("▾ Interface Personalization")
         t_layout = QFormLayout(theme_group)
-        self._make_collapsible(theme_group)
+        self._make_collapsible(theme_group, expanded=True)
         
         # Theme Selector
         self.theme_combo = QComboBox()
@@ -134,7 +136,7 @@ class ConfigView(QWidget):
         # --- Group 2: Generation Defaults ---
         gen_group = QGroupBox("▾ Generation Defaults")
         g_layout = QFormLayout(gen_group)
-        self._make_collapsible(gen_group)
+        self._make_collapsible(gen_group, expanded=True)
         
         self.spin_buf_before = QSpinBox()
         self.spin_buf_before.setRange(0, 10000)
@@ -158,7 +160,10 @@ class ConfigView(QWidget):
         # --- Group 3: Advanced Engine Configuration ---
         adv_group = QGroupBox("▾ Advanced Engine Configuration")
         a_layout = QFormLayout(adv_group)
-        self._make_collapsible(adv_group, expanded=False)
+        
+        # Load persisted group expansion state
+        is_expanded = getattr(self.state, 'advanced_engine_expanded', False)
+        self._make_collapsible(adv_group, expanded=is_expanded, state_key='advanced_engine_expanded')
 
         # GPU Device Handling (Dynamic Checkboxes)
         import torch

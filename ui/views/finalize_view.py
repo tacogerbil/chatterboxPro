@@ -52,8 +52,10 @@ class FinalizeView(QWidget):
         
         # Normalization
         self.norm_chk = QCheckBox("Enable EBU R128 Normalization")
-        self.norm_chk.setChecked(False)
-        self.norm_val = QDoubleSpinBox(); self.norm_val.setValue(-23.0); self.norm_val.setRange(-50, 0)
+        self.norm_chk.setChecked(self.state.settings.norm_enabled)
+        self.norm_chk.stateChanged.connect(lambda state: setattr(self.state.settings, 'norm_enabled', state == Qt.Checked or state == 2))
+        self.norm_val = QDoubleSpinBox(); self.norm_val.setValue(self.state.settings.norm_level); self.norm_val.setRange(-50, 0)
+        self.norm_val.valueChanged.connect(lambda v: setattr(self.state.settings, 'norm_level', v))
         
         norm_row = QHBoxLayout()
         norm_row.addWidget(self.norm_chk)
@@ -65,6 +67,8 @@ class FinalizeView(QWidget):
         # Silence Removal (Auto-Editor)
         self.silence_chk = QCheckBox("Enable Silence Removal")
         self.silence_chk.setToolTip("Requires auto-editor installed")
+        self.silence_chk.setChecked(self.state.settings.silence_removal_enabled)
+        self.silence_chk.stateChanged.connect(lambda state: setattr(self.state.settings, 'silence_removal_enabled', state == Qt.Checked or state == 2))
         proc_layout.addRow(self.silence_chk)
         
         # Silence Params (Legacy restoration)

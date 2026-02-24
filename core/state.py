@@ -87,6 +87,7 @@ class AppState:
     auto_regen_sub: bool = False # For Batch Fix Logic
     auto_assemble_after_run: bool = False
     aggro_clean_on_parse: bool = False
+    advanced_engine_expanded: bool = False
     
     # UI Theme State (
     theme_name: str = "dark_teal.xml"

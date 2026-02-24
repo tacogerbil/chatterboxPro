@@ -67,6 +67,7 @@ class ConfigService:
                 # and is restored automatically by the settings loop above.
                 'auto_regen_main', 'auto_regen_sub',
                 'auto_assemble_after_run', 'aggro_clean_on_parse',
+                'advanced_engine_expanded',
                 'theme_name', 'theme_invert', 'window_geometry_hex'
             }
             
@@ -95,6 +96,7 @@ class ConfigService:
                 'auto_regen_sub': app_state.auto_regen_sub,
                 'auto_assemble_after_run': app_state.auto_assemble_after_run,
                 'aggro_clean_on_parse': app_state.aggro_clean_on_parse,
+                'advanced_engine_expanded': app_state.advanced_engine_expanded,
                 'theme_name': app_state.theme_name,
                 'theme_invert': app_state.theme_invert,
                 'window_geometry_hex': app_state.window_geometry_hex
