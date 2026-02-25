@@ -234,8 +234,8 @@ class ControlsView(QWidget):
         layout.addWidget(btn_clean, 1, 2)
         layout.addWidget(btn_filter, 1, 3)
         
-        # Row 2: Splits
-        # [Split Marked] [Split Failed]
+        btn_split_marked = QPushButton("Split Marked"); btn_split_marked.clicked.connect(self._split_marked)
+        btn_split_marked.setToolTip("Splits all marked chunks using the sentence splitter.")
         
         btn_split_all_sent = QPushButton("Split Failed (Sent)"); btn_split_all_sent.clicked.connect(self._split_all_failed)
         btn_split_all_sent.setToolTip("Splits all failed chunks by sentence.")

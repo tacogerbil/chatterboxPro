@@ -424,6 +424,7 @@ class GenerationService(QObject):
                 "index": result.get("original_index"),
                 "status": result.get("status", "error"),
                 "path": result.get("path", ""),
+                "similarity_ratio": result.get("similarity_ratio")
             }
             with open(journal_path, "a", encoding="utf-8") as f:
                 f.write(__import__('json').dumps(record) + "\n")

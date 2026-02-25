@@ -254,16 +254,23 @@ class ProjectService:
 
             status = record.get("status", "")
             wav_path = record.get("path", "")
+            sim_ratio = record.get("similarity_ratio")
 
             if status == "success" and wav_path and Path(wav_path).exists():
                 sentence["tts_generated"] = "yes"
                 sentence["audio_path"] = wav_path
                 sentence["marked"] = False
+                if sim_ratio is not None:
+                    sentence["similarity_ratio"] = sim_ratio
                 stats["matched"] += 1
             else:
                 # Explicit failure or missing file — keep as failed so it reruns
                 sentence["tts_generated"] = "failed"
                 sentence["marked"] = True
+                if sim_ratio is not None:
+                    sentence["similarity_ratio"] = sim_ratio
+                if wav_path and Path(wav_path).exists():
+                    sentence["audio_path"] = wav_path
                 stats["failed_kept"] += 1
 
         logging.info(
