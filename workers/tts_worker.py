@@ -404,7 +404,7 @@ def worker_process_chunk(task: WorkerTask):
                 cand_sr = cand_features.get('sr')
                 cand_mfcc = extract_mfcc_profile(temp_path_str, y=cand_y, sr=cand_sr)
                 timbre_score = calculate_timbre_similarity(ref_mfcc_profile, cand_mfcc)
-                TIMBRE_THRESHOLD = 0.75
+                TIMBRE_THRESHOLD = 0.82
                 if timbre_score < TIMBRE_THRESHOLD:
                     logging.warning(f"FIDELITY REJECT: Timbre Mismatch (Score: {timbre_score:.2f} < {TIMBRE_THRESHOLD}). Possible accent drift.")
                     if best_fidelity_reject is None:
