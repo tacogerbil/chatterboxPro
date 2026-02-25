@@ -655,13 +655,29 @@ class ControlsView(QWidget):
         if c: self._refresh()
 
     def _regen_marked(self):
-        # Call generation service for marked items
-        # Logic: find ALL marked items
-        indices = [i for i, item in enumerate(self.playlist_service.state.sentences) if item.get('marked')]
-        if not indices: QMessageBox.information(self, "Info", "No marked items."); return
+        """Generate all marked items. If Auto-loop is checked, each chunk retries harder in-place."""
+        indices = [
+            i for i, item in enumerate(self.playlist_service.state.sentences)
+            if item.get('marked') and not item.get('is_pause')
+        ]
+        if not indices:
+            QMessageBox.information(self, "Info", "No marked items."); return
         
-        if self.generation_service:
-            self.generation_service.start_generation(indices)
+        if not self.generation_service:
+            QMessageBox.warning(self, "Error", "Generation service not connected."); return
+        
+        # When Auto-loop is checked, multiply per-chunk max_attempts so each chunk
+        # retries aggressively in-place rather than cycling entire batches.
+        auto_loop = self.chk_auto_loop.isChecked()
+        if auto_loop:
+            original_attempts = self.playlist_service.state.settings.max_attempts
+            LOOP_MULTIPLIER = 6  # e.g. 3 attempts → 18 per chunk
+            self.generation_service.set_attempts_boost(original_attempts)  # Let service restore it on finish
+            self.playlist_service.state.settings.max_attempts = original_attempts * LOOP_MULTIPLIER
+            logging.info(f"Auto-loop ON: max_attempts boosted {original_attempts} → "
+                         f"{self.playlist_service.state.settings.max_attempts} per chunk")
+        
+        self.generation_service.start_generation(indices)
 
     def _auto_pause_action(self):
         """Wraps all chapters with configured buffer pause."""

@@ -31,7 +31,7 @@ class GenerationThread(QThread):
     # Signals to communicate back to the Service (which runs on Main Thread)
     progress_update = Signal(int, int) # completed, total
     batch_complete = Signal(list) # list of result dicts
-    finished = Signal()
+    generation_done = Signal()   # Renamed from 'finished' to avoid shadowing QThread.finished
     error_occurred = Signal(str)
     stopped = Signal()
 
@@ -152,7 +152,7 @@ class GenerationThread(QThread):
             if self.stop_requested.is_set():
                 self.stopped.emit()
             else:
-                self.finished.emit()
+                self.generation_done.emit()  # Use renamed signal — never shadow QThread.finished
 
         except Exception as e:
             logging.error(f"GenerationThread crashed: {e}", exc_info=True)
@@ -186,9 +186,8 @@ class GenerationService(QObject):
         self.state = app_state
         self.worker_thread: Optional[GenerationThread] = None
         self.playlist_service: Optional[Any] = None # Injected dependency
-        self.auto_fix_stage: str = "NONE" 
-        self._loop_iteration: int = 0
         self.is_running: bool = False
+        self._original_max_attempts: Optional[int] = None  # For restoring when auto-loop boost is active
 
     def set_playlist_service(self, service: Any) -> None:
         self.playlist_service = service
@@ -202,62 +201,16 @@ class GenerationService(QObject):
         else:
             self.stopped.emit()
 
-    def _auto_fix_logic(self) -> None:
-        """
-        State machine for auto-regeneration loops.
-        Handles retries, splitting, and infinite looping for stubborn chunks.
-        """
-        # 1. Identify Failures
-        failed_indices = [
-            i for i, s in enumerate(self.state.sentences) 
-            if s.get('tts_generated') == STATUS_FAILED
-        ]
-        
-        if not failed_indices:
-            self.auto_fix_stage = "NONE"
-            logging.info("Auto-Fix: All clear.")
-            self.finished.emit() 
-            return
+    def _restore_max_attempts(self) -> None:
+        """Restores max_attempts to its original value if it was boosted for auto-loop."""
+        if self._original_max_attempts is not None:
+            self.state.settings.max_attempts = self._original_max_attempts
+            logging.info(f"Auto-loop: max_attempts restored to {self._original_max_attempts}")
+            self._original_max_attempts = None
 
-        # 2. State Transition
-        if self.auto_fix_stage == "MAIN_INITIAL":
-            # Initial run had failures. Trigger Retry 1.
-            self.auto_fix_stage = "MAIN_RETRY_1"
-            self.auto_fix_status.emit(f"Auto-Fix: Retry 1 ({len(failed_indices)} items)...")
-            
-            # Mark failed for regeneration
-            for idx in failed_indices: 
-                self.state.sentences[idx]['marked'] = True
-                
-            self.start_generation(failed_indices)
-
-        elif self.auto_fix_stage == "MAIN_RETRY_1":
-            # Retry 1 had failures. Split them.
-            self.auto_fix_stage = "MAIN_SPLIT"
-            self.auto_fix_status.emit(f"Auto-Fix: Splitting {len(failed_indices)} failed items...")
-            
-            if self.playlist_service:
-                count = self.playlist_service.split_all_failed(confirm=False)
-            
-            # After splitting, identify new marked items (the pieces)
-            new_marked = [i for i, s in enumerate(self.state.sentences) if s.get('marked')]
-            self.start_generation(new_marked)
-
-        elif self.auto_fix_stage == "MAIN_SPLIT":
-            # Post-Split run finished. If failures remain, enter infinite loop.
-            self.auto_fix_stage = "MAIN_LOOP"
-            self._loop_iteration = 0
-            self.auto_fix_status.emit(f"Auto-Fix: Entering Loop for {len(failed_indices)} items...")
-            self.start_generation(failed_indices)
-
-        elif self.auto_fix_stage == "MAIN_LOOP":
-            # Infinite loop until success or stop
-            self._loop_iteration += 1
-            self.auto_fix_status.emit(f"Auto-Fix: Loop Iteration {self._loop_iteration} ({len(failed_indices)} items)...")
-            self.start_generation(failed_indices)
-            
-        else:
-            self.finished.emit()
+    def set_attempts_boost(self, original: int) -> None:
+        """Called by ControlsView when auto-loop boosts max_attempts."""
+        self._original_max_attempts = original
 
     def _get_chapter_ranges(self) -> List[Tuple[int, int]]:
         """Returns list of (start_idx, end_idx) for each chapter."""
@@ -447,9 +400,12 @@ class GenerationService(QObject):
         
         self.worker_thread.progress_update.connect(self.progress_update)
         self.worker_thread.batch_complete.connect(self._on_batch_complete)
-        self.worker_thread.finished.connect(self._on_finished)
+        self.worker_thread.generation_done.connect(self._on_finished)  # Custom signal (fired inside run)
         self.worker_thread.stopped.connect(self._on_stopped)
         self.worker_thread.error_occurred.connect(self.error_occurred)
+        # Connect Qt's REAL built-in QThread.finished to deleteLater so the C++ thread object
+        # is only destroyed AFTER run() has fully returned and isRunning() is False.
+        self.worker_thread.finished.connect(self.worker_thread.deleteLater)
         
         self.worker_thread.start()
 
@@ -555,22 +511,18 @@ class GenerationService(QObject):
 
     @Slot()
     def _on_finished(self) -> None:
-        # Clear the thread reference FIRST before any auto-fix logic.
-        # _auto_fix_logic() may call start_generation() which creates a new worker_thread.
-        # If we clear AFTER that call, we destroy the reference to the new live thread → crash.
+        # Clear the thread reference FIRST before any downstream calls.
         self.worker_thread = None
         self.is_running = False
-        
-        if self.state.auto_regen_main:
-             self._auto_fix_logic()
-        else:
-             self.finished.emit()
+        self._restore_max_attempts()
+        self.finished.emit()
 
     @Slot()
     def _on_stopped(self) -> None:
-        self.stopped.emit()
         self.worker_thread = None
         self.is_running = False
+        self._restore_max_attempts()
+        self.stopped.emit()
 
     # --- Preview Logic ---
     preview_ready = Signal(str) # audio_file_path
