@@ -346,6 +346,53 @@ class PlaylistService:
             self._renumber()
         return split_count
 
+    def split_all_failed_half(self) -> int:
+        """Splits all failed chunks exactly in half by sentence count."""
+        split_count = 0
+        i = 0
+        while i < len(self.state.sentences):
+            item = self.state.sentences[i]
+            if item.get('tts_generated') == 'failed':
+                text = item.get('original_sentence', '')
+                
+                # Use the robust sentence splitter that understands abbreviations/initials
+                split_sentences = self.processor.splitter.split(text)
+                
+                # Filter out empty splits
+                valid_sentences = [s.strip() for s in split_sentences if s.strip()]
+                
+                if len(valid_sentences) > 1:
+                    mid = len(valid_sentences) // 2
+                    
+                    # Rejoin the halves so they form two larger chunks instead of N tiny ones
+                    part1 = " ".join(valid_sentences[:mid])
+                    part2 = " ".join(valid_sentences[mid:])
+                    
+                    new_items = []
+                    for s in [part1, part2]:
+                        if not s: continue
+                        new_items.append({
+                            "uuid": uuid.uuid4().hex,
+                            "original_sentence": s,
+                            "paragraph": "no",
+                            "tts_generated": "no",
+                            "marked": True,
+                            "is_chapter_heading": False
+                        })
+                    
+                    if new_items:
+                        # preserve chapter heading for the first piece if original had it
+                        new_items[0]['is_chapter_heading'] = item.get('is_chapter_heading', False)
+                        self.state.sentences[i:i+1] = new_items
+                        split_count += 1
+                        i += len(new_items) # Skip over new items
+                        continue
+            i += 1
+            
+        if split_count > 0:
+            self._renumber()
+        return split_count
+
     def clean_special_chars_selected(self, indices: List[int]) -> int:
         """Removes special chars from selected items."""
         count = 0

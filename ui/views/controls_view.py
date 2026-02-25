@@ -237,14 +237,15 @@ class ControlsView(QWidget):
         # Row 2: Splits
         # [Split Marked] [Split Failed]
         
-        btn_split_marked = QPushButton("Split Marked"); btn_split_marked.clicked.connect(self._split_marked)
-        btn_split_marked.setToolTip("Splits all marked chunks using the sentence splitter.")
+        btn_split_all_sent = QPushButton("Split Failed (Sent)"); btn_split_all_sent.clicked.connect(self._split_all_failed)
+        btn_split_all_sent.setToolTip("Splits all failed chunks by sentence.")
         
-        btn_split_all = QPushButton("Split Failed"); btn_split_all.clicked.connect(self._split_all_failed)
-        btn_split_all.setToolTip("Splits all failed chunks using the sentence splitter.")
+        btn_split_all_half = QPushButton("Split Failed (Half)"); btn_split_all_half.clicked.connect(self._split_all_failed_half)
+        btn_split_all_half.setToolTip("Splits all failed chunks exactly in half.")
         
         layout.addWidget(btn_split_marked, 2, 0, 1, 2)
-        layout.addWidget(btn_split_all, 2, 2, 1, 2)
+        layout.addWidget(btn_split_all_sent, 2, 2, 1, 1)
+        layout.addWidget(btn_split_all_half, 2, 3, 1, 1)
         
         # Row 2.5: Re-chunk Session (NEW)
         btn_rechunk = QPushButton("🔄 Re-chunk Session")
@@ -642,7 +643,14 @@ class ControlsView(QWidget):
         if count: 
             self._refresh()
             self.structure_changed.emit()
-            QMessageBox.information(self, "Split", f"Split {count} chunks.")
+            QMessageBox.information(self, "Split", f"Split {count} chunks by sentence.")
+
+    def _split_all_failed_half(self):
+        count = self.playlist_service.split_all_failed_half()
+        if count: 
+            self._refresh()
+            self.structure_changed.emit()
+            QMessageBox.information(self, "Split", f"Split {count} chunks in half.")
         
     def _clean_chars(self):
         indices = self._get_selected_indices()

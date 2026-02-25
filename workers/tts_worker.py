@@ -468,13 +468,26 @@ def worker_process_chunk(task: WorkerTask):
             # Early debug: Log what Whisper returned
             logging.warning(f"[DEBUG] Whisper returned for chunk #{sentence_number}, attempt {attempt_num+1}: '{transcribed}'")
             
+            # Calculate Standard Text Similarity Check First (so we can log/save it even if we reject)
+            ratio = get_similarity_ratio(text_chunk, transcribed)
+            current_candidate_data['similarity_ratio'] = ratio
+
+            # Log transcription for debugging (using WARNING level to ensure visibility)
+            logging.warning(f"ASR Debug - Chunk #{sentence_number}, Attempt {attempt_num+1}:")
+            logging.warning(f"  Expected: '{text_chunk[:80]}'")
+            logging.warning(f"  Got:      '{transcribed[:80]}'")
+            
             # 1. Check for Non-Speech Artifacts using Info & Segments
             # Because VAD is enabled, silence is mostly stripped before transcription.
             max_no_speech_prob = max((s.no_speech_prob for s in segment_list), default=0.0)
             if max_no_speech_prob > 0.4:
                 logging.warning(f"ASR REJECTED: High No-Speech Probability ({max_no_speech_prob:.2f}) for chunk #{sentence_number}, attempt {attempt_num+1}")
-                # Treat as failure, do not even check text match
-                if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                if best_failed_candidate is None or ratio > best_failed_candidate.get('similarity_ratio', 0.0):
+                    if best_failed_candidate and Path(best_failed_candidate['path']).exists():
+                        os.remove(best_failed_candidate['path'])
+                    best_failed_candidate = current_candidate_data.copy()
+                else:
+                    if Path(temp_path_str).exists(): os.remove(temp_path_str)
                 continue
 
             # 2. Check for Hallucination Loops (Screeching)
@@ -482,7 +495,12 @@ def worker_process_chunk(task: WorkerTask):
             max_compression_ratio = max((s.compression_ratio for s in segment_list), default=0.0)
             if max_compression_ratio > 2.0:
                 logging.warning(f"ASR REJECTED: High Compression Ratio ({max_compression_ratio:.2f}) for chunk #{sentence_number}, attempt {attempt_num+1}")
-                if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                if best_failed_candidate is None or ratio > best_failed_candidate.get('similarity_ratio', 0.0):
+                    if best_failed_candidate and Path(best_failed_candidate['path']).exists():
+                        os.remove(best_failed_candidate['path'])
+                    best_failed_candidate = current_candidate_data.copy()
+                else:
+                    if Path(temp_path_str).exists(): os.remove(temp_path_str)
                 continue
             
             # 3. Strict Length Validation (Hallucination Check)
@@ -501,12 +519,6 @@ def worker_process_chunk(task: WorkerTask):
             len_t = len(n_trans_clean)
             len_s = len(n_source_clean)
             
-            # Allow 10% slack + 5 chars (for minor variations/spelling)
-            # Example: "Power" (5) -> "Power why" (8). 8 > 5*1.1+5 = 10.5? No. 
-            # "The secrets of power trilogy book one" (31 chars)
-            # "The secrets of power trilogy book one why" (34 chars)
-            # 34 > 31*1.1 (34.1) + 5 = 39. False. This rule is too loose for short words.
-            
             # Tighter Rule for High Similarity:
             # If we are basically matching, we shouldn't have trailing garbage.
             # Let's use Word Count.
@@ -521,21 +533,23 @@ def worker_process_chunk(task: WorkerTask):
             if wc_s < 10:
                 if diff >= 1:
                      logging.warning(f"ASR REJECTED: Extra Word in Short Sentence ({wc_t} vs {wc_s}). Hallucination?")
-                     if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                     if best_failed_candidate is None or ratio > best_failed_candidate.get('similarity_ratio', 0.0):
+                         if best_failed_candidate and Path(best_failed_candidate['path']).exists():
+                             os.remove(best_failed_candidate['path'])
+                         best_failed_candidate = current_candidate_data.copy()
+                     else:
+                         if Path(temp_path_str).exists(): os.remove(temp_path_str)
                      continue
             else:
                 if diff >= 2:
                      logging.warning(f"ASR REJECTED: Word Count Mismatch ({wc_t} vs {wc_s}) - Suspected Hallucination/Repetition.")
-                     if Path(temp_path_str).exists(): os.remove(temp_path_str)
+                     if best_failed_candidate is None or ratio > best_failed_candidate.get('similarity_ratio', 0.0):
+                         if best_failed_candidate and Path(best_failed_candidate['path']).exists():
+                             os.remove(best_failed_candidate['path'])
+                         best_failed_candidate = current_candidate_data.copy()
+                     else:
+                         if Path(temp_path_str).exists(): os.remove(temp_path_str)
                      continue
-
-            # 4. Standard Text Similarity Check
-            ratio = get_similarity_ratio(text_chunk, transcribed)
-            
-            # Log transcription for debugging (using WARNING level to ensure visibility)
-            logging.warning(f"ASR Debug - Chunk #{sentence_number}, Attempt {attempt_num+1}:")
-            logging.warning(f"  Expected: '{text_chunk[:80]}'")
-            logging.warning(f"  Got:      '{transcribed[:80]}'")
             
             
         except Exception as e:
@@ -543,8 +557,6 @@ def worker_process_chunk(task: WorkerTask):
             # If whisper fails entirely, we probably shouldn't trust this file either
             if Path(temp_path_str).exists(): os.remove(temp_path_str)
             continue
-
-        current_candidate_data['similarity_ratio'] = ratio
         
         if ratio >= asr_threshold:
             logging.info(f"ASR PASSED for chunk #{sentence_number}, attempt {attempt_num+1} (Sim: {ratio:.2f})")
