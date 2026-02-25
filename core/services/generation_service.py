@@ -555,13 +555,16 @@ class GenerationService(QObject):
 
     @Slot()
     def _on_finished(self) -> None:
-        # Check auto-fix logic
+        # Clear the thread reference FIRST before any auto-fix logic.
+        # _auto_fix_logic() may call start_generation() which creates a new worker_thread.
+        # If we clear AFTER that call, we destroy the reference to the new live thread → crash.
+        self.worker_thread = None
+        self.is_running = False
+        
         if self.state.auto_regen_main:
              self._auto_fix_logic()
         else:
              self.finished.emit()
-        self.worker_thread = None
-        self.is_running = False
 
     @Slot()
     def _on_stopped(self) -> None:

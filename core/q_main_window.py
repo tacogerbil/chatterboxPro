@@ -283,20 +283,46 @@ class ChatterboxProQt(QMainWindow):
             self.setup_view.stop_btn.setEnabled(False)
 
     def closeEvent(self, event) -> None:
-        """Handle application closure: Save State."""
+        """Handle application closure: save state and cleanly shut down any running generation."""
+
+        # --- Guard: Warn if generation is actively running ---
+        if hasattr(self, 'gen_service') and self.gen_service.is_running:
+            reply = QMessageBox.question(
+                self,
+                "Generation In Progress",
+                "A generation job is currently running.\n\n"
+                "Closing now will stop generation and save the progress journal.\n"
+                "Any in-flight chunks will be lost.\n\n"
+                "Close anyway?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                event.ignore()
+                return
+
         print("Saving session state...", flush=True)
-        
+
         # Save Geometry
         self.app_state.window_geometry_hex = self.saveGeometry().toHex().data().decode()
-        
-        # STOP GENERATION if running
+
+        # --- Stop generation and wait for the thread to exit cleanly ---
         if hasattr(self, 'gen_service'):
-            print("Stopping generation service...", flush=True)
-            self.gen_service.request_stop()
+            gen_thread = self.gen_service.worker_thread
+            if gen_thread and gen_thread.isRunning():
+                print("Stopping generation thread and waiting for clean exit...", flush=True)
+                self.gen_service.request_stop()
+                # Wait up to 10 seconds for the thread to finish its current task.
+                # This prevents the "QThread: Destroyed while thread is still running" crash.
+                if not gen_thread.wait(10_000):
+                    # Last resort: forcefully terminate if it refused to stop in time.
+                    print("Thread did not stop in time — forcing termination.", flush=True)
+                    gen_thread.terminate()
+                    gen_thread.wait(2_000)
 
         # 1. Save App Config
         self.config_service.save_state(self.app_state)
-        
+
         # 2. Save Session Data (Sentences, Splits, Pauses)
         if self.app_state.session_name:
              if self.app_state.is_session_loaded:
@@ -304,8 +330,9 @@ class ChatterboxProQt(QMainWindow):
                  self.project_service.save_current_session(self.app_state)
              else:
                  print(f"Skipping auto-save for session '{self.app_state.session_name}': Data not loaded (Safety Guard).")
-             
+
         event.accept()
+
 
 def launch_qt_app() -> None:
     # Create the Application
