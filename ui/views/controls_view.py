@@ -240,7 +240,7 @@ class ControlsView(QWidget):
         btn_split_all_sent = QPushButton("Split Failed (Sentence)"); btn_split_all_sent.clicked.connect(self._split_all_failed)
         btn_split_all_sent.setToolTip("Splits all failed chunks out into individual sentences.")
         
-        btn_split_all_half = QPushButton("Split Failed (Half)"); btn_split_all_half.clicked.connect(self._split_all_failed_half)
+        btn_split_all_half = QPushButton("Split Failed (Half Chunk)"); btn_split_all_half.clicked.connect(self._split_all_failed_half)
         btn_split_all_half.setToolTip("Splits all failed chunks exactly in half.")
         
         layout.addWidget(btn_split_marked, 2, 0, 1, 2)
