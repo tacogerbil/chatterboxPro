@@ -194,7 +194,6 @@ class GenerationService(QObject):
 
     def request_stop(self) -> None:
         """Sets the stop flag to terminate generation."""
-        self.auto_fix_stage = "NONE" # Hard stop breaks loop
         if self.worker_thread and self.worker_thread.isRunning():
             logging.info("Generation stop requested...")
             self.worker_thread.request_stop()
@@ -309,9 +308,6 @@ class GenerationService(QObject):
         if self.worker_thread and self.worker_thread.isRunning():
             logging.warning("Generation already running.")
             return
-        
-        if self.auto_fix_stage == "NONE":
-            self.auto_fix_stage = "MAIN_INITIAL"
         
         self.is_running = True
         self.started.emit()

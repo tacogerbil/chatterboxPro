@@ -233,7 +233,7 @@ class ProjectService:
         self.save_current_session(app_state)
 
         for sentence in app_state.sentences:
-            if sentence.get("is_pause") or sentence.get("is_chapter_heading"):
+            if sentence.get("is_pause"):  # Pauses have no audio — skip. Chapter headings DO have audio.
                 continue
 
             uid = sentence.get("uuid", "")
