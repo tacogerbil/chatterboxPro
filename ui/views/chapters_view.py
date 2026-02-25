@@ -134,16 +134,16 @@ class ChapterDelegate(QStyledItemDelegate):
         style.drawItemText(painter, text_rect, Qt.AlignLeft | Qt.AlignVCenter, option.palette, 
                            True, text, QPalette.Text)
 
-        # 6. Draw "SELECT" Button
+        # 6. Draw "JUMP" Button
         # Background
-        btn_color = QColor("#D35400")
+        btn_color = QColor("#1A6FA8")  # Blue to distinguish from Generate (orange)
         painter.setBrush(QBrush(btn_color))
         painter.setPen(Qt.NoPen)
         painter.drawRoundedRect(button_rect, 4, 4)
         
         # Text
         painter.setPen(Qt.white)
-        painter.drawText(button_rect, Qt.AlignCenter, "SELECT")
+        painter.drawText(button_rect, Qt.AlignCenter, "JUMP →")
         
         painter.restore()
 
@@ -152,7 +152,7 @@ class ChapterDelegate(QStyledItemDelegate):
         if event.type() == QEvent.MouseButtonRelease:
             pos = event.pos()
             
-            # Check for SELECT Button
+            # Check for JUMP Button
             button_width = 80
             rect = option.rect
             button_rect = QRect(rect.right() - button_width - 5, rect.top() + 2, button_width, rect.height() - 4)
@@ -165,11 +165,18 @@ class ChapterDelegate(QStyledItemDelegate):
             # Check for Checkbox
             check_rect = self._get_check_rect(option, option.widget)
             if check_rect.contains(pos):
-                # Toggle Check State
+                # Toggle Check State via checkbox
                 current_state = model.data(index, Qt.CheckStateRole)
                 new_state = Qt.Checked if current_state == Qt.Unchecked else Qt.Unchecked
                 model.setData(index, new_state, Qt.CheckStateRole)
                 return True
+            
+            # Clicking anywhere else on the row body also toggles the checkbox
+            # so users can just click the chapter name to select it
+            current_state = model.data(index, Qt.CheckStateRole)
+            new_state = Qt.Checked if current_state == Qt.Unchecked else Qt.Unchecked
+            model.setData(index, new_state, Qt.CheckStateRole)
+            return True
                 
         return super().editorEvent(event, model, option, index)
 
