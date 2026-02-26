@@ -212,7 +212,10 @@ class GenerationService(QObject):
         self._original_max_attempts = original
 
     def _get_chapter_ranges(self) -> List[Tuple[int, int]]:
-        """Returns list of (start_idx, end_idx) for each chapter."""
+        """Returns list of (start_idx, end_idx) covering ALL chunks without gaps.
+        Even if the first chapter heading isn't at index 0, this ensures
+        all chunks before it are still included in generation.
+        """
         chapter_starts = [
             i for i, s in enumerate(self.state.sentences) 
             if s.get('is_chapter_heading')
@@ -220,11 +223,16 @@ class GenerationService(QObject):
         
         if not chapter_starts:
             return [(0, len(self.state.sentences))]
-        
+            
         ranges = []
+        # If the first chapter isn't at the beginning, we must include the preamble!
+        if chapter_starts[0] > 0:
+            ranges.append((0, chapter_starts[0]))
+            
         for i, start in enumerate(chapter_starts):
             end = chapter_starts[i+1] if i+1 < len(chapter_starts) else len(self.state.sentences)
             ranges.append((start, end))
+            
         return ranges
 
     def _configure_workers(self, target_gpus: str, combine_gpus: bool = False) -> Tuple[List[str], int]:
