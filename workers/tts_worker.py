@@ -580,6 +580,16 @@ def worker_process_chunk(task: WorkerTask):
             
             # All validations passed
             passed_candidates.append(current_candidate_data)
+            
+            # --- Early Exit Logic (User Request) ---
+            # If we've passed ASR and we've done at least MIN_ATTEMPTS, we can stop early
+            # instead of burning time on all Max Attempts.
+            MIN_ATTEMPTS = 3
+            if attempt_num + 1 >= MIN_ATTEMPTS:
+                logging.info(f"Chunk #{sentence_number} succeeded and met minimum ({MIN_ATTEMPTS}) attempts early exit criteria. Stopping generation loop.")
+                break
+            else:
+                logging.info(f"Chunk #{sentence_number} succeeded, but continuing to meet minimum {MIN_ATTEMPTS} attempts for best candidate selection.")
         else:
             logging.warning(f"ASR FAILED for chunk #{sentence_number}, attempt {attempt_num+1} (Sim: {ratio:.2f})")
             # FIX: Simplified logic to robustly track the best failure
