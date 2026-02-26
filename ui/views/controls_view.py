@@ -185,6 +185,10 @@ class ControlsView(QWidget):
         btn_split.setProperty("class", "action")
         btn_split.setToolTip("Split the current text chunk into smaller sentences.")
         
+        btn_merge_sel = QPushButton("🔗 Merge\nSelected"); btn_merge_sel.clicked.connect(self._merge_selected)
+        btn_merge_sel.setProperty("class", "action")
+        btn_merge_sel.setToolTip("Merge multiple selected contiguous chunks into one.")
+        
         btn_pass = QPushButton("✓ Passed"); btn_pass.clicked.connect(self._mark_passed)
         btn_pass.setProperty("class", "success")
         btn_pass.setToolTip("Manually mark item as Passed (Green).")
@@ -197,12 +201,13 @@ class ControlsView(QWidget):
         btn_del.setProperty("class", "danger")
         btn_del.setToolTip("Delete selected items.")
         
-        # Span Delete across last 2 cols to balance
+        # 6 columns to balance
         layout.addWidget(btn_mark, 1, 0)
         layout.addWidget(btn_split, 1, 1)
-        layout.addWidget(btn_pass, 1, 2)
-        layout.addWidget(btn_reset, 1, 3)
-        layout.addWidget(btn_del, 1, 4, 1, 2)
+        layout.addWidget(btn_merge_sel, 1, 2)
+        layout.addWidget(btn_pass, 1, 3)
+        layout.addWidget(btn_reset, 1, 4)
+        layout.addWidget(btn_del, 1, 5)
         
         group.add_layout(layout)
 
@@ -466,6 +471,20 @@ class ControlsView(QWidget):
              self.structure_changed.emit()
         else:
             QMessageBox.warning(self, "Split Failed", "Could not split chunk (maybe too short?)")
+            
+    def _merge_selected(self):
+        indices = self._get_selected_indices()
+        if not indices or len(indices) < 2:
+            QMessageBox.information(self, "Merge", "Please select at least two contiguous chunks to merge.")
+            return
+            
+        count = self.playlist_service.merge_selected(indices)
+        if count:
+            self._refresh()
+            self.structure_changed.emit()
+            QMessageBox.information(self, "Merged", f"Merged {len(indices)} chunks into one.")
+        else:
+            QMessageBox.warning(self, "Merge Failed", "Could not merge chunks. Make sure they are contiguous and contain text (not just pauses).")
 
     def _insert_text(self):
         idx = self._get_selected_index()

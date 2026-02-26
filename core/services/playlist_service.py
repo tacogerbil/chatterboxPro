@@ -352,6 +352,52 @@ class PlaylistService:
             self._renumber()
         return merged_count
 
+    def merge_selected(self, indices: List[int]) -> int:
+        """Merges multiple selected contiguous chunks into a single chunk.
+        
+        The resulting chunk receives a new UUID and replaces the selected items.
+        Pauses within the selection are ignored for text concatenation.
+        """
+        if not indices or len(indices) < 2:
+            return 0
+            
+        indices = sorted(indices)
+        
+        # Verify contiguity
+        for i in range(1, len(indices)):
+            if indices[i] != indices[i-1] + 1:
+                logging.warning("Merge Selected: Indices are not contiguous.")
+                return 0
+                
+        first_idx = indices[0]
+        first_item = self.state.sentences[first_idx]
+        
+        # Combine text of all selected items that are not pauses
+        text_parts = []
+        for idx in indices:
+            item = self.state.sentences[idx]
+            if not item.get('is_pause'):
+                text_parts.append(item.get('original_sentence', '').strip())
+                
+        if not text_parts:
+            # They only selected pauses
+            return 0
+            
+        merged_text = " ".join(t for t in text_parts if t)
+        
+        # Create a completely fresh item to clear audio artifacts and UUIDs securely
+        is_chapter = first_item.get('is_chapter_heading', False)
+        new_item = self._create_base_item(merged_text, marked=False, is_chapter_heading=is_chapter)
+        
+        # Remove old ones from back to front to avoid index shifting
+        for idx in reversed(indices):
+            self.state.sentences.pop(idx)
+            
+        self.state.sentences.insert(first_idx, new_item)
+        
+        self._renumber()
+        return len(indices)
+
     def split_all_failed(self) -> int:
         """Splits all failed chunks using the sentence splitter."""
         split_count = 0

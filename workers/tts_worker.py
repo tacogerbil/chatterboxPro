@@ -254,7 +254,7 @@ def worker_process_chunk(task: WorkerTask):
         if tts_engine is None or whisper_model is None:
             raise RuntimeError(f"Engine initialization failed for device {device_str}")
     except Exception as e_model_load:
-        return {"original_index": original_index, "status": "error", "error_message": f"Engine Load Fail: {e_model_load}"}
+        return {"uuid": uuid, "original_index": original_index, "status": "error", "error_message": f"Engine Load Fail: {e_model_load}"}
 
     run_temp_dir = Path(output_dir_str) / session_name / f"run_{run_idx+1}_temp"
     run_temp_dir.mkdir(exist_ok=True, parents=True)
@@ -266,7 +266,7 @@ def worker_process_chunk(task: WorkerTask):
             tts_engine.prepare_reference(ref_audio_path, exaggeration=min(exaggeration, 1.0))
     except Exception as e:
         logging.error(f"[Worker-{pid}] Failed to prepare reference for chunk {sentence_number}: {e}", exc_info=True)
-        return {"original_index": original_index, "status": "error", "error_message": f"Reference Prep Fail: {e}"}
+        return {"uuid": uuid, "original_index": original_index, "status": "error", "error_message": f"Reference Prep Fail: {e}"}
 
     ref_features = {}
     ref_mfcc_profile = None
