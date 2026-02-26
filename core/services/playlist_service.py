@@ -176,18 +176,18 @@ class PlaylistService:
     def convert_to_chapter(self, index: int) -> bool:
         """Converts an existing item into a Chapter Heading.
 
-        IMPORTANT: The item's `marked` flag is intentionally set to False.
-        Chapter headings must NOT be included in batch-mark workflows
-        (regen marked, reflow, split-all-marked) that scan the entire list.
-        Setting marked=True here was the root cause of chapters vanishing in
-        unrelated parts of the book during join/reflow operations.
+        NOTE: Chapters CAN be marked now so the user can regenerate their audio.
+        Batch operations like `split_all_marked` and `merge_failed_down` have
+        explicit guards to ignore `is_chapter_heading` items, preventing them
+        from vanishing.
         """
         item = self.get_selected_item(index)
         if not item: return False
 
         if not item.get('is_chapter_heading'):
             item['is_chapter_heading'] = True
-            item['marked'] = False  # Never include chapters in batch-mark operations
+            # We intentionally leave the 'marked' flag as it was. 
+            # If the user wants to mark it to read it, they can.
             return True
         return False
 
