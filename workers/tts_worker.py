@@ -603,7 +603,7 @@ def worker_process_chunk(task: WorkerTask):
     
     chosen_candidate = None
     status = "error"
-    return_payload = {"original_index": original_index}
+    return_payload = {"uuid": uuid, "original_index": original_index}
 
     if passed_candidates:
         chosen_candidate = sorted(passed_candidates, key=lambda x: x["duration"])[0]

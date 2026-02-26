@@ -15,6 +15,43 @@ class PlaylistService:
         self.state = app_state
         self.processor = TextPreprocessor()
         
+    def _create_base_item(self, text: str, marked: bool = False, is_chapter_heading: bool = False) -> Dict[str, Any]:
+        """Creates a standardized sentence item, auto-detecting PAUSE markers and applying correct flags."""
+        import re
+        import uuid
+        
+        is_pause = False
+        duration = 0
+        tts_gen = 'no'
+        
+        clean_text = text.strip()
+        
+        # Auto-detect [PAUSE...]
+        if clean_text.startswith('[PAUSE'):
+            is_pause = True
+            tts_gen = 'n/a'
+            marked = False # Pauses shouldn't be "marked" for regeneration
+            is_chapter_heading = False
+            
+            # Try to grab duration 
+            m = re.search(r'(\d+)\s*ms', clean_text)
+            duration = int(m.group(1)) if m else 500
+            
+        item = {
+            "uuid": uuid.uuid4().hex,
+            "original_sentence": clean_text,
+            "paragraph": "no",
+            "tts_generated": tts_gen,
+            "marked": marked,
+            "is_chapter_heading": is_chapter_heading,
+            "is_pause": is_pause
+        }
+        
+        if is_pause:
+            item["duration"] = duration
+            
+        return item
+
     def get_selected_item(self, index: int) -> Optional[Dict[str, Any]]:
         if 0 <= index < len(self.state.sentences):
             return self.state.sentences[index]
@@ -30,6 +67,7 @@ class PlaylistService:
             item['marked'] = True
         else:
             item['marked'] = False
+            item['tts_generated'] = 'n/a'
         
         # Clear artifacts to prevent stale UI stats
         keys_to_clear = ['audio_path', 'similarity_ratio', 'generation_seed', 'asr_match', 'ffmpeg_cmd']
@@ -45,9 +83,21 @@ class PlaylistService:
         
         original = item.get('original_sentence', '')
         if new_text.strip() and new_text != original:
-            item['original_sentence'] = new_text
-            item['tts_generated'] = 'no' # Invalidate audio
-            item['marked'] = True
+            clean_text = new_text.strip()
+            item['original_sentence'] = clean_text
+            
+            if clean_text.startswith('[PAUSE'):
+                import re
+                item['is_pause'] = True
+                item['tts_generated'] = 'n/a'
+                item['marked'] = False
+                if not item.get('duration'):
+                    m = re.search(r'(\d+)\s*ms', clean_text)
+                    item['duration'] = int(m.group(1)) if m else 500
+            else:
+                item['is_pause'] = False
+                item['tts_generated'] = 'no' # Invalidate audio
+                item['marked'] = True
             return True
         return False
 
@@ -85,14 +135,7 @@ class PlaylistService:
             # heading is NOT silently deleted when a heading is split to clean it up.
             is_ch = was_chapter if idx_s == 0 else bool(self.processor.chapter_regex.match(s_clean))
 
-            new_item = {
-                "uuid": uuid.uuid4().hex,
-                "original_sentence": s_clean,
-                "paragraph": "no",
-                "tts_generated": "no",
-                "marked": False,
-                "is_chapter_heading": is_ch,
-            }
+            new_item = self._create_base_item(s_clean, marked=False, is_chapter_heading=is_ch)
             new_items.append(new_item)
 
         # Replace old item with new items
@@ -101,17 +144,13 @@ class PlaylistService:
         return True
 
     def insert_item(self, index: int, text: str, is_pause: bool = False, duration: int = 0, is_chapter: bool = False):
-        new_item = {
-            "uuid": uuid.uuid4().hex,
-            "original_sentence": text,
-            "paragraph": "no",
-            "tts_generated": "n/a" if is_pause else "no",
-            "marked": False,
-            "is_chapter_heading": is_chapter,
-            "is_pause": is_pause
-        }
-        if is_pause:
-             new_item["duration"] = duration
+        new_item = self._create_base_item(text, marked=False, is_chapter_heading=is_chapter)
+        
+        # Override values if explicitly passed
+        if is_pause and not new_item.get('is_pause'):
+             new_item['is_pause'] = True
+             new_item['tts_generated'] = 'n/a'
+             new_item['duration'] = duration
              
         # Insert AT index (shifting current item down)
         # If list empty, append.
@@ -327,14 +366,8 @@ class PlaylistService:
                      new_items = []
                      for s in split_sentences:
                         if not s.strip(): continue
-                        new_items.append({
-                            "uuid": uuid.uuid4().hex,
-                            "original_sentence": s.strip(),
-                            "paragraph": "no",
-                            "tts_generated": "no",
-                            "marked": True,
-                            "is_chapter_heading": bool(self.processor.chapter_regex.match(s.strip()))
-                        })
+                        is_ch = bool(self.processor.chapter_regex.match(s.strip()))
+                        new_items.append(self._create_base_item(s.strip(), marked=True, is_chapter_heading=is_ch))
                      
                      self.state.sentences[i:i+1] = new_items
                      split_count += 1
@@ -371,14 +404,7 @@ class PlaylistService:
                     new_items = []
                     for s in [part1, part2]:
                         if not s: continue
-                        new_items.append({
-                            "uuid": uuid.uuid4().hex,
-                            "original_sentence": s,
-                            "paragraph": "no",
-                            "tts_generated": "no",
-                            "marked": True,
-                            "is_chapter_heading": False
-                        })
+                        new_items.append(self._create_base_item(s, marked=True, is_chapter_heading=False))
                     
                     if new_items:
                         # preserve chapter heading for the first piece if original had it
@@ -556,14 +582,8 @@ class PlaylistService:
                      new_items = []
                      for s in split_sentences:
                         if not s.strip(): continue
-                        new_items.append({
-                            "uuid": uuid.uuid4().hex,
-                            "original_sentence": s.strip(),
-                            "paragraph": "no",
-                            "tts_generated": "no",
-                            "marked": True,
-                            "is_chapter_heading": bool(self.processor.chapter_regex.match(s.strip()))
-                        })
+                        is_ch = bool(self.processor.chapter_regex.match(s.strip()))
+                        new_items.append(self._create_base_item(s.strip(), marked=True, is_chapter_heading=is_ch))
                      
                      self.state.sentences[i:i+1] = new_items
                      split_count += 1

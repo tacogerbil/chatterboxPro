@@ -438,23 +438,34 @@ class GenerationService(QObject):
         
         updated_indices = []
         
+        # Build quick lookup by UUID to handle shifted indices
+        uuid_to_index = {item.get('uuid'): idx for idx, item in enumerate(self.state.sentences) if item.get('uuid')}
+        
         for result in results:
-            original_idx = result.get('original_index')
-            if original_idx is None: continue
+            result_uuid = result.get('uuid')
             
-            updated_indices.append(original_idx)
+            # Strict UUID matching: no fallback to original_index
+            if not result_uuid or result_uuid not in uuid_to_index:
+                logging.warning(f"Result returned for unknown/stale UUID '{result_uuid}'. Chunk was likely deleted or split. Ignoring.")
+                # We do NOT delete the audio file here because it might be needed for crash recovery or manual inspection.
+                # It will simply remain orphaned in the session folder.
+                continue
+                
+            actual_idx = uuid_to_index[result_uuid]
+                
+            updated_indices.append(actual_idx)
             
             # Update State
-            self.state.sentences[original_idx]['generation_seed'] = result.get('seed')
-            self.state.sentences[original_idx]['similarity_ratio'] = result.get('similarity_ratio')
+            self.state.sentences[actual_idx]['generation_seed'] = result.get('seed')
+            self.state.sentences[actual_idx]['similarity_ratio'] = result.get('similarity_ratio')
             
             if result.get('path'):
-                self.state.sentences[original_idx]['audio_path'] = result.get('path')
+                self.state.sentences[actual_idx]['audio_path'] = result.get('path')
             
             status = result.get('status')
             asr = result.get('similarity_ratio', 0.0)
             
-            old_status = self.state.chunk_status.get(original_idx)
+            old_status = self.state.chunk_status.get(actual_idx)
             new_status = 'passed' if status == 'success' else 'failed'
             
             # Update counters based on status transition
@@ -470,21 +481,21 @@ class GenerationService(QObject):
                 else:
                     self.state.chunks_failed += 1
             
-            self.state.chunk_status[original_idx] = new_status
+            self.state.chunk_status[actual_idx] = new_status
             self.state.chunks_completed += 1
             
             if status == 'success':
-                self.state.sentences[original_idx]['tts_generated'] = STATUS_YES
-                self.state.sentences[original_idx]['marked'] = False
-                logging.info(f"✅ Chunk [{original_idx+1}] PASSED: ASR Match={asr*100:.1f}%")
+                self.state.sentences[actual_idx]['tts_generated'] = STATUS_YES
+                self.state.sentences[actual_idx]['marked'] = False
+                logging.info(f"✅ Chunk [{actual_idx+1}] PASSED: ASR Match={asr*100:.1f}%")
             else:
-                self.state.sentences[original_idx]['tts_generated'] = STATUS_FAILED
-                self.state.sentences[original_idx]['marked'] = True
+                self.state.sentences[actual_idx]['tts_generated'] = STATUS_FAILED
+                self.state.sentences[actual_idx]['marked'] = True
                 error_msg = result.get('error_message', 'Unknown Error')
-                logging.warning(f"❌ Chunk [{original_idx+1}] FAILED: {error_msg} (ASR={asr*100:.1f}%)")
+                logging.warning(f"❌ Chunk [{actual_idx+1}] FAILED: {error_msg} (ASR={asr*100:.1f}%)")
 
             # Persist this result to the crash-safe progress journal immediately
-            self._append_to_journal(result, self.state.sentences[original_idx])
+            self._append_to_journal(result, self.state.sentences[actual_idx])
         # Emit Aggregated Signals (Once per batch)
         
         # 1. Stats
