@@ -477,7 +477,16 @@ class SetupView(QWidget):
                 self.file_path_edit.setText(src_path)
                 
                 if 'generation_settings' in data:
-                     self.state.update_settings(**data['generation_settings'])
+                     # Remove certain global user preferences so they aren't overwritten by historical project saves
+                     loaded_settings = data['generation_settings'].copy()
+                     
+                     # Keys to preserve from current global AppState
+                     preserve_keys = ['max_attempts', 'target_gpus']
+                     for key in preserve_keys:
+                         if key in loaded_settings:
+                             del loaded_settings[key]
+                             
+                     self.state.update_settings(**loaded_settings)
                 
                 # Restore ref_audio_path
                 if 'ref_audio_path' in data:

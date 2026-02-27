@@ -89,6 +89,34 @@ def punc_norm(text: str) -> str:
     # (1-3 letter caps — FBI, DNA, OK, HA — are left untouched.)
     text = re.sub(r'\b([A-Z]{4,})\b', lambda m: m.group(1).title(), text)
 
+    # However, some common 1-3 letter words are also often capitalized 
+    # for emphasis (e.g., "TWO", "THE", "AND", "NOT", "ALL").
+    # Force Title-case them so they aren't spelled out as acronyms (e.g., T-W-O).
+    common_short_words = {
+        "A", "I", "OH", "AH", "NO", "SO", "DO", "GO", "TO", "WE", "HE", "BE", "ME", "MY", "BY",
+        "OR", "AS", "AT", "IN", "IS", "ON", "UP", "AN", "IF", "OF", "IT",
+        "THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL", "ANY", "CAN", "HAD", "HER",
+        "WAS", "ONE", "OUR", "OUT", "DAY", "GET", "HAS", "HIM", "HIS", "HOW", "MAN",
+        "NEW", "NOW", "OLD", "SEE", "TWO", "WAY", "WHO", "BOY", "DID", "ITS", "LET", "PUT", "SAY",
+        "SHE", "TOO", "USE", "DAD", "MOM", "YES", "OFF", "SIX", "TEN", "NON", "PRO", "CON", "MAD",
+        "BAD", "SAD", "BIG", "RED", "BOX", "CAR", "CAT", "DOG", "BAT", "ART", "EYE", "GOD", "WAR",
+        "EAT", "RUN", "SIT", "FLY", "HOP", "ASK", "CRY", "DIE", "TRY", "BUY", "PAY", "OWN", "SET",
+        "ACT", "ADD", "AGE", "AGO", "AIR", "ARM", "BAR", "BED", "BIT", "BUG", "BUS", "CUP", "CUT",
+        "DRY", "EGG", "END", "FAT", "FIT", "FUN", "GAS", "GUN", "GUY", "HAT", "HIT", "HOT", "ICE",
+        "ILL", "JOB", "JOY", "KEY", "KID", "LAW", "LEG", "LIP", "LOW", "MAP", "MAY", "NET", "OIL",
+        "PAD", "PAN", "PEN", "POP", "RIB", "RUB", "SEA", "SUN", "TAX", "TIE", "TIP", "TOP", "VAN",
+        "WIN", "YET", "ZOO", "ZIP", "ZIL", "ZAP", "ZIG", "ZAG", "WOW", "HEY", "YAY", "WHOA",
+        "BAM", "BOO", "YEP", "NAH", "UGH", "YEAH", "RAW", "WAR", "RAW", "LAW", "AWE"
+    }
+
+    def _short_word_replacer(m):
+        word = m.group(1)
+        if word in common_short_words:
+            return word.title()
+        return word
+
+    text = re.sub(r'\b([A-Z]{1,3})\b', _short_word_replacer, text)
+
     # Add full stop if no ending punc
     text = text.rstrip()
     sentence_enders = {".", "!", "?", "-", ","}

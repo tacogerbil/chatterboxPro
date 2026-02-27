@@ -291,6 +291,8 @@ def worker_process_chunk(task: WorkerTask):
     best_failed_candidate = None
     best_fidelity_reject = None  # Last resort: best candidate that failed pitch/timbre gates
     
+    logging.info(f"[Worker-{pid}] Starting chunk #{sentence_number} | Config: Max Attempts={max_attempts}, Target Candidates={num_candidates}")
+    
     for attempt_num in range(max_attempts):
         if len(passed_candidates) >= num_candidates:
             logging.info(f"Met required number of candidates ({num_candidates}). Stopping early.")
