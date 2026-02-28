@@ -500,7 +500,8 @@ class GenerationService(QObject):
                 self.state.sentences[actual_idx]['tts_generated'] = STATUS_FAILED
                 self.state.sentences[actual_idx]['marked'] = True
                 error_msg = result.get('error_message', 'Unknown Error')
-                logging.warning(f"❌ Chunk [{actual_idx+1}] FAILED: {error_msg} (ASR={asr*100:.1f}%)")
+                asr_display = asr * 100 if asr is not None else 0.0
+                logging.warning(f"❌ Chunk [{actual_idx+1}] FAILED: {error_msg} (ASR={asr_display:.1f}%)")
 
             # Persist this result to the crash-safe progress journal immediately
             self._append_to_journal(result, self.state.sentences[actual_idx])
