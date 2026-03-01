@@ -143,7 +143,7 @@ class AssemblyService(QObject):
             raw_combined_path = temp_dir / "raw_combined_audio.wav"
             (
                 ffmpeg.input(str(concat_list_path), format='concat', safe=0, protocol_whitelist='file,pipe')
-                .output(str(raw_combined_path), acodec='pcm_s16le', ar=S3GEN_SR)
+                .output(str(raw_combined_path), acodec='pcm_s16le')
                 .overwrite_output()
                 .run(quiet=False, capture_stderr=True)
             )
@@ -210,7 +210,7 @@ class AssemblyService(QObject):
                     (
                         ffmpeg.input(str(path_to_process))
                         .filter('loudnorm', I=target_i, TP=EBU_R128_TRUE_PEAK_MAX, LRA=EBU_R128_LOUDNESS_RANGE)
-                        .output(str(norm_out), ar=DEFAULT_SAMPLE_RATE)
+                        .output(str(norm_out))
                         .overwrite_output()
                         .run(quiet=False, capture_stderr=True)
                     )
