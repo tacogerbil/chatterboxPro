@@ -114,7 +114,7 @@ class AssemblyService(QObject):
                     if s_data.get("is_pause"):
                         pause_duration_ms = s_data.get("duration", 1000)
                         pause_file = temp_dir / f"pause_{s_data.get('uuid', 'unknown')}.wav"
-                        AudioSegment.silent(duration=int(pause_duration_ms)).export(pause_file, format="wav")
+                        AudioSegment.silent(duration=int(pause_duration_ms), frame_rate=S3GEN_SR).export(pause_file, format="wav")
                         f.write(f"file '{pause_file.absolute()}'\n")
                         continue
 
@@ -122,7 +122,7 @@ class AssemblyService(QObject):
                     if len(app.sentences) > 1: 
                          pause_duration = app.settings.silence_duration
                          silence_file = temp_dir / f"silence_{s_data.get('uuid', 'unknown')}.wav"
-                         AudioSegment.silent(duration=pause_duration).export(silence_file, format="wav")
+                         AudioSegment.silent(duration=pause_duration, frame_rate=S3GEN_SR).export(silence_file, format="wav")
                          f.write(f"file '{silence_file.absolute()}'\n")
 
                     # Main Audio
@@ -202,13 +202,14 @@ class AssemblyService(QObject):
                 norm_out = temp_dir / f"normalized_{unique_id}.wav"
                 
                 try:
-                    from core.constants import EBU_R128_TRUE_PEAK_MAX, EBU_R128_LOUDNESS_RANGE, DEFAULT_SAMPLE_RATE
+                    from core.constants import EBU_R128_TRUE_PEAK_MAX, EBU_R128_LOUDNESS_RANGE
                     
-                    target_i = app.settings.norm_level
+                    target_i = float(app.settings.norm_level)
+                    target_i = max(-70.0, min(-5.0, target_i))
                     
                     (
                         ffmpeg.input(str(path_to_process))
-                        .filter('loudnorm', I=target_i, TP=EBU_R128_TRUE_PEAK_MAX, LRA=EBU_R128_LOUDNESS_RANGE)
+                        .filter('loudnorm', I=f"{target_i:.1f}", TP=EBU_R128_TRUE_PEAK_MAX, LRA=EBU_R128_LOUDNESS_RANGE)
                         .output(str(norm_out))
                         .overwrite_output()
                         .run(quiet=False, capture_stderr=True)
