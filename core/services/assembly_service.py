@@ -126,11 +126,13 @@ class AssemblyService(QObject):
                          f.write(f"file '{silence_file.absolute()}'\n")
 
                     # Main Audio
-                    f_path = session_path / "Sentence_wavs" / f"audio_{s_data.get('uuid', 'unknown')}.wav"
+                    saved_path = s_data.get('audio_path')
+                    f_path = Path(saved_path) if saved_path else session_path / "Sentence_wavs" / f"audio_{s_data.get('uuid', 'unknown')}.wav"
+                    
                     if f_path.exists():
                         f.write(f"file '{f_path.absolute()}'\n")
                     else:
-                        logging.warning(f"Audio for {s_data.get('uuid', 'unknown')} not found.")
+                        logging.warning(f"Audio for {s_data.get('uuid', 'unknown')} not found at {f_path}.")
             
             # Check file count
             with open(concat_list_path, 'r') as f:
@@ -282,9 +284,10 @@ class AssemblyService(QObject):
             chapters.append(all_items_in_order)
         else:
             for item in all_items_in_order:
-                if item.get("is_chapter_heading") and current_chapter_items:
-                    chapters.append(current_chapter_items)
-                    current_chapter_items = [item]
+                if item.get("is_chapter_heading"):
+                    if current_chapter_items:
+                        chapters.append(current_chapter_items)
+                    current_chapter_items = [item]  # Start new chapter with the heading ITSELF
                 else:
                     current_chapter_items.append(item)
             if current_chapter_items:
