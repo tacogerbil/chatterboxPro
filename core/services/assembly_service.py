@@ -61,16 +61,21 @@ class AssemblyService(QObject):
         
         return True, ""
 
-    def assemble_audiobook(self, output_path_str: str, is_for_acx=False, metadata=None):
+    def assemble_audiobook(self, output_path_str: str, is_for_acx=False, metadata=None, quiet=False):
         if not output_path_str: 
             return
             
-        self.assembly_started.emit()
+        if not quiet:
+            self.assembly_started.emit()
+            
         app = self.state # Alias for easier porting
         
         is_valid, error_msg = self._validate_settings()
         if not is_valid:
-            self.assembly_error.emit(f"Invalid settings: {error_msg}")
+            if not quiet:
+                self.assembly_error.emit(f"Invalid settings: {error_msg}")
+            else:
+                logging.error(f"Assembly Error (Quiet): Invalid settings: {error_msg}")
             return
         
         # Metadata override if provided
@@ -81,14 +86,14 @@ class AssemblyService(QObject):
 
         session_name = app.session_name
         if not session_name:
-            self.assembly_error.emit("No active session.")
+            if not quiet: self.assembly_error.emit("No active session.")
             return
 
         session_path = Path("Outputs_Pro") / session_name 
         
         all_items_in_order = sorted(app.sentences, key=lambda s: int(s['sentence_number']))
         if not all_items_in_order:
-             self.assembly_error.emit("No text chunks to assemble.")
+             if not quiet: self.assembly_error.emit("No text chunks to assemble.")
              return
 
         output_path = Path(output_path_str)
@@ -96,7 +101,7 @@ class AssemblyService(QObject):
         try:
             temp_dir.resolve().mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            self.assembly_error.emit(f"Failed to create temp dir: {e}")
+            if not quiet: self.assembly_error.emit(f"Failed to create temp dir: {e}")
             return
 
         try:
@@ -119,12 +124,6 @@ class AssemblyService(QObject):
                          silence_file = temp_dir / f"silence_{s_data.get('uuid', 'unknown')}.wav"
                          AudioSegment.silent(duration=pause_duration).export(silence_file, format="wav")
                          f.write(f"file '{silence_file.absolute()}'\n")
-
-                    # Chapter Heading Silence (Pre) - REMOVED per user request (handled by Auto-Pause)
-                    # if s_data.get("is_chapter_heading"):
-                    #    chapter_silence = temp_dir / f"chapter_pre_{s_data['uuid']}.wav"
-                    #    AudioSegment.silent(duration=1500).export(chapter_silence, format="wav")
-                    #    f.write(f"file '{chapter_silence.absolute()}'\n")
 
                     # Main Audio
                     f_path = session_path / "Sentence_wavs" / f"audio_{s_data.get('uuid', 'unknown')}.wav"
@@ -183,17 +182,17 @@ class AssemblyService(QObject):
                     else:
                         error_msg = "Auto-Editor finished but output file missing"
                         logging.warning(error_msg)
-                        self.assembly_error.emit(f"Warning: {error_msg}. Using original audio.")
+                        if not quiet: self.assembly_error.emit(f"Warning: {error_msg}. Using original audio.")
                         
                 except subprocess.CalledProcessError as e:
                     error_msg = f"Auto-Editor failed: {e.stderr if e.stderr else str(e)}"
                     logging.error(error_msg)
-                    self.assembly_error.emit(f"Silence removal failed: {error_msg}")
+                    if not quiet: self.assembly_error.emit(f"Silence removal failed: {error_msg}")
                     # Continue with original file
                 except FileNotFoundError:
                     error_msg = "auto-editor not found. Please install it: pip install auto-editor"
                     logging.error(error_msg)
-                    self.assembly_error.emit(error_msg)
+                    if not quiet: self.assembly_error.emit(error_msg)
             
             # 2. Normalization (EBU R128 / Loudnorm)
             if app.settings.norm_enabled:
@@ -221,12 +220,12 @@ class AssemblyService(QObject):
                     else:
                         error_msg = "Normalization output file missing"
                         logging.warning(error_msg)
-                        self.assembly_error.emit(f"Warning: {error_msg}. Using previous audio.")
+                        if not quiet: self.assembly_error.emit(f"Warning: {error_msg}. Using previous audio.")
                         
                 except ffmpeg.Error as e:
                     error_msg = f"Normalization failed: {e.stderr.decode() if e.stderr else str(e)}"
                     logging.error(error_msg)
-                    self.assembly_error.emit(error_msg)
+                    if not quiet: self.assembly_error.emit(error_msg)
             
             # Export Final
             logging.info(f"Step 4: Final Export to {output_path}...")
@@ -255,11 +254,12 @@ class AssemblyService(QObject):
                     else:
                         AudioSegment.from_wav(path_to_process).export(output_path, format=file_format)
 
-            self.assembly_finished.emit(str(output_path))
+            if not quiet:
+                self.assembly_finished.emit(str(output_path))
             
         except Exception as e:
             logging.error(f"Assembly failed: {e}", exc_info=True)
-            self.assembly_error.emit(str(e))
+            if not quiet: self.assembly_error.emit(str(e))
         finally:
             if temp_dir.exists():
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -301,7 +301,7 @@ class AssemblyService(QObject):
                 final_chapter_path = output_dir / f"{i+1:02d}_{chapter_filename_base}.mp3"
                 
                 app.sentences = chapter_items
-                self.assemble_audiobook(str(final_chapter_path), is_for_acx=True)
+                self.assemble_audiobook(str(final_chapter_path), is_for_acx=True, quiet=True)
                 exported_count += 1
              
              self.assembly_finished.emit(f"Exported {exported_count} chapters to {output_dir}")

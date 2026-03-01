@@ -158,12 +158,14 @@ class FinalizeView(QWidget):
         self.btn_assemble.setEnabled(True)
         self.btn_assemble.setText("Assemble Single File")
         self.btn_export.setEnabled(True)
+        self.btn_export.setText("Export by Chapter")
 
     def _on_error(self, msg):
         QMessageBox.critical(self, "Error", msg)
         self.btn_assemble.setEnabled(True)
         self.btn_assemble.setText("Assemble Single File")
         self.btn_export.setEnabled(True)
+        self.btn_export.setText("Export by Chapter")
 
     def assemble(self, output_path: str = None):
         if not hasattr(self, 'assembly_service'): return
